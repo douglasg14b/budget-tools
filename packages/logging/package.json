@@ -1,0 +1,19 @@
+{
+    "name": "@budget-tools/logging",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "scripts": {
+        "build": "tsc",
+        "lint:check": "eslint .",
+        "lint:fix": "eslint --fix ."
+    },
+    "dependencies": {
+        "kleur": "^4.1.5"
+    },
+    "devDependencies": {
+        "@budget-tools/eslint-config": "workspace:*"
+    }
+}

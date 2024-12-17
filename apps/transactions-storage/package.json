@@ -5,12 +5,14 @@
     "type": "module",
     "main": "./src/main.ts",
     "scripts": {
-        "run": "dotenvx run --env-file=.env.development -- npx tsx",
+        "run:prod": "tsx ./src/main.ts",
+        "run:dev": "dotenvx run --env-file=.env -- npx tsx",
         "build": "tsc",
         "lint:check": "eslint .",
         "lint:fix": "eslint --fix ."
     },
     "dependencies": {
+        "@budget-tools/logging": "workspace:*",
         "@dotenvx/dotenvx": "^1.31.0",
         "csv-parse": "^5.6.0",
         "pg": "^8.13.1",

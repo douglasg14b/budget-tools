@@ -1,3 +1,4 @@
+import { logInfo, logSection, logSubSection } from '@budget-tools/logging';
 import type * as ynab from 'ynab';
 
 import type { NewTransaction, SubTransactionSchema, Transaction } from './data';
@@ -6,17 +7,23 @@ import { chunkArray } from './utils';
 import type { YnabTransaction } from './ynab';
 import { ynabService } from './ynab';
 
+logSection('Starting Transactions Retrieval');
+
+logSubSection('Pulling transactions from YNAB');
+
 const ynabDelta = await trackingRepository.getYnabLastServerKnowledge();
 const { transactions, serverKnowledge } = await ynabService.getTransactions(ynabDelta || undefined);
 
-console.log(`Got ${transactions.length} transactions from YNAB`);
+logInfo(`Got ${transactions.length} transactions from YNAB`);
 
 // Transactions we need to delete if we track them
 const deletedTransactions = transactions.filter((transaction) => transaction.deleted);
 const newOrUpdatedTransactions = transactions.filter((transaction) => !transaction.deleted);
 
-console.log(`Deleting ${deletedTransactions.length} transactions`);
-console.log(`Upserting ${newOrUpdatedTransactions.length} transactions`);
+logInfo(`Deleting ${deletedTransactions.length} transactions`);
+logInfo(`Upserting ${newOrUpdatedTransactions.length} transactions`);
+
+logSubSection('Processing Transactions');
 
 for (const transaction of deletedTransactions) {
     await transactionsRepository.deleteTransaction(transaction.id);
@@ -47,8 +54,12 @@ for (const chunk of chunks) {
     }
 }
 
+logSubSection('Finished processing transactions. Cleaning up.');
+
 await trackingRepository.setLastServerKnowledge(serverKnowledge);
 await trackingRepository.setLastPulledAt(new Date());
+
+logSubSection('DONE');
 
 // We effectively just replace the entity values here
 function createOrUpdateEntity(
