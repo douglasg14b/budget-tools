@@ -6,7 +6,9 @@
     "author": "",
     "license": "ISC",
     "scripts": {
-        "pull-transactions": "cd apps/transactions-storage && pnpm run:prod"
+        "pull-transactions": "cd apps/transactions-retrieval && pnpm run:prod",
+        "start:dev:docker": "docker compose --env-file .env.compose.dev build --parallel && docker compose --env-file .env.compose.dev up -d",
+        "stop:dev:docker": "docker-compose --env-file .env.compose.dev down --volumes"
     },
     "dependencies": {
         "dayjs": "^1.11.13",

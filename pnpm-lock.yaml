@@ -61,7 +61,7 @@ importers:
         specifier: ^7.5.0
         version: 7.5.0
 
-  apps/transactions-storage:
+  apps/transactions-retrieval:
     dependencies:
       '@budget-tools/logging':
         specifier: workspace:*

@@ -1,0 +1,42 @@
+# Dependency directories
+node_modules
+**/node_modules
+jspm_packages
+
+# Build output directory
+dist
+**/dist
+
+# Docs
+*.md
+
+# Version control
+.git
+.gitignore
+
+# Environment files
+.env
+*.env.local
+
+# IDE and editor directories
+.idea
+.vscode
+*.swp
+*.swo
+*.sublime-workspace
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Other files and directories to ignore
+coverage/
+tmp/
+.husky
+.github
+**/.*.tar
