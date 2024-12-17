@@ -1,0 +1,27 @@
+{
+    "name": "@budget-tools/transaction-cleaner",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "main": "./src/main.ts",
+    "scripts": {
+        "run": "dotenvx run --env-file=.env.development -- npx tsx",
+        "build": "tsc",
+        "lint:check": "eslint .",
+        "lint:fix": "eslint --fix ."
+    },
+    "dependencies": {
+        "@dotenvx/dotenvx": "^1.31.0",
+        "csv-parse": "^5.6.0",
+        "pg": "^8.13.1",
+        "env-var": "^7.5.0"
+    },
+    "devDependencies": {
+        "@budget-tools/eslint-config": "workspace:*",
+        "@types/pg": "^8.11.10",
+        "dotenv": "^16.4.7"
+    },
+    "_moduleAliases": {
+        "@": "src"
+    }
+}

@@ -1,0 +1,3 @@
+{
+    "extends": "@budget-tools/config-typescript/node.json"
+}

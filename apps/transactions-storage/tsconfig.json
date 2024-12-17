@@ -1,0 +1,12 @@
+{
+    "extends": "@budget-tools/config-typescript/node.json",
+    "include": ["src/**/*.ts", "./**/*.ts", "./**/*.test.ts"],
+    "compilerOptions": {
+        "rootDir": ".",
+        "baseUrl": "./",
+        "esModuleInterop": true,
+        "paths": {
+            "@/*": ["src/*"]
+        }
+    }
+}
