@@ -1,16 +1,10 @@
 name: budget-tools-dev-environment
 services:
-    transactions-retrieval-service:
-        container_name: transactions-retrieval-service
-        env_file: './apps/transactions-retrieval/.env.${ENV_NAME}'
+    transactions-retrieval:
+        container_name: transactions-retrieval
+        env_file: './apps/transactions-retrieval/.env.dev'
         environment:
-            YNAB_API_KEY: ${YNAB_API_KEY}
-            YNAB_BUDGET_NAME: ${YNAB_BUDGET_NAME}
-            DB_USER: ${DB_USER}
-            DB_PASSWORD: ${DB_PASSWORD}
-            DB_NAME: ${DB_NAME}
-            DB_HOST: ${DB_HOST}
-            DB_PORT: ${DB_PORT}
+            DB_CONNECTION_STRING: ${DB_CONNECTION_STRING}
         build:
             context: .
             dockerfile: ./apps/transactions-retrieval/Dockerfile
@@ -19,8 +13,7 @@ services:
         depends_on:
             postgres:
                 condition: service_healthy
-    transactions-retrieval-data:
-        container_name: transactions-retrieval-data
+    postgres:
         hostname: postgres
         shm_size: 512MB
         image: postgres:16
@@ -31,14 +24,14 @@ services:
             - ./init/docker_postgres_init.sql:/docker-entrypoint-initdb.d/docker_postgres_init.sql
         environment:
             DATABASE_HOST: 127.0.0.1
-            POSTGRES_USER: ${DB_USER}
-            POSTGRES_PASSWORD: ${DB_PASSWORD}
-            POSTGRES_DB: ${DB_NAME}
+            POSTGRES_USER: budget_tools_user
+            POSTGRES_PASSWORD: password
+            POSTGRES_DB: budget_tools
             PGDATA: /data/postgres
         healthcheck:
             test:
                 - CMD-SHELL
-                - 'pg_isready -U ${DB_USER} -d ${DB_NAME}'
+                - 'pg_isready -U budget_tools_user -d budget_tools'
             interval: 10s
             timeout: 5s
             retries: 5

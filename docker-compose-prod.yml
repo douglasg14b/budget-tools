@@ -1,0 +1,16 @@
+name: budget-tools
+services:
+    transactions-retrieval:
+        container_name: transactions-retrieval
+        environment:
+            YNAB_API_KEY: ${YNAB_API_KEY}
+            YNAB_BUDGET_NAME: ${YNAB_BUDGET_NAME}
+            DB_CONNECTION_STRING: ${DB_CONNECTION_STRING}
+        build:
+            context: .
+            dockerfile: ./apps/transactions-retrieval/Dockerfile
+        volumes:
+            - .:/app
+        depends_on:
+            postgres:
+                condition: service_healthy

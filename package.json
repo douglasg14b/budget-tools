@@ -7,9 +7,9 @@
     "license": "ISC",
     "scripts": {
         "pull-transactions": "cd apps/transactions-retrieval && pnpm run:prod",
-        "start:dev:docker": "docker compose --env-file .env.compose.dev build --no-cache --parallel && docker compose --env-file .env.compose.dev up -d",
-        "stop:dev:docker": "docker-compose --env-file .env.compose.dev down --volumes",
-        "destroy:dev:docker": "docker-compose --env-file .env.compose.dev down --rmi all"
+        "start:dev:docker": "docker compose -f docker-compose-dev.yml --env-file .env.compose.dev build --no-cache --parallel && docker compose -f docker-compose-dev.yml --env-file .env.compose.dev up -d",
+        "stop:dev:docker": "docker-compose -f docker-compose-dev.yml --env-file .env.compose.dev down --volumes",
+        "destroy:dev:docker": "docker-compose -f docker-compose-dev.yml --env-file .env.compose.dev down --rmi all"
     },
     "dependencies": {
         "dayjs": "^1.11.13",
