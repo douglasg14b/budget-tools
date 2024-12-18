@@ -112,14 +112,23 @@ function createSubtransactions(subtransactions: ynab.SubTransaction[]): SubTrans
 }
 
 function createTransactionMetaData(ynabTransaction: YnabTransaction, tracked: Transaction | null | undefined) {
-    const now = new Date().toISOString();
+    let now = new Date().toISOString();
     const cleared = ynabTransaction.cleared === 'cleared' || ynabTransaction.cleared === 'reconciled';
     const approved = ynabTransaction.approved;
+    const categorized = !!ynabTransaction.category_id;
+
+    // If this is the first time we've seen this transaction, and it's already cleared, approved, and categorized.
+    // We'll assume that was done the date of teh transaction since we don't have a better date.
+    const newAndCompleted = !tracked && cleared && approved && categorized;
+    if (newAndCompleted) {
+        now = ynabTransaction.date.toISOString();
+    }
 
     const meta = tracked?.meta || {
         first_seen_date: now,
         first_cleared_date: cleared ? now : null,
         first_approved_date: approved ? now : null,
+        first_categorized_date: approved ? now : null,
     };
 
     if (tracked) {
@@ -129,6 +138,10 @@ function createTransactionMetaData(ynabTransaction: YnabTransaction, tracked: Tr
 
         if (!meta.first_cleared_date && cleared) {
             meta.first_cleared_date = now;
+        }
+
+        if (!meta.first_categorized_date && categorized) {
+            meta.first_categorized_date = now;
         }
 
         if (!meta.first_seen_date) {

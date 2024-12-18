@@ -45,6 +45,7 @@ type TransactionMeta = {
     first_seen_date: string;
     first_cleared_date: string | null;
     first_approved_date: string | null;
+    first_categorized_date: string | null;
 };
 
 export type YnabTransactionTable = {
