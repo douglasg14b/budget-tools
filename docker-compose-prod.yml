@@ -9,5 +9,3 @@ services:
         build:
             context: .
             dockerfile: ./apps/transactions-retrieval/Dockerfile
-        volumes:
-            - .:/app
