@@ -1,4 +1,5 @@
 import { logInfo, logSection, logSubSection } from '@budget-tools/logging';
+import dayjs from 'dayjs';
 import type * as ynab from 'ynab';
 
 import type { NewTransaction, SubTransactionSchema, Transaction } from './data';
@@ -7,7 +8,7 @@ import { chunkArray } from './utils';
 import type { YnabTransaction } from './ynab';
 import { ynabService } from './ynab';
 
-const VERSION = '1.2';
+const VERSION = '1.3';
 
 logSection(`Starting Transactions Retrieval v${VERSION}`);
 
@@ -114,23 +115,33 @@ function createSubtransactions(subtransactions: ynab.SubTransaction[]): SubTrans
 }
 
 function createTransactionMetaData(ynabTransaction: YnabTransaction, tracked: Transaction | null | undefined) {
-    let now = new Date().toISOString();
+    function getApplicableDateTime() {
+        const transactionDate = dayjs(ynabTransaction.date)
+            .set('hour', 0)
+            .set('minute', 0)
+            .set('second', 0)
+            .set('millisecond', 0);
+        const todayDate = dayjs().set('hour', 0).set('minute', 0).set('second', 0).set('millisecond', 0);
+
+        // If transaction is before today, use the transaction date
+        if (transactionDate.isBefore(todayDate)) {
+            return ynabTransaction.date.toISOString();
+        }
+
+        return new Date().toISOString();
+    }
+
+    // Use the oldest date available to us
+    const now = getApplicableDateTime();
     const cleared = ynabTransaction.cleared === 'cleared' || ynabTransaction.cleared === 'reconciled';
     const approved = ynabTransaction.approved;
     const categorized = !!ynabTransaction.category_id;
-
-    // If this is the first time we've seen this transaction, and it's already cleared, approved, and categorized.
-    // We'll assume that was done the date of teh transaction since we don't have a better date.
-    const newAndCompleted = !tracked && cleared && approved && categorized;
-    if (newAndCompleted) {
-        now = ynabTransaction.date.toISOString();
-    }
 
     const meta = tracked?.meta || {
         first_seen_date: now,
         first_cleared_date: cleared ? now : null,
         first_approved_date: approved ? now : null,
-        first_categorized_date: approved ? now : null,
+        first_categorized_date: categorized ? now : null,
     };
 
     if (tracked) {
