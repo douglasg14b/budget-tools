@@ -19,7 +19,7 @@ services:
         depends_on:
             postgres:
                 condition: service_healthy
-    postgres:
+    transactions-retrieval-data:
         container_name: transactions-retrieval-data
         hostname: postgres
         shm_size: 512MB
