@@ -20,6 +20,7 @@ services:
             postgres:
                 condition: service_healthy
     postgres:
+        container_name: transactions-retrieval-data
         hostname: postgres
         shm_size: 512MB
         image: postgres:16
