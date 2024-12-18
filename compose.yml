@@ -3,6 +3,14 @@ services:
     transactions-retrieval:
         container_name: transactions-retrieval
         env_file: './apps/transactions-retrieval/.env.${ENV_NAME}'
+        environment:
+            YNAB_API_KEY: ${YNAB_API_KEY}
+            YNAB_BUDGET_NAME: ${YNAB_BUDGET_NAME}
+            DB_USER: ${DB_USER}
+            DB_PASSWORD: ${DB_PASSWORD}
+            DB_NAME: ${DB_NAME}
+            DB_HOST: ${DB_HOST}
+            DB_PORT: ${DB_PORT}
         build:
             context: .
             dockerfile: ./apps/transactions-retrieval/Dockerfile
