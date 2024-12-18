@@ -1,7 +1,7 @@
 name: budget-tools-dev-environment
 services:
-    transactions-retrieval:
-        container_name: transactions-retrieval
+    transactions-retrieval-service:
+        container_name: transactions-retrieval-service
         env_file: './apps/transactions-retrieval/.env.${ENV_NAME}'
         environment:
             YNAB_API_KEY: ${YNAB_API_KEY}
