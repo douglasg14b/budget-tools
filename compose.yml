@@ -16,7 +16,6 @@ services:
             dockerfile: ./apps/transactions-retrieval/Dockerfile
         volumes:
             - .:/app
-            - /app/node_modules
         depends_on:
             postgres:
                 condition: service_healthy
