@@ -7,7 +7,7 @@ import { chunkArray } from './utils';
 import type { YnabTransaction } from './ynab';
 import { ynabService } from './ynab';
 
-const VERSION = '1.1';
+const VERSION = '1.2';
 
 logSection(`Starting Transactions Retrieval v${VERSION}`);
 
