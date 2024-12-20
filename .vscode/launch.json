@@ -27,12 +27,12 @@
             ]
         },
         {
-            "name": "app/transactions-storage",
+            "name": "app/transactions-retrieval",
             "type": "node",
             "request": "launch",
-            "program": "${fileWorkspaceFolder}/apps/transactions-storage/src/main.ts",
+            "program": "${fileWorkspaceFolder}/apps/transactions-retrieval/src/main.ts",
             "runtimeExecutable": "tsx",
-            "envFile": "${workspaceFolder}/apps/transactions-storage/.env.development",
+            "envFile": "${workspaceFolder}/apps/transactions-retrieval/.env.dev",
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen",
             "skipFiles": [

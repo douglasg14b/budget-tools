@@ -4,6 +4,8 @@ import type { TransactionClearedStatus, TransactionDetailDebtTransactionTypeEnum
 export interface Database {
     tracking: StateTrackingTable;
     transactions: YnabTransactionTable;
+    category_groups: CategoryGroupTable;
+    categories: CategoryTable;
 }
 
 type CachedBudgetValue = {
@@ -79,3 +81,27 @@ export type YnabTransactionTable = {
 export type Transaction = Selectable<YnabTransactionTable>;
 export type NewTransaction = Insertable<YnabTransactionTable>;
 export type TransactionUpdate = Updateable<YnabTransactionTable>;
+
+export type CategoryGroupTable = {
+    id: string;
+    name: string;
+    hidden: boolean;
+    deleted: boolean;
+};
+
+export type CategoryTable = {
+    id: string;
+    category_group_id: string;
+    name: string;
+    hidden: boolean;
+    deleted: boolean;
+    note: string | null;
+};
+
+export type CategoryGroup = Selectable<CategoryGroupTable>;
+export type NewCategoryGroup = Insertable<CategoryGroupTable>;
+export type CategoryGroupUpdate = Updateable<CategoryGroupTable>;
+
+export type Category = Selectable<CategoryTable>;
+export type NewCategory = Insertable<CategoryTable>;
+export type CategoryUpdate = Updateable<CategoryTable>;

@@ -1,5 +1,6 @@
-import { YNAB_API_KEY, YNAB_BUDGET_NAME } from '../environment';
 import * as ynab from 'ynab';
+
+import { YNAB_API_KEY, YNAB_BUDGET_NAME } from '../environment';
 
 export type YnabTransaction = Omit<ynab.TransactionDetail, 'date'> & { date: Date };
 
@@ -47,6 +48,16 @@ export class YnabService {
         this._cachedBudget = budget;
 
         return budget;
+    }
+
+    public async getCategories() {
+        const budget = await this.getBudget();
+        const response = await this.client.categories.getCategories(budget.id);
+
+        return {
+            categoryGroups: response.data.category_groups,
+            serverKnowledge: response.data.server_knowledge,
+        };
     }
 }
 

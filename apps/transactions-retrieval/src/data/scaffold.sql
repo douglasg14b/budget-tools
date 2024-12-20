@@ -1,28 +1,33 @@
+DO $$
+BEGIN
+    -- Create user if it doesn't exist
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'budget_tools_user') THEN
+        CREATE USER budget_tools_user WITH PASSWORD '123456';
+    END IF;
+END
+$$;
 
-CREATE DATABASE budget_tools;
-CREATE USER budget_tools_user WITH PASSWORD '123456';
-ALTER DATABASE budget_tools OWNER TO budget_tools_user;
+-- Grant privileges if not already granted
 GRANT ALL PRIVILEGES ON DATABASE budget_tools TO budget_tools_user;
 
-\c budget_tools -- Connect to the budget_tools database
+\c budget_tools
 
+-- Grant privileges
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO budget_tools_user;
--- Grant usage and update privileges on all sequences
 GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO budget_tools_user;
 
--- Step 6: Ensure future tables automatically grant privileges to the user
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO budget_tools_user;
 
-
-CREATE TABLE tracking (
+-- Create tables if they don't exist
+CREATE TABLE IF NOT EXISTS tracking (
     id SERIAL PRIMARY KEY,
     last_pulled_date TIMESTAMPTZ,
     last_server_knowledge NUMERIC,
     cache_budget JSONB
 );
 
-CREATE TABLE transactions (
+CREATE TABLE IF NOT EXISTS transactions (
     id TEXT NOT NULL,
     date DATE NOT NULL,
     amount INTEGER NOT NULL,
@@ -50,7 +55,40 @@ CREATE TABLE transactions (
     PRIMARY KEY (id)
 );
 
--- Create indexes
-CREATE INDEX idx_ynab_date ON transactions (date);
-CREATE INDEX idx_ynab_cleared ON transactions (cleared);
-CREATE INDEX idx_ynab_approved ON transactions (approved);
+CREATE TABLE IF NOT EXISTS category_groups (
+    id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    hidden BOOLEAN NOT NULL,
+    deleted BOOLEAN NOT NULL,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS categories (
+    id TEXT NOT NULL,
+    category_group_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    hidden BOOLEAN NOT NULL,
+    deleted BOOLEAN NOT NULL,
+    note TEXT,
+    PRIMARY KEY (id),
+    FOREIGN KEY (category_group_id) REFERENCES category_groups(id)
+);
+
+-- Create indexes for transactions
+CREATE INDEX IF NOT EXISTS idx_ynab_date ON transactions (date);
+CREATE INDEX IF NOT EXISTS idx_ynab_cleared ON transactions (cleared);
+CREATE INDEX IF NOT EXISTS idx_ynab_approved ON transactions (approved);
+CREATE INDEX IF NOT EXISTS idx_transaction_account_name ON transactions (account_name);
+CREATE INDEX IF NOT EXISTS idx_transaction_payee_name ON transactions (payee_name);
+CREATE INDEX IF NOT EXISTS idx_transaction_category_name ON transactions (category_name);
+
+-- Create indexes for categories
+CREATE INDEX IF NOT EXISTS idx_category_group_id ON categories (category_group_id);
+CREATE INDEX IF NOT EXISTS idx_category_hidden ON categories (hidden);
+CREATE INDEX IF NOT EXISTS idx_category_deleted ON categories (deleted);
+CREATE INDEX IF NOT EXISTS idx_category_name ON categories (name);
+
+-- Create indexes for category groups
+CREATE INDEX IF NOT EXISTS idx_category_group_hidden ON category_groups (hidden);
+CREATE INDEX IF NOT EXISTS idx_category_group_deleted ON category_groups (deleted);
+CREATE INDEX IF NOT EXISTS idx_category_group_name ON category_groups (name);
