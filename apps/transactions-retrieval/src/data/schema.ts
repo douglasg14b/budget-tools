@@ -17,7 +17,7 @@ export type MetricTableMeta = {
 export type MetricsTable = {
     id: Generated<number>;
     date: ColumnType<Date, string>;
-    name: 'unapproved' | 'uncategorized';
+    name: 'unapproved' | 'approved' | 'uncategorized' | 'categorized';
     value: number;
     meta: JSONColumnType<MetricTableMeta, MetricTableMeta, MetricTableMeta>;
 };
