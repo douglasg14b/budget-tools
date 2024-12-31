@@ -74,6 +74,20 @@ CREATE TABLE IF NOT EXISTS categories (
     FOREIGN KEY (category_group_id) REFERENCES category_groups(id)
 );
 
+CREATE TABLE IF NOT EXISTS metrics (
+    id SERIAL PRIMARY KEY,
+    date TIMESTAMPTZ NOT NULL,
+    name TEXT NOT NULL,
+    value NUMERIC NOT NULL,
+    meta JSONB NOT NULL
+);
+
+-- Create indexes for metrics
+CREATE INDEX IF NOT EXISTS idx_metrics_date ON metrics (date);
+CREATE INDEX IF NOT EXISTS idx_metrics_name ON metrics (name);
+CREATE INDEX IF NOT EXISTS idx_metrics_meta_account_id ON metrics USING GIN ((meta->'account_id'));
+CREATE INDEX IF NOT EXISTS idx_metrics_meta_account_name ON metrics USING GIN ((meta->'account_name'));
+
 -- Create indexes for transactions
 CREATE INDEX IF NOT EXISTS idx_ynab_date ON transactions (date);
 CREATE INDEX IF NOT EXISTS idx_ynab_cleared ON transactions (cleared);

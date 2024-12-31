@@ -6,7 +6,24 @@ export interface Database {
     transactions: YnabTransactionTable;
     category_groups: CategoryGroupTable;
     categories: CategoryTable;
+    metrics: MetricsTable;
 }
+
+export type MetricTableMeta = {
+    account_id: string | null;
+    account_name: string;
+};
+
+export type MetricsTable = {
+    id: Generated<number>;
+    date: ColumnType<Date, string>;
+    name: 'unapproved' | 'uncategorized';
+    value: number;
+    meta: JSONColumnType<MetricTableMeta, MetricTableMeta, MetricTableMeta>;
+};
+
+export type Metric = Selectable<MetricsTable>;
+export type NewMetric = Insertable<MetricsTable>;
 
 type CachedBudgetValue = {
     id: string;

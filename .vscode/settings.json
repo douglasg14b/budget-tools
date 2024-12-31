@@ -20,5 +20,5 @@
     "material-icon-theme.folders.associations": {
         "typescript-config": "typescript"
     },
-    "cSpell.words": ["dotenvx", "Insertable", "Kysely", "subtransactions", "Updateable", "YNAB"]
+    "cSpell.words": ["dotenvx", "Insertable", "Kysely", "subtransactions", "uncategorized", "Updateable", "YNAB"]
 }
