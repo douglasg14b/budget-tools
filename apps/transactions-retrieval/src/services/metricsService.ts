@@ -12,10 +12,11 @@ export class MetricsService {
     public async generateMetrics() {
         const unapproved = await this.getUnapprovedByAccount();
         const uncategorized = await this.getUncategorizedByAccount();
+        const date = new Date().toISOString();
 
         for (const { account_name, count } of unapproved) {
             await this.repo.insertMetric({
-                date: new Date().toISOString(),
+                date,
                 name: 'unapproved',
                 value: Number(count),
                 meta: { account_id: null, account_name },
@@ -24,7 +25,7 @@ export class MetricsService {
 
         for (const { account_name, count } of uncategorized) {
             await this.repo.insertMetric({
-                date: new Date().toISOString(),
+                date,
                 name: 'uncategorized',
                 value: Number(count),
                 meta: { account_id: null, account_name },
@@ -44,8 +45,8 @@ export class MetricsService {
     private async getUncategorizedByAccount() {
         return await database
             .selectFrom('transactions')
-            .where('transfer_account_id', '=', null)
-            .where('category_id', '=', null)
+            .where('transfer_account_id', 'is', null)
+            .where('category_id', 'is', null)
             .groupBy('account_name')
             .select([database.fn.countAll().as('count'), 'account_name'])
             .execute();
