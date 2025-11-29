@@ -1,6 +1,17 @@
-import { database, DatabaseClient, NewTransaction, Transaction, TransactionUpdate } from '../data';
+import type { DatabaseClient, NewTransaction, Transaction, TransactionUpdate } from '../data';
+import { database } from '../data';
 
-export class TransactionsRepository {
+export interface ITransactionsRepository {
+    getTransactions(): Promise<Transaction[]>;
+    getTransaction(transactionId: string): Promise<Transaction | undefined>;
+    deleteTransaction(transactionId: string): Promise<unknown>;
+    upsertTransaction(transaction: Transaction | NewTransaction): Promise<unknown>;
+    insertTransaction(transaction: NewTransaction): Promise<unknown>;
+    updateTransaction(transaction: Transaction): Promise<unknown>;
+    transactionTracked(transactionId: string): Promise<boolean>;
+}
+
+export class TransactionsRepository implements ITransactionsRepository {
     private dbClient: DatabaseClient;
 
     constructor(dbClient: DatabaseClient) {
@@ -33,7 +44,6 @@ export class TransactionsRepository {
                 return this.insertTransaction(transaction as NewTransaction);
             }
         } catch (err) {
-            debugger;
             console.error(`Error upserting transaction ${transaction.id}`, err);
             console.error(JSON.stringify(transaction, null, 2));
             throw err;
@@ -47,7 +57,6 @@ export class TransactionsRepository {
             }
             return await this.dbClient.insertInto('transactions').values(transaction).execute();
         } catch (err) {
-            debugger;
             console.error(`Error inserting transaction ${transaction.id}`, err);
             console.error(JSON.stringify(transaction, null, 2));
             throw err;
@@ -66,7 +75,6 @@ export class TransactionsRepository {
                 .where('id', '=', transaction.id)
                 .execute();
         } catch (err) {
-            debugger;
             console.error(`Error inserting transaction ${transaction.id}`, err);
             console.error(JSON.stringify(transaction, null, 2));
             throw err;

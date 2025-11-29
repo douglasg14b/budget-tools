@@ -2,7 +2,7 @@ import { logInfo } from '@budget-tools/logging';
 import dayjs from 'dayjs';
 import type * as ynab from 'ynab';
 
-import type { NewTransaction, SubTransactionSchema, Transaction } from '../data';
+import { database, type NewTransaction, type SubTransactionSchema, type Transaction } from '../data';
 import type { TrackingRepository, TransactionsRepository } from '../repositories';
 import { trackingRepository, transactionsRepository } from '../repositories';
 import { chunkArray } from '../utils';
@@ -21,10 +21,50 @@ export class YnabTransactionsService {
     public async processTransactions() {
         const { trackingRepository, ynabService } = this.dependencies;
         const ynabDelta = await trackingRepository.getYnabLastServerKnowledge();
-        const { transactions, serverKnowledge } = await ynabService.getTransactions(ynabDelta || undefined);
+
+        logInfo(`Using YNAB last server knowledge: ${ynabDelta || 'none'}`);
+
+        const { transactions, serverKnowledge } = await ynabService.getTransactions({
+            lastServerKnowledge: ynabDelta || undefined,
+        });
 
         logInfo(`Got ${transactions.length} transactions from YNAB`);
 
+        // We handle the case of no new transactions specially to see if we need to pull older transactions
+        // This can happen when YNAB API stops respecting last_server_knowledge properly and we have large gaps in transactions
+        if (transactions.length === 0) {
+            const mostRecentDate = await this.getMostRecentReceivedTransactions();
+            logInfo(`No new transactions. Most recent pulled transaction date is ${mostRecentDate.toISOString()}`);
+            const now = new Date();
+
+            // If mostRecentDate is more than 7 days ago, we pull again from `(mostRecentDate) - ((now - mostRecentDate) / 2)` to catch any missed transactions
+
+            const diffDays = dayjs(now).diff(dayjs(mostRecentDate), 'day');
+
+            if (diffDays <= 7) {
+                logInfo(`Most recent transaction is within 7 days. No need to pull older transactions.`);
+                return;
+            }
+
+            const daysInPastToPull = diffDays + Math.ceil(diffDays / 2);
+            const pullFromDate = dayjs(mostRecentDate).subtract(daysInPastToPull, 'day').toDate();
+
+            logInfo(`Pulling transactions from ${pullFromDate.toISOString()}`);
+
+            const { transactions: olderTransactions, serverKnowledge: newServerKnowledge } =
+                await ynabService.getTransactions({
+                    sinceDate: pullFromDate,
+                    lastServerKnowledge: undefined,
+                });
+
+            logInfo(`Got ${olderTransactions.length} older transactions from YNAB`);
+            await this.processTransactionsInternal(olderTransactions, newServerKnowledge);
+        } else {
+            await this.processTransactionsInternal(transactions, serverKnowledge);
+        }
+    }
+
+    private async processTransactionsInternal(transactions: YnabTransaction[], serverKnowledge: number) {
         const deletedTransactions = transactions.filter((transaction) => transaction.deleted);
         const newOrUpdatedTransactions = transactions.filter((transaction) => !transaction.deleted);
 
@@ -153,6 +193,20 @@ export class YnabTransactionsService {
         }
 
         return meta;
+    }
+
+    private async getMostRecentReceivedTransactions() {
+        const transactions = await database
+            .selectFrom('transactions')
+            .selectAll()
+            .orderBy('date', 'desc')
+            .limit(10)
+            .execute();
+
+        // We get the last 10 to avoid a random recent transaction with a gap from looking "correct"
+        const oldest = transactions.map((x) => new Date(x.date).getTime()).sort((a, b) => a - b)[0];
+
+        return new Date(oldest);
     }
 }
 

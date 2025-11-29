@@ -4,6 +4,11 @@ import { YNAB_API_KEY, YNAB_BUDGET_NAME } from '../environment';
 
 export type YnabTransaction = Omit<ynab.TransactionDetail, 'date'> & { date: Date };
 
+interface GetTransactionsParams {
+    sinceDate?: Date;
+    lastServerKnowledge?: number;
+}
+
 export class YnabService {
     private _cachedBudget: ynab.BudgetSummary | null = null;
     private client: ynab.API;
@@ -12,12 +17,12 @@ export class YnabService {
         this.client = new ynab.API(apiKey);
     }
 
-    public async getTransactions(lastServerKnowledge?: number) {
+    public async getTransactions({ sinceDate, lastServerKnowledge }: GetTransactionsParams) {
         const budget = await this.getBudget();
 
         const response = await this.client.transactions.getTransactions(
             budget.id,
-            undefined,
+            sinceDate?.toISOString() || undefined,
             undefined,
             lastServerKnowledge,
         );
