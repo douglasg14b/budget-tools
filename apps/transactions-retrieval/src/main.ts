@@ -4,7 +4,7 @@ import { categoriesService } from './services/categoriesService';
 import { metricsService } from './services/metricsService';
 import { ynabTransactionsService } from './services/ynabTransactionsService';
 
-const VERSION = '1.4';
+const VERSION = '1.5';
 
 logSection(`Starting Transactions Retrieval v${VERSION}`);
 
