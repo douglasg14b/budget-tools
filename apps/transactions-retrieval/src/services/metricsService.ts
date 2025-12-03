@@ -1,3 +1,5 @@
+import { logInfo } from '@budget-tools/logging';
+
 import { database } from '@/data';
 import type { MetricsRepository } from '@/repositories';
 import { metricsRepository } from '@/repositories';
@@ -17,6 +19,8 @@ export class MetricsService {
     }
 
     public async generateMetrics() {
+        logInfo('Starting metrics generation...');
+
         const unapproved = groupResults(await this.getUnapprovedByAccount());
         const approved = groupResults(await this.getApprovedByAccount());
         const uncategorized = groupResults(await this.getUncategorizedByAccount());
@@ -26,11 +30,17 @@ export class MetricsService {
         // We need to emit metrics for all accounts, even if they have no unapproved or uncategorized transactions
         const accountNames = await this.getDistinctAccountNames();
 
+        logInfo(`Found ${accountNames.length} accounts to generate metrics for: ${accountNames.join(', ')}`);
+
         for (const accountName of accountNames) {
             const unapprovedCount = accountName in unapproved ? Number(unapproved[accountName].count) : 0;
             const approvedCount = accountName in approved ? Number(approved[accountName].count) : 0;
             const uncategorizedCount = accountName in uncategorized ? Number(uncategorized[accountName].count) : 0;
             const categorizedCount = accountName in categorized ? Number(categorized[accountName].count) : 0;
+
+            logInfo(
+                `Generating metrics for account '${accountName}': unapproved=${unapprovedCount}, approved=${approvedCount}, uncategorized=${uncategorizedCount}, categorized=${categorizedCount}`,
+            );
 
             await this.repo.insertMetric({
                 date,
@@ -60,6 +70,8 @@ export class MetricsService {
                 meta: { account_id: null, account_name: accountName },
             });
         }
+
+        logInfo(`Metrics generation completed. Generated 4 metrics for ${accountNames.length} accounts.`);
     }
 
     private async getDistinctAccountNames() {
