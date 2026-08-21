@@ -1,0 +1,15 @@
+pre-commit:
+    commands:
+        check-biome:
+            skip:
+                - merge
+            run: pnpm biome check --no-errors-on-unmatched --files-ignore-unknown=true --diagnostic-level=error {staged_files}
+
+        exclude-openapi:
+            glob:
+                - '*/openapi.json'
+            skip:
+                - merge
+            run: |
+                echo "Error: do not commit openapi.json — use openapi.generated.json"
+                exit 1

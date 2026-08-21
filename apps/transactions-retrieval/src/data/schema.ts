@@ -7,6 +7,7 @@ export interface Database {
     category_groups: CategoryGroupTable;
     categories: CategoryTable;
     metrics: MetricsTable;
+    categorization_feedback: CategorizationFeedbackTable;
 }
 
 export type MetricTableMeta = {
@@ -122,3 +123,23 @@ export type CategoryGroupUpdate = Updateable<CategoryGroupTable>;
 export type Category = Selectable<CategoryTable>;
 export type NewCategory = Insertable<CategoryTable>;
 export type CategoryUpdate = Updateable<CategoryTable>;
+
+export type CategorizationFeedbackTable = {
+    id: Generated<number>;
+    transaction_id: string;
+    action: 'Approved' | 'Rejected' | 'Changed';
+    suggested_category: string | null;
+    suggested_category_group: string | null;
+    suggested_confidence: number | null;
+    suggested_method: string | null;
+    suggested_tier: string | null;
+    chosen_category: string | null;
+    chosen_category_group: string | null;
+    chosen_category_id: string | null;
+    proposal_snapshot: JSONColumnType<Record<string, unknown>>;
+    notes: string | null;
+    created_at: ColumnType<Date, string | Date, string | Date>;
+};
+
+export type CategorizationFeedback = Selectable<CategorizationFeedbackTable>;
+export type NewCategorizationFeedback = Insertable<CategorizationFeedbackTable>;

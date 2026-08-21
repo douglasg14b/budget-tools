@@ -1,0 +1,10 @@
+---
+description: Use the move-files skill for any file or folder moves/renames
+alwaysApply: false
+paths: ["**/*"]
+---
+# Use move-files skill for moves
+
+When moving or renaming files/folders, always use the `move-files` skill and its
+`node .cursor/skills/move-files/scripts/move.mjs --from "<src>" --to "<dst>"`
+workflow. Never use PowerShell `Move-Item`/`Rename-Item` or ad-hoc scripts.

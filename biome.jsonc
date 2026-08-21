@@ -1,0 +1,151 @@
+{
+    "$schema": "https://biomejs.dev/schemas/2.5.5/schema.json",
+    "vcs": {
+        "enabled": true,
+        "clientKind": "git",
+        "useIgnoreFile": true,
+        "defaultBranch": "main"
+    },
+    "files": {
+        "includes": [
+            "**",
+            "!**/dist",
+            "!**/node_modules",
+            "!**/.env*",
+            "!**/pnpm-lock.yaml",
+            "!**/__data__",
+            "!**/apps/categorization-ai",
+            "!**/apps/categorization-ai/bin",
+            "!**/gen",
+            "!**/*.gen.ts",
+            "!**/apps/api/generated",
+            "!**/apps/api/src/generated"
+        ],
+        "ignoreUnknown": true
+    },
+    "formatter": {
+        "enabled": true,
+        "formatWithErrors": false,
+        "indentStyle": "space",
+        "indentWidth": 4,
+        "lineEnding": "lf",
+        "lineWidth": 120,
+        "attributePosition": "auto",
+        "bracketSameLine": false,
+        "bracketSpacing": true,
+        "expand": "auto",
+        "useEditorconfig": true
+    },
+    "linter": {
+        "enabled": true,
+        "domains": {
+            "project": "recommended",
+            "react": "recommended",
+            "test": "recommended"
+        },
+        "rules": {
+            "recommended": true,
+            "nursery": {
+                "noMisusedPromises": "error",
+                "noFloatingPromises": "error",
+                "useExhaustiveSwitchCases": "error"
+            },
+            "style": {
+                "useNodejsImportProtocol": "off",
+                "useImportType": {
+                    "level": "warn",
+                    "options": {
+                        "style": "separatedType"
+                    }
+                },
+                "noDefaultExport": "warn",
+                "useThrowOnlyError": "error"
+            },
+            "performance": {
+                "noNamespaceImport": "warn",
+                "noAccumulatingSpread": "off"
+            },
+            "correctness": {
+                "noUnusedVariables": "error",
+                "useExhaustiveDependencies": {
+                    "level": "warn",
+                    "options": { "reportUnnecessaryDependencies": false }
+                }
+            },
+            "suspicious": {
+                "noDoubleEquals": "error",
+                "noExplicitAny": "error",
+                "noEmptyBlockStatements": "warn",
+                "noEvolvingTypes": "error",
+                "noExportsInTest": "error",
+                "noVar": "error"
+            },
+            "complexity": {
+                "useArrowFunction": "off",
+                "noCommaOperator": "error"
+            }
+        },
+        "includes": ["**", "!**/vitest.config.ts", "!**/openapi-ts.config.ts"]
+    },
+    "javascript": {
+        "formatter": {
+            "jsxQuoteStyle": "double",
+            "quoteProperties": "asNeeded",
+            "trailingCommas": "all",
+            "semicolons": "always",
+            "arrowParentheses": "always",
+            "bracketSameLine": false,
+            "quoteStyle": "single",
+            "attributePosition": "auto",
+            "bracketSpacing": true
+        },
+        "parser": {
+            "unsafeParameterDecoratorsEnabled": true
+        }
+    },
+    "assist": {
+        "enabled": true,
+        "actions": {
+            "source": {
+                "organizeImports": "on"
+            }
+        }
+    },
+    "overrides": [
+        {
+            "includes": ["**/__mocks__", "**/__tests__", "**/*.test.ts", "**/*.test.tsx"],
+            "linter": {
+                "rules": {
+                    "performance": {
+                        "noNamespaceImport": "off"
+                    },
+                    "suspicious": {
+                        "noEmptyBlockStatements": "off"
+                    }
+                }
+            }
+        },
+        {
+            "includes": ["**/*.json"],
+            "formatter": {
+                "indentWidth": 2
+            }
+        },
+        {
+            "includes": ["**/package.json"],
+            "formatter": {
+                "expand": "always"
+            }
+        },
+        {
+            "includes": ["vite.config.*"],
+            "linter": {
+                "rules": {
+                    "style": {
+                        "noDefaultExport": "off"
+                    }
+                }
+            }
+        }
+    ]
+}

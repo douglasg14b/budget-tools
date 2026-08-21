@@ -1,0 +1,29 @@
+{
+  "name": "@budget-tools/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "pnpm tsoa",
+    "dev": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx watch apps/api/src/server.ts",
+    "prebuild": "pnpm tsoa",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "postbuild": "pnpm --filter @budget-tools/web-sdk build",
+    "pretypecheck": "pnpm tsoa",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- vitest run --passWithNoTests",
+    "tsoa": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- tsoa spec-and-routes"
+  },
+  "dependencies": {
+    "@tsoa/runtime": "7.0.0-alpha.0",
+    "env-var": "^7.5.0",
+    "express": "^5.2.1",
+    "reflect-metadata": "^0.2.2",
+    "tsoa": "7.0.0-alpha.0"
+  },
+  "devDependencies": {
+    "@budget-tools/config-typescript": "workspace:^",
+    "@dotenvx/dotenvx": "^1.31.0",
+    "@types/express": "^5.0.6"
+  }
+}

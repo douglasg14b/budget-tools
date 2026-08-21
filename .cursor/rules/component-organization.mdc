@@ -1,0 +1,31 @@
+---
+description: Guidelines for organizing UI components and file structure
+globs: **/*.tsx
+alwaysApply: false
+paths: ["**/*.tsx"]
+---
+
+# Component Organization
+
+## Directory Structure
+
+- **Primary/feature components** live at the feature's component root (e.g. `src/components/` or a feature-local `components/` folder).
+- **Supporting/utility components** are organized into subdirectories by purpose:
+  - `components/shared/` or `components/ui/` — reusable primitives and layout pieces
+  - `components/<feature>/` — feature-specific building blocks
+  - Group related components together in logical subdirectories
+- Use `index.ts` files for clean imports from subdirectories when appropriate.
+
+## Component Design Principles
+
+- **Prefer separate components over variants** when each variant is single-use
+  - ✅ `OrderSummaryHeader`, `OrderSummaryFooter` (separate files)
+  - ❌ Generic `SummarySection` with variant prop for single-use cases
+- Keep components focused and single-purpose
+- Extract reusable logic into shared utilities/components
+
+## File Naming
+
+- Use PascalCase for component files: `OrderSummaryHeader.tsx`
+- Match component name to file name: `export function OrderSummaryHeader()`
+- Use descriptive names that indicate purpose and context

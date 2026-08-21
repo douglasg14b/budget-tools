@@ -1,0 +1,35 @@
+---
+description: Styling guidelines for co-located CSS and component styles
+globs: **/*.tsx,**/*.css
+alwaysApply: false
+paths: ["**/*.tsx", "**/*.css"]
+---
+
+# Styling Guidelines
+
+## Component styling priority
+
+When the UI stack provides styling APIs (component props, design tokens, theme variables), prefer them in this order:
+
+1. Component/library props (`variant`, `size`, `color`, etc.)
+2. Lightweight style props or utility classes for small adjustments
+3. Co-located CSS Modules for complex or reusable styling
+
+Keep inline/prop-based styling lightweight; if you need more than a few adjustments, move to a CSS Module class.
+
+Use the project's design tokens or CSS variables instead of raw hex values when a token exists.
+
+## CSS Organization
+
+- Co-locate styles with the component that consumes them using `*.module.css` files
+- Do not add or expand a monolithic global component stylesheet
+- If multiple nearby components share styling, use a local shared module in that feature/component area
+- Scope third-party/global selector overrides through `:global(...)` inside a nearby CSS Module, not in app-wide global CSS
+
+## Inline Styles (Minimize)
+
+Only use inline styles for:
+
+- Dynamic values (animations driven by runtime state)
+- Simple one-off values (`lineHeight`, `flex: 1`)
+- Layout-specific positioning (`position: relative`, `zIndex`)

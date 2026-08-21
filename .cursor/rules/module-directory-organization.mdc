@@ -1,0 +1,56 @@
+---
+description: How to organize files within a feature module directory — when to group into subdirectories and what the top level should communicate
+globs: **/*.ts,**/*.tsx
+alwaysApply: false
+paths: ["**/*.ts", "**/*.tsx"]
+---
+
+# Module Directory Organization
+
+When a feature directory grows beyond a handful of files, a flat list of names communicates nothing about what is important. Organize by **role**, so opening the directory immediately reveals the shape of the module.
+
+## The Test: What Does the Top Level Communicate?
+
+A well-organized directory lets a reader answer these questions at a glance:
+
+- What is the public entry point?
+- What is the core orchestrator?
+- Where do implementation details live?
+
+If the answer to any of these is "you have to read every filename to find out," the directory needs grouping.
+
+## Roles and Their Subdirectories
+
+| Role | Where it lives | Examples |
+|------|---------------|---------|
+| Public entry point(s) | Top level | `createWidget.ts`, `WidgetEngine.ts` |
+| Core orchestrator | Top level | `processOrder.ts` |
+| Shared types (cross-cutting) | Top level | `types.ts` |
+| Barrel export | Top level | `index.ts` |
+| Discrete pipeline/processing steps | `pipeline/` | `validateInput.ts`, `formatOutput.ts` |
+| Pure utility functions | `utils/` | `parseDate.ts`, `normalizeText.ts` |
+| Tests | `__tests__/` beside their source | see test-placement rule |
+
+Other subdirectory names are fine when the role is clear: `adapters/`, `validators/`, `formatters/`. The name should describe the **role**, not the contents.
+
+## Types: Co-locate, Don't Consolidate
+
+- Types used by **one file** live in that file.
+- Types shared across **multiple files** in the module may live in a shared `types.ts` at the module root — but only when they are genuinely cross-cutting.
+- Do **not** move types away from their owning file just to consolidate them. A reader following an import should find the type next to the code it describes.
+
+## When to Group
+
+Group into a subdirectory when:
+- Three or more files share the same role (all pipeline steps, all pure utils).
+- The top-level directory has become a flat wash where no single file stands out as important.
+
+Do **not** create a subdirectory for one or two files — inline or keep them at the top level.
+
+## Tests Follow Their Source
+
+When a source file moves into a subdirectory, its test moves too (per `test-placement.mdc`). A test for `pipeline/queryExpansion.ts` lives at `pipeline/__tests__/queryExpansion.test.ts`, not at the parent's `__tests__/`. System-level or integration tests with no single owning file stay at the module root's `__tests__/`.
+
+## Single-Use Utilities
+
+A utility used by only one caller is not a utility — inline it. A separate file earns its place when two or more callers share it, or when it is complex enough to warrant its own tests.

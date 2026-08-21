@@ -1,5 +1,7 @@
 import pg from 'pg';
+
 const { Pool } = pg;
+
 import { Kysely, PostgresDialect } from 'kysely';
 
 import { DB_CONNECTION_STRING } from '../environment';

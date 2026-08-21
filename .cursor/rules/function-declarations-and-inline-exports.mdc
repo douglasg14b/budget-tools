@@ -1,0 +1,46 @@
+---
+description: Enforce function declarations and inline exports in JS/TS files
+globs: **/*.ts, **/*tsx
+alwaysApply: false
+paths: ["**/*.ts", "**/*.tsx"]
+---
+
+# Function Declarations And Inline Exports
+
+Prefer function declarations over function expressions assigned to constants.
+
+```typescript
+// ❌ Avoid
+const parseMessage = (input: string) => normalize(input);
+
+// ✅ Prefer
+function parseMessage(input: string): string {
+  return normalize(input);
+}
+```
+
+Export items where they are declared. Do not collect exports at the end of implementation files.
+
+```typescript
+// ❌ Avoid
+function parseMessage(input: string): string {
+  return normalize(input);
+}
+function scoreMessage(input: string): number {
+  return input.length;
+}
+export { parseMessage, scoreMessage };
+
+// ✅ Prefer
+export function parseMessage(input: string): string {
+  return normalize(input);
+}
+export function scoreMessage(input: string): number {
+  return input.length;
+}
+```
+
+Exceptions:
+
+- `index.ts`-style barrel files may export from other modules.
+- Existing third-party or framework-required patterns can remain only when technically required.

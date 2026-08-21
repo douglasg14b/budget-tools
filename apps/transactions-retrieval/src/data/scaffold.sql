@@ -105,4 +105,26 @@ CREATE INDEX IF NOT EXISTS idx_category_name ON categories (name);
 -- Create indexes for category groups
 CREATE INDEX IF NOT EXISTS idx_category_group_hidden ON category_groups (hidden);
 CREATE INDEX IF NOT EXISTS idx_category_group_deleted ON category_groups (deleted);
+
+CREATE TABLE IF NOT EXISTS categorization_feedback (
+    id SERIAL PRIMARY KEY,
+    transaction_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    suggested_category TEXT,
+    suggested_category_group TEXT,
+    suggested_confidence REAL,
+    suggested_method TEXT,
+    suggested_tier TEXT,
+    chosen_category TEXT,
+    chosen_category_group TEXT,
+    chosen_category_id TEXT,
+    proposal_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_categorization_feedback_transaction
+    ON categorization_feedback (transaction_id);
+CREATE INDEX IF NOT EXISTS idx_categorization_feedback_created
+    ON categorization_feedback (created_at);
 CREATE INDEX IF NOT EXISTS idx_category_group_name ON category_groups (name);

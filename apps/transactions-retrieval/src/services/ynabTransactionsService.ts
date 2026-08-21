@@ -1,8 +1,8 @@
 import { logInfo } from '@budget-tools/logging';
 import dayjs from 'dayjs';
 import type * as ynab from 'ynab';
-
-import { database, type NewTransaction, type SubTransactionSchema, type Transaction } from '../data';
+import type { NewTransaction, SubTransactionSchema, Transaction } from '../data';
+import { database } from '../data';
 import type { TrackingRepository, TransactionsRepository } from '../repositories';
 import { trackingRepository, transactionsRepository } from '../repositories';
 import { chunkArray } from '../utils';
@@ -91,14 +91,12 @@ export class YnabTransactionsService {
         let countCompleted = 0;
 
         for (const chunk of chunks) {
-            const promises = chunk.map((transaction) =>
-                (async () => {
-                    const existing = await transactionsRepository.getTransaction(transaction.id);
-                    const entity = this.createOrUpdateEntity(transaction, existing);
-                    await transactionsRepository.upsertTransaction(entity);
-                    countCompleted++;
-                })(),
-            );
+            const promises = chunk.map(async (transaction) => {
+                const existing = await transactionsRepository.getTransaction(transaction.id);
+                const entity = this.createOrUpdateEntity(transaction, existing);
+                await transactionsRepository.upsertTransaction(entity);
+                countCompleted++;
+            });
 
             await Promise.all(promises);
 

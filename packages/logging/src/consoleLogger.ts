@@ -1,7 +1,7 @@
 import kleur from 'kleur';
 
 export function log(message: string, color: 'red' | 'blue' | 'cyan' | 'green') {
-    let colored;
+    let colored: string;
 
     switch (color) {
         case 'red':
@@ -29,7 +29,7 @@ export function logInfo(message: string) {
 }
 
 export function logError(message: string, error?: unknown) {
-    let errorTxt;
+    let errorTxt: string;
 
     if (!error) {
         errorTxt = '';

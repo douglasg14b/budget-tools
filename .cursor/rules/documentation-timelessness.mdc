@@ -1,0 +1,39 @@
+---
+description: Documentation must be timeless and free of meta commentary — describe the system as it is
+globs: **/*.md
+alwaysApply: false
+paths: ["**/*.md"]
+---
+
+# Documentation: timeless, no meta commentary
+
+Write documentation that describes the system **as it currently is**, for a reader with **zero
+prior context**. A doc should read the same whether it was written today or a year from now.
+
+## No meta commentary / change-narration
+
+Do not narrate how the system got here or reference internal process. A reader does not share our
+context and cannot resolve it. Forbidden in docs:
+
+- Staleness/status banners: "STALE", "OUTDATED", "recently changed", "TODO: update".
+- Change-narration: "was X, now Y", "renamed from…", "used to…", "no longer…", "previously".
+- Internal process labels: phase/workstream numbers ("Phase 1", "WS3"), ticket/PR ids, sprint
+  names, commit hashes — nobody reading the docs knows what these are.
+- Context assumptions: "as we discussed", "the new approach", "the recent refactor".
+
+State facts, not history. If a name changed, just use the current name. If a concept was removed,
+delete it — do not leave a tombstone explaining what it used to be.
+
+## Fix content, don't annotate it
+
+If a doc is wrong or out of date, **rewrite it to be correct**. Do not slap a banner on top pointing
+elsewhere or apologizing for staleness — that is meta commentary and it makes the doc worse. Describe
+the behavior, data model, and usage plainly; link to the canonical source of truth rather than
+duplicating volatile detail.
+
+## Exception — explicitly temporal documents
+
+Some documents are *about* process or decisions over time and are the correct home for it: status /
+orientation trackers, implementation plans, changelogs, and ADRs (architecture decision records).
+Dated entries, phase references, and decision history belong **there**. Do not let that vocabulary
+leak into reference/system documentation (READMEs, guides, data-model/taxonomy/architecture docs).

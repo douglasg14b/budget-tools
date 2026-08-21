@@ -1,13 +1,15 @@
 import dayjs from 'dayjs';
-import * as ynab from 'ynab';
-import { loadAccountTransactions, SourceTransactionEntry } from './loadCsvTransactions';
-import { loadYnabTransactionsByAccount } from './loadYnabTransactions';
+import { writeFileSync } from 'fs';
 import { similarity as ratcliff_similarity } from 'talisman/metrics/ratcliff-obershelp';
+import type * as ynab from 'ynab';
 import { BANK_IGNORE_LIST } from './constants';
+import type { SourceTransactionEntry } from './loadCsvTransactions';
+import { loadAccountTransactions } from './loadCsvTransactions';
+import { loadYnabTransactionsByAccount } from './loadYnabTransactions';
 
-const ynabCheckingTransactions = await loadYnabTransactionsByAccount('checking');
+const ynabCheckingTransactions = await loadYnabTransactionsByAccount('card-1684');
 
-const bankCheckingTransactions = loadAccountTransactions('checking');
+const bankCheckingTransactions = loadAccountTransactions('card-1684');
 const matchedYnabTransactions = new Map<string, ynab.TransactionSummary>();
 
 const remainingYnabTransactions = [...ynabCheckingTransactions];
@@ -24,6 +26,20 @@ console.log(remainingYnabTransactions);
 console.log(notFound);
 console.log(foundButUncleared);
 console.log(foundButDissimilarDate);
+
+writeFileSync(
+    'cleaning-output.json',
+    JSON.stringify(
+        {
+            notFound,
+            foundButUncleared,
+            foundButDissimilarDate,
+            remainingYnabTransactions,
+        },
+        null,
+        2,
+    ),
+);
 
 // The state of a source transaction relative to YNAB.
 
@@ -119,12 +135,7 @@ function findSourceTransactionInYnab(source: SourceTransactionEntry, ynabTransac
         }
     }
 
-    // unknown
-    debugger;
-
     throw new Error('Unknown state');
-
-    return makeResponse('Not Found');
 }
 
 function findSourceTransaction(ynabTransaction: ynab.TransactionSummary, sourceTransactions: SourceTransactionEntry[]) {
@@ -151,7 +162,7 @@ type TransactionComparator = {
 function transactionsNumericallySimilar(
     principal: TransactionComparator,
     comparison: TransactionComparator,
-    dayVariance: number = 8,
+    dayVariance: number = 10,
 ) {
     const principalMinDate = dayjs(principal.date).subtract(dayVariance, 'day');
     const principalMaxDate = dayjs(principal.date).add(dayVariance, 'day');

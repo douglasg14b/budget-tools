@@ -1,0 +1,13 @@
+---
+description: Minimal always-on context — where to look before structural or cross-cutting work
+alwaysApply: true
+paths: ["**/*"]
+---
+
+# Repository spine
+
+- Skim the repo’s primary architecture/conventions doc (e.g. **`AGENTS.md`**, **`README.md`**, or app-specific docs) before changing layout, package boundaries, persistence, bootstrap flow, or cross-cutting systems.
+- **Dependencies**: add with `pnpm` only — see `.cursor/rules/package-json-deps.mdc` (no hand-edited versions in `package.json`).
+- **Env**: new variables go through the repo’s **central, typed env/config** module; never commit `.env*` or paste tokens/secrets into code, chats, or logs.
+- **Tests**: colocate under `__tests__` — `.cursor/rules/test-placement.mdc`.
+- This file is intentionally thin; domain rules live in scoped `.mdc` files and attach via globs.

@@ -1,6 +1,6 @@
-import { readFileSync } from 'fs';
 import { parse } from 'csv-parse/sync';
-import { AccountName } from './constants';
+import { readFileSync } from 'fs';
+import type { AccountName } from './constants';
 
 export interface SourceTransactionEntry {
     date: string;
@@ -10,7 +10,7 @@ export interface SourceTransactionEntry {
 }
 
 export function loadAccountTransactions(account: AccountName): SourceTransactionEntry[] {
-    const csv = readFileSync(`data/${account}.csv`, 'utf-8');
+    const csv = readFileSync(`apps/transaction-cleaner/data/${account}.csv`, 'utf-8');
     const parsed = parse(csv, {
         columns: true,
         skip_empty_lines: true,

@@ -1,9 +1,10 @@
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import * as ynab from 'ynab';
-import { AccountName, ACCOUNTS_NAME_MAP } from './constants';
-import { writeFileSync, readFileSync, existsSync } from 'fs';
+import type { AccountName } from './constants';
+import { ACCOUNTS_NAME_MAP } from './constants';
 
-const TRANSACTIONS_FILE_PATH = 'data/ynab-transactions.json';
-const ACCESS_TOKEN = '==============================';
+const TRANSACTIONS_FILE_PATH = 'apps/transaction-cleaner/data/ynab-transactions.json';
+const ACCESS_TOKEN = 'dJX3mRHKaTsXDMXYuwyLuyDVltPyjwd0z1hqME6dkqk';
 const BUDGET_NAME = 'Detailed Budget';
 const YNAB_CLIENT = new ynab.API(ACCESS_TOKEN);
 

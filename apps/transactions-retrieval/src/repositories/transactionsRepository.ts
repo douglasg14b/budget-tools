@@ -39,10 +39,9 @@ export class TransactionsRepository implements ITransactionsRepository {
 
         try {
             if (exists) {
-                return this.updateTransaction(transaction as Transaction);
-            } else {
-                return this.insertTransaction(transaction as NewTransaction);
+                return await this.updateTransaction(transaction as Transaction);
             }
+            return await this.insertTransaction(transaction as NewTransaction);
         } catch (err) {
             console.error(`Error upserting transaction ${transaction.id}`, err);
             console.error(JSON.stringify(transaction, null, 2));

@@ -1,0 +1,15 @@
+---
+globs: **/*.ts
+alwaysApply: false
+description: >
+  Prevent runtime code from discovering the repository root; reserve repo-root
+  lookup for tooling and tests.
+paths: ["**/*.ts"]
+---
+
+# Repo Root Resolution
+
+- Runtime code must not search for the repository root.
+- Do not hardcode `../../..`-style climbs, `new URL('../../...')`, or similar manual path math to locate the repository root in application code.
+- If root lookup is unavoidable, use a shared repo utility from this monorepo (if one exists) or confine lookup to tooling, build scripts, tests, and generators that already start from an explicit directory.
+- If runtime code needs repository-relative paths, establish that contract at startup or through explicit configuration instead of looking up the root during request handling.
