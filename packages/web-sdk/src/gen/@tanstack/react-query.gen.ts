@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { Health, type Options } from '../sdk.gen';
-import type { GetHealthData, GetHealthResponse } from '../types.gen';
+import { Categories, Categorization, Health, type Options } from '../sdk.gen';
+import type { GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -52,4 +52,37 @@ export const getHealthOptions = (options?: Options<GetHealthData>) => queryOptio
         return data;
     },
     queryKey: getHealthQueryKey(options)
+});
+
+export const getCategorizationQueueQueryKey = (options?: Options<GetCategorizationQueueData>) => createQueryKey('getCategorizationQueue', options);
+
+/**
+ * Pending review queue with AI proposals joined to local transaction details.
+ */
+export const getCategorizationQueueOptions = (options?: Options<GetCategorizationQueueData>) => queryOptions<GetCategorizationQueueResponse, DefaultError, GetCategorizationQueueResponse, ReturnType<typeof getCategorizationQueueQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await Categorization.request({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getCategorizationQueueQueryKey(options)
+});
+
+export const getCategoriesQueryKey = (options?: Options<GetCategoriesData>) => createQueryKey('getCategories', options);
+
+export const getCategoriesOptions = (options?: Options<GetCategoriesData>) => queryOptions<GetCategoriesResponse, DefaultError, GetCategoriesResponse, ReturnType<typeof getCategoriesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await Categories.request({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getCategoriesQueryKey(options)
 });

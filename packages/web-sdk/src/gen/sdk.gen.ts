@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetHealthData, GetHealthResponses } from './types.gen';
+import type { GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -21,5 +21,20 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 export class Health {
     public static request<ThrowOnError extends boolean = false>(options?: Options<GetHealthData, ThrowOnError>): RequestResult<GetHealthResponses, unknown, ThrowOnError> {
         return (options?.client ?? client).get<GetHealthResponses, unknown, ThrowOnError>({ url: '/health', ...options });
+    }
+}
+
+export class Categorization {
+    /**
+     * Pending review queue with AI proposals joined to local transaction details.
+     */
+    public static request<ThrowOnError extends boolean = false>(options?: Options<GetCategorizationQueueData, ThrowOnError>): RequestResult<GetCategorizationQueueResponses, unknown, ThrowOnError> {
+        return (options?.client ?? client).get<GetCategorizationQueueResponses, unknown, ThrowOnError>({ url: '/categorization/queue', ...options });
+    }
+}
+
+export class Categories {
+    public static request<ThrowOnError extends boolean = false>(options?: Options<GetCategoriesData, ThrowOnError>): RequestResult<GetCategoriesResponses, unknown, ThrowOnError> {
+        return (options?.client ?? client).get<GetCategoriesResponses, unknown, ThrowOnError>({ url: '/categories', ...options });
     }
 }

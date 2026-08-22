@@ -66,6 +66,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@budget-tools/db':
+        specifier: workspace:^
+        version: link:../../packages/db
       '@tsoa/runtime':
         specifier: 7.0.0-alpha.0
         version: 7.0.0-alpha.0
@@ -75,6 +78,12 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1
+      kysely:
+        specifier: ^0.27.5
+        version: 0.27.5
+      pg:
+        specifier: ^8.13.1
+        version: 8.13.1
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -91,6 +100,12 @@ importers:
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.11.10
+      vitest:
+        specifier: ^2.1.1
+        version: 2.1.8(@types/node@20.17.10)(lightningcss@1.33.0)
 
   apps/transaction-cleaner:
     dependencies:
@@ -103,6 +118,9 @@ importers:
 
   apps/transactions-retrieval:
     dependencies:
+      '@budget-tools/db':
+        specifier: workspace:^
+        version: link:../../packages/db
       '@budget-tools/logging':
         specifier: workspace:*
         version: link:../../packages/logging
@@ -212,6 +230,28 @@ importers:
         version: 7.18.0(eslint@8.57.1)(typescript@5.7.2)
 
   packages/config-typescript: {}
+
+  packages/db:
+    dependencies:
+      kysely:
+        specifier: ^0.27.5
+        version: 0.27.5
+      pg:
+        specifier: ^8.13.1
+        version: 8.13.1
+      ynab:
+        specifier: ^2.6.0
+        version: 2.6.0
+    devDependencies:
+      '@budget-tools/config-typescript':
+        specifier: workspace:^
+        version: link:../config-typescript
+      '@types/node':
+        specifier: ^20.14.0
+        version: 20.17.10
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.11.10
 
   packages/logging:
     dependencies:

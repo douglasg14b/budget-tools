@@ -15,15 +15,20 @@
     "tsoa": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- tsoa spec-and-routes"
   },
   "dependencies": {
+    "@budget-tools/db": "workspace:^",
     "@tsoa/runtime": "7.0.0-alpha.0",
     "env-var": "^7.5.0",
     "express": "^5.2.1",
+    "kysely": "^0.27.5",
+    "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
     "tsoa": "7.0.0-alpha.0"
   },
   "devDependencies": {
     "@budget-tools/config-typescript": "workspace:^",
     "@dotenvx/dotenvx": "^1.31.0",
-    "@types/express": "^5.0.6"
+    "@types/express": "^5.0.6",
+    "@types/pg": "^8.11.10",
+    "vitest": "^2.1.1"
   }
 }

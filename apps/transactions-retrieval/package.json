@@ -12,11 +12,12 @@
     "lint:fix": "eslint --fix ."
   },
   "dependencies": {
+    "@budget-tools/db": "workspace:^",
     "@budget-tools/logging": "workspace:*",
     "@dotenvx/dotenvx": "^1.31.0",
     "csv-parse": "^5.6.0",
-    "pg": "^8.13.1",
-    "env-var": "^7.5.0"
+    "env-var": "^7.5.0",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "@budget-tools/eslint-config": "workspace:*",

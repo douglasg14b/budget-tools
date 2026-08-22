@@ -8,6 +8,118 @@ export type HealthDto = {
     ok: true;
 };
 
+export type QueueSummaryDto = {
+    blocked: number;
+    review: number;
+    suggested: number;
+    autoApply: number;
+    total: number;
+};
+
+export type TransactionDetailDto = {
+    importPayeeName: string | null;
+    importId: string | null;
+    categoryName: string | null;
+    categoryId: string | null;
+    payeeName: string | null;
+    payeeId: string | null;
+    accountName: string;
+    accountId: string;
+    approved: boolean;
+    cleared: string;
+    memo: string | null;
+    amount: number;
+    date: string;
+    id: string;
+};
+
+export type ApprovalTier = 'AutoApply' | 'Suggested' | 'Review' | 'Blocked';
+
+export type CategorizationFlagsDto = {
+    requiresManualReview: boolean;
+    isExcluded: boolean;
+    isNovelImport: boolean;
+    isAmbiguous: boolean;
+};
+
+export type CategorizationMethod = 'ImportAmountLookup' | 'ImportLookup' | 'PayeeIdLookup' | 'CanonicalPayeeLookup' | 'PayeeClusterLookup' | 'PayeeModel' | 'HierarchicalModel' | 'CategoryModel' | 'Consensus' | 'LlmCategorization' | 'Excluded' | 'ManualReview' | 'None';
+
+export type CategorizationRouteReason = 'None' | 'ExcludedPayee' | 'ExcludedCheck' | 'AmbiguousMerchant' | 'UntrainedCategory' | 'NovelImportString' | 'LowConfidence';
+
+export type ProposalGapReason = 'None' | 'AmbiguousMerchant' | 'InsufficientAgreement' | 'TwoMethodSuggestion' | 'SingleMethodSuggestion' | 'ImportAmountNearMiss' | 'NoQualifiedSignals' | 'LlmSuggestion' | 'Excluded';
+
+export type MethodSignalDto = {
+    confidence: number;
+    category: string;
+    method: CategorizationMethod;
+};
+
+export type CategoryOptionDto = {
+    supportingMethods: Array<MethodSignalDto>;
+    confidence: number;
+    categoryId: string | null;
+    categoryGroup: string | null;
+    category: string;
+    rank: number;
+};
+
+export type ConfidenceIntervalDto = {
+    spread: number;
+    third: number | null;
+    second: number | null;
+    top: number;
+};
+
+export type CategorizationProposalDto = {
+    notes: string | null;
+    resolvedPayee: string | null;
+    featureText: string;
+    confidenceInterval: ConfidenceIntervalDto;
+    options: Array<CategoryOptionDto>;
+    agreeingSignals: Array<MethodSignalDto>;
+    signals: Array<MethodSignalDto>;
+    gapReason: ProposalGapReason;
+    routeReason: CategorizationRouteReason;
+    method: CategorizationMethod;
+    confidence: number;
+    suggestedCategoryId: string | null;
+    suggestedCategoryGroup: string | null;
+    suggestedCategory: string | null;
+    flags: CategorizationFlagsDto;
+    tier: ApprovalTier;
+    transactionId: string;
+};
+
+export type CategorizationQueueItemDto = {
+    proposal: CategorizationProposalDto;
+    transaction: TransactionDetailDto;
+};
+
+export type CategorizationQueueDto = {
+    items: Array<CategorizationQueueItemDto>;
+    llm: boolean;
+    generatedAt: string;
+    summary: QueueSummaryDto;
+};
+
+export type CategoryDto = {
+    note: string | null;
+    hidden: boolean;
+    name: string;
+    id: string;
+};
+
+export type CategoryGroupDto = {
+    categories: Array<CategoryDto>;
+    hidden: boolean;
+    name: string;
+    id: string;
+};
+
+export type CategoriesDto = {
+    groups: Array<CategoryGroupDto>;
+};
+
 export type GetHealthData = {
     body?: never;
     path?: never;
@@ -23,3 +135,52 @@ export type GetHealthResponses = {
 };
 
 export type GetHealthResponse = GetHealthResponses[keyof GetHealthResponses];
+
+export type GetCategorizationQueueData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Comma-separated ApprovalTier values to include
+         */
+        tier?: string;
+        /**
+         * Filter to a single YNAB account id
+         */
+        accountId?: string;
+        /**
+         * Enable LLM fallback for this predict run (cache key)
+         */
+        llm?: boolean;
+        /**
+         * Force a new predict-json spawn
+         */
+        refresh?: boolean;
+    };
+    url: '/categorization/queue';
+};
+
+export type GetCategorizationQueueResponses = {
+    /**
+     * Ok
+     */
+    200: CategorizationQueueDto;
+};
+
+export type GetCategorizationQueueResponse = GetCategorizationQueueResponses[keyof GetCategorizationQueueResponses];
+
+export type GetCategoriesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/categories';
+};
+
+export type GetCategoriesResponses = {
+    /**
+     * Ok
+     */
+    200: CategoriesDto;
+};
+
+export type GetCategoriesResponse = GetCategoriesResponses[keyof GetCategoriesResponses];

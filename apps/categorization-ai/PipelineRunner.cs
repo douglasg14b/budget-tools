@@ -47,6 +47,7 @@ public static class PipelineRunner
         await using var db = new BudgetToolsContext(dbOptions);
 
         string mode = args.Length > 0 ? args[0].ToLowerInvariant() : "run";
+        TextWriter diagnostics = mode == "predict-json" ? Console.Error : Console.Out;
         bool forceRetrain = args.Contains("--force", StringComparer.OrdinalIgnoreCase);
         bool useLlm = args.Contains("--llm", StringComparer.OrdinalIgnoreCase) || llmSettings.Enabled;
 
@@ -73,12 +74,12 @@ public static class PipelineRunner
         TrainingTransaction[] allTraining = TransactionQueries.GetTrainingTransactions(db);
         if (allTraining.Length == 0)
         {
-            Console.WriteLine("No accepted, categorized transactions found in the database.");
+            diagnostics.WriteLine("No accepted, categorized transactions found in the database.");
             return 1;
         }
 
-        Console.WriteLine($"Loaded {allTraining.Length} training transactions from database.");
-        PrintCatalogSummary(catalog);
+        diagnostics.WriteLine($"Loaded {allTraining.Length} training transactions from database.");
+        PrintCatalogSummary(catalog, diagnostics);
 
         (TrainingTransaction[] trainSet, TrainingTransaction[] evalSet) = SplitByDate(
             allTraining,
@@ -87,13 +88,13 @@ public static class PipelineRunner
         return mode switch
         {
             "export" => ExportTrainingCsv(allTraining, mlSettings),
-            "train" => Train(pipeline, allTraining, forceRetrain),
+            "train" => Train(pipeline, allTraining, forceRetrain, diagnostics),
             "evaluate" => Evaluate(pipeline, trainSet, evalSet, categoryModel, mlSettings),
             "evaluate-llm" => await EvaluateLlmAsync(pipeline, trainSet, evalSet, llmSettings, mlSettings),
             "diagnose" => Diagnose(pipeline, trainSet, evalSet, mlSettings),
             "analyze-gap" => AnalyzeGap(pipeline, trainSet, evalSet, catalog, mlSettings),
             "predict" => await PredictAfterTrainAsync(pipeline, allTraining, db, mlSettings, useLlm, forceRetrain),
-            "predict-json" => await PredictJsonAsync(pipeline, allTraining, db, mlSettings, useLlm, forceRetrain),
+            "predict-json" => await PredictJsonAsync(pipeline, allTraining, db, mlSettings, useLlm, forceRetrain, diagnostics),
             "feedback-stats" => await FeedbackStatsAsync(db),
             "run" => await RunAllAsync(
                 pipeline, allTraining, trainSet, evalSet, categoryModel, db, mlSettings, useLlm, forceRetrain),
@@ -101,12 +102,12 @@ public static class PipelineRunner
         };
     }
 
-    private static void PrintCatalogSummary(CategoryCatalog catalog)
+    private static void PrintCatalogSummary(CategoryCatalog catalog, TextWriter diagnostics)
     {
         IReadOnlyList<CategoryInfo> untrained = catalog.GetUntrainedCategories();
         if (untrained.Count > 0)
         {
-            Console.WriteLine(
+            diagnostics.WriteLine(
                 $"Category catalog: {catalog.AllCategories.Count} assignable, " +
                 $"{untrained.Count} never classified in training (LLM/manual).");
         }
@@ -128,11 +129,16 @@ public static class PipelineRunner
         return await PredictAfterTrainAsync(pipeline, allTraining, db, settings, useLlm, forceRetrain);
     }
 
-    private static int Train(CategorizationPipeline pipeline, TrainingTransaction[] trainSet, bool forceRetrain)
+    private static int Train(
+        CategorizationPipeline pipeline,
+        TrainingTransaction[] trainSet,
+        bool forceRetrain,
+        TextWriter? diagnostics = null)
     {
-        Console.WriteLine($"Training on {trainSet.Length} accepted, categorized transactions...");
+        TextWriter output = diagnostics ?? Console.Out;
+        output.WriteLine($"Training on {trainSet.Length} accepted, categorized transactions...");
         pipeline.Train(trainSet, forceRetrain);
-        Console.WriteLine(
+        output.WriteLine(
             $"Training complete. Ambiguous merchants indexed: " +
             $"{pipeline.AmbiguousIndex.AmbiguousPayeeCount} payees, " +
             $"{pipeline.AmbiguousIndex.AmbiguousImportCount} import keys. " +
@@ -597,9 +603,10 @@ public static class PipelineRunner
         BudgetToolsContext db,
         MlSettings settings,
         bool useLlm,
-        bool forceRetrain)
+        bool forceRetrain,
+        TextWriter diagnostics)
     {
-        Train(pipeline, trainingData, forceRetrain);
+        Train(pipeline, trainingData, forceRetrain, diagnostics);
         PendingTransaction[] pending = TransactionQueries.GetPendingTransactions(db);
         IReadOnlyList<CategorizationProposal> proposals =
             await pipeline.PredictPendingDetailedAsync(pending, useLlm);

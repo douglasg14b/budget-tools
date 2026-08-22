@@ -21,6 +21,467 @@
 					"ok"
 				],
 				"type": "object"
+			},
+			"QueueSummaryDto": {
+				"properties": {
+					"blocked": {
+						"type": "number",
+						"format": "double"
+					},
+					"review": {
+						"type": "number",
+						"format": "double"
+					},
+					"suggested": {
+						"type": "number",
+						"format": "double"
+					},
+					"autoApply": {
+						"type": "number",
+						"format": "double"
+					},
+					"total": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"blocked",
+					"review",
+					"suggested",
+					"autoApply",
+					"total"
+				],
+				"type": "object"
+			},
+			"TransactionDetailDto": {
+				"properties": {
+					"importPayeeName": {
+						"type": "string",
+						"nullable": true
+					},
+					"importId": {
+						"type": "string",
+						"nullable": true
+					},
+					"categoryName": {
+						"type": "string",
+						"nullable": true
+					},
+					"categoryId": {
+						"type": "string",
+						"nullable": true
+					},
+					"payeeName": {
+						"type": "string",
+						"nullable": true
+					},
+					"payeeId": {
+						"type": "string",
+						"nullable": true
+					},
+					"accountName": {
+						"type": "string"
+					},
+					"accountId": {
+						"type": "string"
+					},
+					"approved": {
+						"type": "boolean"
+					},
+					"cleared": {
+						"type": "string"
+					},
+					"memo": {
+						"type": "string",
+						"nullable": true
+					},
+					"amount": {
+						"type": "number",
+						"format": "double"
+					},
+					"date": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"importPayeeName",
+					"importId",
+					"categoryName",
+					"categoryId",
+					"payeeName",
+					"payeeId",
+					"accountName",
+					"accountId",
+					"approved",
+					"cleared",
+					"memo",
+					"amount",
+					"date",
+					"id"
+				],
+				"type": "object"
+			},
+			"ApprovalTier": {
+				"type": "string",
+				"enum": [
+					"AutoApply",
+					"Suggested",
+					"Review",
+					"Blocked"
+				]
+			},
+			"CategorizationFlagsDto": {
+				"properties": {
+					"requiresManualReview": {
+						"type": "boolean"
+					},
+					"isExcluded": {
+						"type": "boolean"
+					},
+					"isNovelImport": {
+						"type": "boolean"
+					},
+					"isAmbiguous": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"requiresManualReview",
+					"isExcluded",
+					"isNovelImport",
+					"isAmbiguous"
+				],
+				"type": "object"
+			},
+			"CategorizationMethod": {
+				"type": "string",
+				"enum": [
+					"ImportAmountLookup",
+					"ImportLookup",
+					"PayeeIdLookup",
+					"CanonicalPayeeLookup",
+					"PayeeClusterLookup",
+					"PayeeModel",
+					"HierarchicalModel",
+					"CategoryModel",
+					"Consensus",
+					"LlmCategorization",
+					"Excluded",
+					"ManualReview",
+					"None"
+				]
+			},
+			"CategorizationRouteReason": {
+				"type": "string",
+				"enum": [
+					"None",
+					"ExcludedPayee",
+					"ExcludedCheck",
+					"AmbiguousMerchant",
+					"UntrainedCategory",
+					"NovelImportString",
+					"LowConfidence"
+				]
+			},
+			"ProposalGapReason": {
+				"type": "string",
+				"enum": [
+					"None",
+					"AmbiguousMerchant",
+					"InsufficientAgreement",
+					"TwoMethodSuggestion",
+					"SingleMethodSuggestion",
+					"ImportAmountNearMiss",
+					"NoQualifiedSignals",
+					"LlmSuggestion",
+					"Excluded"
+				]
+			},
+			"MethodSignalDto": {
+				"properties": {
+					"confidence": {
+						"type": "number",
+						"format": "double"
+					},
+					"category": {
+						"type": "string"
+					},
+					"method": {
+						"$ref": "#/components/schemas/CategorizationMethod"
+					}
+				},
+				"required": [
+					"confidence",
+					"category",
+					"method"
+				],
+				"type": "object"
+			},
+			"CategoryOptionDto": {
+				"properties": {
+					"supportingMethods": {
+						"items": {
+							"$ref": "#/components/schemas/MethodSignalDto"
+						},
+						"type": "array"
+					},
+					"confidence": {
+						"type": "number",
+						"format": "double"
+					},
+					"categoryId": {
+						"type": "string",
+						"nullable": true
+					},
+					"categoryGroup": {
+						"type": "string",
+						"nullable": true
+					},
+					"category": {
+						"type": "string"
+					},
+					"rank": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"supportingMethods",
+					"confidence",
+					"categoryId",
+					"categoryGroup",
+					"category",
+					"rank"
+				],
+				"type": "object"
+			},
+			"ConfidenceIntervalDto": {
+				"properties": {
+					"spread": {
+						"type": "number",
+						"format": "double"
+					},
+					"third": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
+					"second": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
+					"top": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"spread",
+					"third",
+					"second",
+					"top"
+				],
+				"type": "object"
+			},
+			"CategorizationProposalDto": {
+				"properties": {
+					"notes": {
+						"type": "string",
+						"nullable": true
+					},
+					"resolvedPayee": {
+						"type": "string",
+						"nullable": true
+					},
+					"featureText": {
+						"type": "string"
+					},
+					"confidenceInterval": {
+						"$ref": "#/components/schemas/ConfidenceIntervalDto"
+					},
+					"options": {
+						"items": {
+							"$ref": "#/components/schemas/CategoryOptionDto"
+						},
+						"type": "array"
+					},
+					"agreeingSignals": {
+						"items": {
+							"$ref": "#/components/schemas/MethodSignalDto"
+						},
+						"type": "array"
+					},
+					"signals": {
+						"items": {
+							"$ref": "#/components/schemas/MethodSignalDto"
+						},
+						"type": "array"
+					},
+					"gapReason": {
+						"$ref": "#/components/schemas/ProposalGapReason"
+					},
+					"routeReason": {
+						"$ref": "#/components/schemas/CategorizationRouteReason"
+					},
+					"method": {
+						"$ref": "#/components/schemas/CategorizationMethod"
+					},
+					"confidence": {
+						"type": "number",
+						"format": "double"
+					},
+					"suggestedCategoryId": {
+						"type": "string",
+						"nullable": true
+					},
+					"suggestedCategoryGroup": {
+						"type": "string",
+						"nullable": true
+					},
+					"suggestedCategory": {
+						"type": "string",
+						"nullable": true
+					},
+					"flags": {
+						"$ref": "#/components/schemas/CategorizationFlagsDto"
+					},
+					"tier": {
+						"$ref": "#/components/schemas/ApprovalTier"
+					},
+					"transactionId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"notes",
+					"resolvedPayee",
+					"featureText",
+					"confidenceInterval",
+					"options",
+					"agreeingSignals",
+					"signals",
+					"gapReason",
+					"routeReason",
+					"method",
+					"confidence",
+					"suggestedCategoryId",
+					"suggestedCategoryGroup",
+					"suggestedCategory",
+					"flags",
+					"tier",
+					"transactionId"
+				],
+				"type": "object"
+			},
+			"CategorizationQueueItemDto": {
+				"properties": {
+					"proposal": {
+						"$ref": "#/components/schemas/CategorizationProposalDto"
+					},
+					"transaction": {
+						"$ref": "#/components/schemas/TransactionDetailDto"
+					}
+				},
+				"required": [
+					"proposal",
+					"transaction"
+				],
+				"type": "object"
+			},
+			"CategorizationQueueDto": {
+				"properties": {
+					"items": {
+						"items": {
+							"$ref": "#/components/schemas/CategorizationQueueItemDto"
+						},
+						"type": "array"
+					},
+					"llm": {
+						"type": "boolean"
+					},
+					"generatedAt": {
+						"type": "string"
+					},
+					"summary": {
+						"$ref": "#/components/schemas/QueueSummaryDto"
+					}
+				},
+				"required": [
+					"items",
+					"llm",
+					"generatedAt",
+					"summary"
+				],
+				"type": "object"
+			},
+			"CategoryDto": {
+				"properties": {
+					"note": {
+						"type": "string",
+						"nullable": true
+					},
+					"hidden": {
+						"type": "boolean"
+					},
+					"name": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"note",
+					"hidden",
+					"name",
+					"id"
+				],
+				"type": "object"
+			},
+			"CategoryGroupDto": {
+				"properties": {
+					"categories": {
+						"items": {
+							"$ref": "#/components/schemas/CategoryDto"
+						},
+						"type": "array"
+					},
+					"hidden": {
+						"type": "boolean"
+					},
+					"name": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"categories",
+					"hidden",
+					"name",
+					"id"
+				],
+				"type": "object"
+			},
+			"CategoriesDto": {
+				"properties": {
+					"groups": {
+						"items": {
+							"$ref": "#/components/schemas/CategoryGroupDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"groups"
+				],
+				"type": "object"
 			}
 		},
 		"securitySchemes": {}
@@ -48,6 +509,88 @@
 				},
 				"tags": [
 					"health"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/categorization/queue": {
+			"get": {
+				"operationId": "GetCategorizationQueue",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/CategorizationQueueDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Pending review queue with AI proposals joined to local transaction details.",
+				"tags": [
+					"categorization"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"description": "Comma-separated ApprovalTier values to include",
+						"in": "query",
+						"name": "tier",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"description": "Filter to a single YNAB account id",
+						"in": "query",
+						"name": "accountId",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"description": "Enable LLM fallback for this predict run (cache key)",
+						"in": "query",
+						"name": "llm",
+						"required": false,
+						"schema": {
+							"type": "boolean"
+						}
+					},
+					{
+						"description": "Force a new predict-json spawn",
+						"in": "query",
+						"name": "refresh",
+						"required": false,
+						"schema": {
+							"type": "boolean"
+						}
+					}
+				]
+			}
+		},
+		"/categories": {
+			"get": {
+				"operationId": "GetCategories",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/CategoriesDto"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"categories"
 				],
 				"security": [],
 				"parameters": []

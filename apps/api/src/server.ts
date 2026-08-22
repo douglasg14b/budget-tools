@@ -5,6 +5,8 @@ import express from 'express';
 import { ValidateError } from 'tsoa';
 
 import { API_PORT } from './environment';
+import { QueryValidationError } from './features/categorization/filterQueue';
+import { PredictJsonError } from './features/categorization/predictJson';
 import { RegisterRoutes } from './generated/routes';
 import { getRequestId, requestContextMiddleware } from './services/requestContext';
 
@@ -19,6 +21,20 @@ function errorHandler(error: unknown, request: Request, response: Response, _nex
         response.status(422).json({
             details: error?.fields,
             message: 'Validation failed',
+        });
+        return;
+    }
+
+    if (error instanceof QueryValidationError) {
+        response.status(422).json({
+            message: error.message,
+        });
+        return;
+    }
+
+    if (error instanceof PredictJsonError) {
+        response.status(503).json({
+            message: error.message,
         });
         return;
     }

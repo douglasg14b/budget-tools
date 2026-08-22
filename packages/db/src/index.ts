@@ -1,3 +1,4 @@
+export { createDatabase, type DatabaseClient } from './createDatabase';
 export type {
     CategorizationFeedback,
     Category,
@@ -17,5 +18,4 @@ export type {
     SubTransactionSchema,
     Transaction,
     TransactionUpdate,
-} from '@budget-tools/db';
-export * from './database';
+} from './schema';
