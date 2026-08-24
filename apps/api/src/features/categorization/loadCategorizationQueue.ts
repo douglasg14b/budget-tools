@@ -1,176 +1,179 @@
-import { getDatabase } from '../../data/database';
 import {
     CATEGORIZATION_AI_WORKING_DIR,
-    CATEGORIZATION_LLM_ENABLED,
     CATEGORIZATION_MODELS_DIR,
     CATEGORIZATION_PREDICT_TIMEOUT_MS,
+    CATEGORIZATION_QUEUE_BATCH_SIZE,
+    CATEGORIZATION_QUEUE_CACHE_DIR,
     getDbConnectionString,
+    getSqliteDbPath,
 } from '../../environment';
+import { loadTravelWindowsSignature } from '../travelWindows/travelWindowsStore';
+import {
+    cacheEntriesMap,
+    cacheFilePath,
+    isCacheUsable,
+    modelSignature,
+    readProposalCache,
+    writeProposalCache,
+} from './cache/proposalCache';
+import { selectScoringBatch } from './cache/selectScoringBatch';
+import type { CachedProposalEntry, ProposalCacheFile } from './cache/types';
 import type {
-    CategorizationProposalDto,
     CategorizationQueueDto,
     CategorizationQueueItemDto,
     CategorizationQueueQuery,
-    QueueSummaryDto,
-    TransactionDetailDto,
 } from './categorizationDtos';
 import { filterAndSortQueueItems, parseTierFilter } from './filterQueue';
-import { runPredictJson } from './predictJson';
+import { hydrateRelatedTransactions } from './hydrateRelatedTransactions';
+import { listPendingTransactions, toTransactionDetail } from './listPendingTransactions';
+import { assertCategorizationModelsExist, runPredictJson } from './predictJson';
+import { summarizeQueue } from './summarizeQueue';
 
-type CachedQueue = {
+type QueueSnapshot = {
     generatedAt: string;
-    llm: boolean;
-    summary: QueueSummaryDto;
-    proposals: CategorizationProposalDto[];
+    pendingCount: number;
+    items: CategorizationQueueItemDto[];
 };
 
-const cache = new Map<boolean, CachedQueue>();
-const inFlight = new Map<boolean, Promise<CachedQueue>>();
+let queueLoadChain: Promise<unknown> = Promise.resolve();
 
 /**
- * Returns the review queue: cached (or freshly spawned) proposals joined to Postgres transactions.
+ * Returns the review queue: disk-cached proposals joined to current pending transactions.
+ * Spawns predict-json only for a batch of uncached or stale ids.
  */
 export async function loadCategorizationQueue(query: CategorizationQueueQuery): Promise<CategorizationQueueDto> {
-    const llm = query.llm ?? CATEGORIZATION_LLM_ENABLED;
     const refresh = query.refresh === true;
-    const cached = await getCachedQueue(llm, refresh);
-    const items = await joinTransactions(cached.proposals);
-    const filteredItems = filterAndSortQueueItems(items, {
+    const expand = query.expand === true && !refresh;
+    const snapshot = await getQueueSnapshot(refresh, expand);
+    const filteredItems = filterAndSortQueueItems(snapshot.items, {
         tiers: parseTierFilter(query.tier),
         accountId: query.accountId,
     });
 
     return {
-        summary: cached.summary,
-        generatedAt: cached.generatedAt,
-        llm: cached.llm,
+        summary: summarizeQueue(snapshot.items.map((item) => item.proposal)),
+        generatedAt: snapshot.generatedAt,
+        llm: false,
+        pendingCount: snapshot.pendingCount,
+        scoredCount: snapshot.items.length,
+        hasMore: snapshot.pendingCount > snapshot.items.length,
         items: filteredItems,
     };
 }
 
-async function getCachedQueue(llm: boolean, refresh: boolean): Promise<CachedQueue> {
-    if (!refresh) {
-        const hit = cache.get(llm);
-        if (hit) {
-            return hit;
-        }
-    }
-
-    const pending = inFlight.get(llm);
-    if (pending) {
-        return pending;
-    }
-
-    const promise = loadQueueFromCli(llm);
-    inFlight.set(llm, promise);
-    try {
-        const result = await promise;
-        cache.set(llm, result);
-        return result;
-    } finally {
-        if (inFlight.get(llm) === promise) {
-            inFlight.delete(llm);
-        }
-    }
+async function getQueueSnapshot(refresh: boolean, expand: boolean): Promise<QueueSnapshot> {
+    const run = (): Promise<QueueSnapshot> => loadQueueSnapshot(refresh, expand);
+    const result = queueLoadChain.then(run, run);
+    queueLoadChain = result.then(
+        () => undefined,
+        () => undefined,
+    );
+    return result;
 }
 
-async function loadQueueFromCli(llm: boolean): Promise<CachedQueue> {
-    const envelope = await runPredictJson({
-        workingDir: CATEGORIZATION_AI_WORKING_DIR,
-        modelsDir: CATEGORIZATION_MODELS_DIR,
-        connectionString: getDbConnectionString(),
-        timeoutMs: CATEGORIZATION_PREDICT_TIMEOUT_MS,
-        llm,
+async function loadQueueSnapshot(refresh: boolean, expand: boolean): Promise<QueueSnapshot> {
+    assertCategorizationModelsExist(CATEGORIZATION_MODELS_DIR);
+
+    const pending = await listPendingTransactions();
+    const signature = modelSignature(CATEGORIZATION_MODELS_DIR);
+    const travelSignature = await loadTravelWindowsSignature();
+    const path = cacheFilePath(CATEGORIZATION_QUEUE_CACHE_DIR, false);
+    const cache = await readProposalCache(path);
+    const fingerprints = new Map(pending.map((row) => [row.id, row.fingerprint]));
+    const batch = selectScoringBatch({
+        pendingIds: pending.map((row) => row.id),
+        fingerprints,
+        cacheEntries: cacheEntriesMap(cache),
+        cacheUsable: isCacheUsable(cache, false, signature, travelSignature),
+        batchSize: CATEGORIZATION_QUEUE_BATCH_SIZE,
+        refresh,
+        expand,
     });
 
-    return {
-        generatedAt: new Date().toISOString(),
-        llm,
-        summary: envelope.summary,
-        proposals: envelope.proposals,
-    };
-}
+    let kept = batch.kept;
+    let generatedAt = latestGeneratedAt(kept) ?? new Date().toISOString();
 
-async function joinTransactions(proposals: CategorizationProposalDto[]): Promise<CategorizationQueueItemDto[]> {
-    if (proposals.length === 0) {
-        return [];
+    if (batch.idsToScore.length > 0) {
+        const envelope = await runPredictJson({
+            workingDir: CATEGORIZATION_AI_WORKING_DIR,
+            modelsDir: CATEGORIZATION_MODELS_DIR,
+            connectionString: getDbConnectionString(),
+            sqliteDbPath: getSqliteDbPath(),
+            timeoutMs: CATEGORIZATION_PREDICT_TIMEOUT_MS,
+            llm: false,
+            transactionIds: batch.idsToScore,
+        });
+        const scoredAt = new Date().toISOString();
+        generatedAt = scoredAt;
+        const scoredEntries: CachedProposalEntry[] = [];
+        for (const proposal of envelope.proposals) {
+            const fingerprint = fingerprints.get(proposal.transactionId);
+            if (!fingerprint) {
+                continue;
+            }
+            scoredEntries.push({ fingerprint, generatedAt: scoredAt, proposal });
+        }
+        kept = [...kept, ...scoredEntries];
     }
 
-    const transactionIds = proposals.map((proposal) => proposal.transactionId);
-    const rows = await getDatabase()
-        .selectFrom('transactions')
-        .select([
-            'id',
-            'date',
-            'amount',
-            'memo',
-            'cleared',
-            'approved',
-            'account_id',
-            'account_name',
-            'payee_id',
-            'payee_name',
-            'category_id',
-            'category_name',
-            'import_id',
-            'import_payee_name',
-        ])
-        .where('id', 'in', transactionIds)
-        .execute();
+    if (shouldRewriteCache(cache, kept, signature, travelSignature)) {
+        await writeProposalCache({
+            path,
+            llm: false,
+            modelSignature: signature,
+            travelWindowsSignature: travelSignature,
+            entries: kept,
+        });
+    }
 
-    const transactionsById = new Map(rows.map((row) => [row.id, toTransactionDetail(row)]));
-
-    const items: CategorizationQueueItemDto[] = [];
-    for (const proposal of proposals) {
-        const transaction = transactionsById.get(proposal.transactionId);
-        if (!transaction) {
+    const proposalsById = new Map(kept.map((entry) => [entry.proposal.transactionId, entry.proposal]));
+    const scoredItems: Array<Omit<CategorizationQueueItemDto, 'relatedTransactions'>> = [];
+    for (const row of pending) {
+        const proposal = proposalsById.get(row.id);
+        if (!proposal) {
             continue;
         }
-        items.push({ transaction, proposal });
+        scoredItems.push({ transaction: toTransactionDetail(row), proposal });
     }
+    const items = await hydrateRelatedTransactions(scoredItems);
 
-    return items;
-}
-
-type TransactionRow = {
-    id: string;
-    date: Date | string;
-    amount: number;
-    memo: string | null;
-    cleared: string;
-    approved: boolean;
-    account_id: string;
-    account_name: string;
-    payee_id: string | null;
-    payee_name: string | null;
-    category_id: string | null;
-    category_name: string | null;
-    import_id: string | null;
-    import_payee_name: string | null;
-};
-
-function toTransactionDetail(row: TransactionRow): TransactionDetailDto {
     return {
-        id: row.id,
-        date: formatTransactionDate(row.date),
-        amount: row.amount,
-        memo: row.memo,
-        cleared: row.cleared,
-        approved: row.approved,
-        accountId: row.account_id,
-        accountName: row.account_name,
-        payeeId: row.payee_id,
-        payeeName: row.payee_name,
-        categoryId: row.category_id,
-        categoryName: row.category_name,
-        importId: row.import_id,
-        importPayeeName: row.import_payee_name,
+        generatedAt,
+        pendingCount: pending.length,
+        items,
     };
 }
 
-function formatTransactionDate(value: Date | string): string {
-    if (typeof value === 'string') {
-        return value.slice(0, 10);
+function latestGeneratedAt(entries: readonly CachedProposalEntry[]): string | undefined {
+    let latest: string | undefined;
+    for (const entry of entries) {
+        if (!latest || entry.generatedAt > latest) {
+            latest = entry.generatedAt;
+        }
     }
-    return value.toISOString().slice(0, 10);
+    return latest;
+}
+
+function shouldRewriteCache(
+    cache: ProposalCacheFile | undefined,
+    kept: readonly CachedProposalEntry[],
+    signature: string,
+    travelSignature: string,
+): boolean {
+    if (!isCacheUsable(cache, false, signature, travelSignature)) {
+        return true;
+    }
+
+    if (Object.keys(cache.entries).length !== kept.length) {
+        return true;
+    }
+
+    for (const entry of kept) {
+        const existing = cache.entries[entry.proposal.transactionId];
+        if (!existing || existing.generatedAt !== entry.generatedAt || existing.fingerprint !== entry.fingerprint) {
+            return true;
+        }
+    }
+
+    return false;
 }

@@ -7,6 +7,137 @@
 		"requestBodies": {},
 		"responses": {},
 		"schemas": {
+			"TravelWindowKindDto": {
+				"type": "string",
+				"enum": [
+					"vacation",
+					"work"
+				]
+			},
+			"TravelWindowDto": {
+				"properties": {
+					"accountName": {
+						"type": "string",
+						"nullable": true
+					},
+					"accountId": {
+						"type": "string",
+						"nullable": true
+					},
+					"endDate": {
+						"type": "string"
+					},
+					"startDate": {
+						"type": "string"
+					},
+					"kind": {
+						"$ref": "#/components/schemas/TravelWindowKindDto"
+					},
+					"name": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"accountName",
+					"accountId",
+					"endDate",
+					"startDate",
+					"kind",
+					"name",
+					"id"
+				],
+				"type": "object"
+			},
+			"TravelWindowsDto": {
+				"properties": {
+					"windows": {
+						"items": {
+							"$ref": "#/components/schemas/TravelWindowDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"windows"
+				],
+				"type": "object"
+			},
+			"TravelWindowWriteDto": {
+				"properties": {
+					"accountName": {
+						"type": "string",
+						"nullable": true
+					},
+					"accountId": {
+						"type": "string",
+						"nullable": true
+					},
+					"endDate": {
+						"type": "string"
+					},
+					"startDate": {
+						"type": "string"
+					},
+					"kind": {
+						"$ref": "#/components/schemas/TravelWindowKindDto"
+					},
+					"name": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"accountName",
+					"accountId",
+					"endDate",
+					"startDate",
+					"kind",
+					"name"
+				],
+				"type": "object"
+			},
+			"TravelBiasDto": {
+				"properties": {
+					"enabled": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"enabled"
+				],
+				"type": "object"
+			},
+			"AccountDto": {
+				"properties": {
+					"name": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"name",
+					"id"
+				],
+				"type": "object"
+			},
+			"AccountsDto": {
+				"properties": {
+					"accounts": {
+						"items": {
+							"$ref": "#/components/schemas/AccountDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"accounts"
+				],
+				"type": "object"
+			},
 			"HealthDto": {
 				"properties": {
 					"ok": {
@@ -54,8 +185,21 @@
 				],
 				"type": "object"
 			},
+			"TransactionClearedStatus": {
+				"type": "string",
+				"enum": [
+					"uncleared",
+					"cleared",
+					"reconciled"
+				],
+				"description": "YNAB `cleared` field. Uncleared transactions are excluded from the review queue."
+			},
 			"TransactionDetailDto": {
 				"properties": {
+					"importPayeeNameOriginal": {
+						"type": "string",
+						"nullable": true
+					},
 					"importPayeeName": {
 						"type": "string",
 						"nullable": true
@@ -90,7 +234,7 @@
 						"type": "boolean"
 					},
 					"cleared": {
-						"type": "string"
+						"$ref": "#/components/schemas/TransactionClearedStatus"
 					},
 					"memo": {
 						"type": "string",
@@ -108,6 +252,7 @@
 					}
 				},
 				"required": [
+					"importPayeeNameOriginal",
 					"importPayeeName",
 					"importId",
 					"categoryName",
@@ -136,6 +281,15 @@
 			},
 			"CategorizationFlagsDto": {
 				"properties": {
+					"isTravelWindow": {
+						"type": "boolean"
+					},
+					"isPeriodicConflict": {
+						"type": "boolean"
+					},
+					"isPeriodic": {
+						"type": "boolean"
+					},
 					"requiresManualReview": {
 						"type": "boolean"
 					},
@@ -150,6 +304,9 @@
 					}
 				},
 				"required": [
+					"isTravelWindow",
+					"isPeriodicConflict",
+					"isPeriodic",
 					"requiresManualReview",
 					"isExcluded",
 					"isNovelImport",
@@ -168,6 +325,7 @@
 					"PayeeModel",
 					"HierarchicalModel",
 					"CategoryModel",
+					"PeriodicSeriesLookup",
 					"Consensus",
 					"LlmCategorization",
 					"Excluded",
@@ -198,7 +356,8 @@
 					"ImportAmountNearMiss",
 					"NoQualifiedSignals",
 					"LlmSuggestion",
-					"Excluded"
+					"Excluded",
+					"PeriodicConflict"
 				]
 			},
 			"MethodSignalDto": {
@@ -288,10 +447,154 @@
 				],
 				"type": "object"
 			},
+			"PayeeResolutionMethod": {
+				"type": "string",
+				"enum": [
+					"ExactLookup",
+					"ClusterLookup",
+					"Model",
+					"Llm",
+					"Unresolved"
+				]
+			},
+			"PayeeSuggestionDto": {
+				"properties": {
+					"needsRename": {
+						"type": "boolean"
+					},
+					"confidence": {
+						"type": "number",
+						"format": "double"
+					},
+					"method": {
+						"$ref": "#/components/schemas/PayeeResolutionMethod"
+					},
+					"name": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"needsRename",
+					"confidence",
+					"method",
+					"name"
+				],
+				"type": "object"
+			},
+			"PeriodicCadence": {
+				"type": "string",
+				"enum": [
+					"Weekly",
+					"Biweekly",
+					"Monthly",
+					"Quarterly",
+					"Yearly"
+				]
+			},
+			"PeriodicMatchDto": {
+				"properties": {
+					"cadenceFit": {
+						"type": "number",
+						"format": "double"
+					},
+					"relatedTransactionIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"categoryVoteShare": {
+						"type": "number",
+						"format": "double"
+					},
+					"category": {
+						"type": "string",
+						"nullable": true,
+						"description": "Majority historical category, or null when the series has no usable labels."
+					},
+					"lastDate": {
+						"type": "string"
+					},
+					"medianAmount": {
+						"type": "number",
+						"format": "double"
+					},
+					"occurrenceCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"cadence": {
+						"$ref": "#/components/schemas/PeriodicCadence"
+					}
+				},
+				"required": [
+					"cadenceFit",
+					"relatedTransactionIds",
+					"categoryVoteShare",
+					"category",
+					"lastDate",
+					"medianAmount",
+					"occurrenceCount",
+					"cadence"
+				],
+				"type": "object"
+			},
+			"TravelWindowHitDto": {
+				"properties": {
+					"targetCategory": {
+						"type": "string",
+						"nullable": true
+					},
+					"kind": {
+						"type": "string",
+						"enum": [
+							"vacation",
+							"work"
+						]
+					},
+					"name": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"targetCategory",
+					"kind",
+					"name",
+					"id"
+				],
+				"type": "object"
+			},
 			"CategorizationProposalDto": {
 				"properties": {
+					"travelWindow": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/TravelWindowHitDto"
+							}
+						],
+						"nullable": true
+					},
+					"periodicMatch": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/PeriodicMatchDto"
+							}
+						],
+						"nullable": true
+					},
 					"notes": {
 						"type": "string",
+						"nullable": true
+					},
+					"payeeSuggestion": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/PayeeSuggestionDto"
+							}
+						],
 						"nullable": true
 					},
 					"resolvedPayee": {
@@ -358,7 +661,10 @@
 					}
 				},
 				"required": [
+					"travelWindow",
+					"periodicMatch",
 					"notes",
+					"payeeSuggestion",
 					"resolvedPayee",
 					"featureText",
 					"confidenceInterval",
@@ -380,6 +686,13 @@
 			},
 			"CategorizationQueueItemDto": {
 				"properties": {
+					"relatedTransactions": {
+						"items": {
+							"$ref": "#/components/schemas/TransactionDetailDto"
+						},
+						"type": "array",
+						"description": "Prior charges in this periodic series, newest first (ids from `proposal.periodicMatch`)."
+					},
 					"proposal": {
 						"$ref": "#/components/schemas/CategorizationProposalDto"
 					},
@@ -388,6 +701,7 @@
 					}
 				},
 				"required": [
+					"relatedTransactions",
 					"proposal",
 					"transaction"
 				],
@@ -401,6 +715,19 @@
 						},
 						"type": "array"
 					},
+					"hasMore": {
+						"type": "boolean",
+						"description": "True when pending transactions exist that have not been scored yet."
+					},
+					"scoredCount": {
+						"type": "number",
+						"format": "double",
+						"description": "Unfiltered scored working-set size."
+					},
+					"pendingCount": {
+						"type": "number",
+						"format": "double"
+					},
 					"llm": {
 						"type": "boolean"
 					},
@@ -413,9 +740,72 @@
 				},
 				"required": [
 					"items",
+					"hasMore",
+					"scoredCount",
+					"pendingCount",
 					"llm",
 					"generatedAt",
 					"summary"
+				],
+				"type": "object"
+			},
+			"LlmSuggestOverlayDto": {
+				"properties": {
+					"payeeSuggestion": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/PayeeSuggestionDto"
+							}
+						],
+						"nullable": true
+					},
+					"notes": {
+						"type": "string",
+						"nullable": true
+					},
+					"confidence": {
+						"type": "number",
+						"format": "double"
+					},
+					"suggestedCategoryId": {
+						"type": "string",
+						"nullable": true
+					},
+					"suggestedCategoryGroup": {
+						"type": "string",
+						"nullable": true
+					},
+					"suggestedCategory": {
+						"type": "string",
+						"nullable": true
+					},
+					"model": {
+						"type": "string"
+					},
+					"transactionId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"payeeSuggestion",
+					"notes",
+					"confidence",
+					"suggestedCategoryId",
+					"suggestedCategoryGroup",
+					"suggestedCategory",
+					"model",
+					"transactionId"
+				],
+				"type": "object"
+			},
+			"LlmSuggestRequestDto": {
+				"properties": {
+					"transactionId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"transactionId"
 				],
 				"type": "object"
 			},
@@ -492,6 +882,209 @@
 		"contact": {}
 	},
 	"paths": {
+		"/travel-windows": {
+			"get": {
+				"operationId": "ListTravelWindows",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TravelWindowsDto"
+								}
+							}
+						}
+					}
+				},
+				"summary": "listTravelWindows",
+				"tags": [
+					"travel-windows"
+				],
+				"security": [],
+				"parameters": []
+			},
+			"post": {
+				"operationId": "CreateTravelWindow",
+				"responses": {
+					"201": {
+						"description": "Created",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TravelWindowDto"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "Overlapping travel window"
+					}
+				},
+				"summary": "createTravelWindow",
+				"tags": [
+					"travel-windows"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/TravelWindowWriteDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/travel-windows/{id}": {
+			"put": {
+				"operationId": "UpdateTravelWindow",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TravelWindowDto"
+								}
+							}
+						}
+					},
+					"409": {
+						"description": "Overlapping travel window"
+					}
+				},
+				"summary": "updateTravelWindow",
+				"tags": [
+					"travel-windows"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/TravelWindowWriteDto"
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "DeleteTravelWindow",
+				"responses": {
+					"204": {
+						"description": "No content"
+					}
+				},
+				"summary": "deleteTravelWindow",
+				"tags": [
+					"travel-windows"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/travel-bias": {
+			"get": {
+				"operationId": "GetTravelBias",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TravelBiasDto"
+								}
+							}
+						}
+					}
+				},
+				"summary": "getTravelBias",
+				"tags": [
+					"travel-bias"
+				],
+				"security": [],
+				"parameters": []
+			},
+			"patch": {
+				"operationId": "PatchTravelBias",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TravelBiasDto"
+								}
+							}
+						}
+					}
+				},
+				"summary": "patchTravelBias",
+				"tags": [
+					"travel-bias"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/TravelBiasDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/accounts": {
+			"get": {
+				"operationId": "ListAccounts",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AccountsDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Distinct YNAB accounts present on synced transactions, for the trip card picker.",
+				"summary": "listAccounts",
+				"tags": [
+					"accounts"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
 		"/health": {
 			"get": {
 				"operationId": "GetHealth",
@@ -529,7 +1122,7 @@
 						}
 					}
 				},
-				"description": "Pending review queue with AI proposals joined to local transaction details.",
+				"description": "Pending review queue with locally scored AI proposals joined to transaction details.",
 				"tags": [
 					"categorization"
 				],
@@ -554,24 +1147,58 @@
 						}
 					},
 					{
-						"description": "Enable LLM fallback for this predict run (cache key)",
-						"in": "query",
-						"name": "llm",
-						"required": false,
-						"schema": {
-							"type": "boolean"
-						}
-					},
-					{
-						"description": "Force a new predict-json spawn",
+						"description": "Discard cached scores and rescore the newest batch",
 						"in": "query",
 						"name": "refresh",
 						"required": false,
 						"schema": {
 							"type": "boolean"
 						}
+					},
+					{
+						"description": "Score the next never-scored batch; ignored when refresh is true",
+						"in": "query",
+						"name": "expand",
+						"required": false,
+						"schema": {
+							"type": "boolean"
+						}
 					}
 				]
+			}
+		},
+		"/categorization/llm-suggest": {
+			"post": {
+				"operationId": "PostLlmSuggest",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/LlmSuggestOverlayDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Just-in-time LLM category (and optional payee) overlay for one scored queue transaction.",
+				"summary": "postLlmSuggest",
+				"tags": [
+					"categorization"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/LlmSuggestRequestDto"
+							}
+						}
+					}
+				}
 			}
 		},
 		"/categories": {

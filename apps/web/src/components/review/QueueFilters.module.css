@@ -1,0 +1,21 @@
+.select {
+    width: 17.5rem;
+}
+
+.select :global(.mantine-Select-input) {
+    background: var(--app-bg-surface);
+    border-color: var(--app-border-strong);
+    color: var(--app-text-primary);
+}
+
+.select :global(.mantine-Select-input)::placeholder {
+    color: var(--app-text-muted);
+}
+
+.select :global(.mantine-Select-label) {
+    color: var(--app-text-muted);
+    font-size: 0.875rem;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}

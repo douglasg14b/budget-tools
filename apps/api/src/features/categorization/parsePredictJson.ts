@@ -7,9 +7,14 @@ import type {
     CategoryOptionDto,
     ConfidenceIntervalDto,
     MethodSignalDto,
+    PayeeResolutionMethod,
+    PayeeSuggestionDto,
+    PeriodicCadence,
+    PeriodicMatchDto,
     PredictJsonEnvelope,
     ProposalGapReason,
     QueueSummaryDto,
+    TravelWindowHitDto,
 } from './categorizationDtos';
 
 export class PredictJsonError extends Error {
@@ -30,6 +35,7 @@ const CATEGORIZATION_METHODS = new Set<CategorizationMethod>([
     'PayeeModel',
     'HierarchicalModel',
     'CategoryModel',
+    'PeriodicSeriesLookup',
     'Consensus',
     'LlmCategorization',
     'Excluded',
@@ -57,6 +63,17 @@ const GAP_REASONS = new Set<ProposalGapReason>([
     'NoQualifiedSignals',
     'LlmSuggestion',
     'Excluded',
+    'PeriodicConflict',
+]);
+
+const PERIODIC_CADENCES = new Set<PeriodicCadence>(['Weekly', 'Biweekly', 'Monthly', 'Quarterly', 'Yearly']);
+
+const PAYEE_RESOLUTION_METHODS = new Set<PayeeResolutionMethod>([
+    'ExactLookup',
+    'ClusterLookup',
+    'Model',
+    'Llm',
+    'Unresolved',
 ]);
 
 /**
@@ -152,7 +169,10 @@ function parseProposal(value: unknown, index: number): CategorizationProposalDto
         confidenceInterval: parseConfidenceInterval(proposal.confidenceInterval, index),
         featureText: typeof proposal.featureText === 'string' ? proposal.featureText : '',
         resolvedPayee: optionalString(proposal.resolvedPayee),
+        payeeSuggestion: parsePayeeSuggestion(proposal.payeeSuggestion, index),
         notes: optionalString(proposal.notes),
+        periodicMatch: parsePeriodicMatch(proposal.periodicMatch, index),
+        travelWindow: parseTravelWindow(proposal.travelWindow, index),
     };
 }
 
@@ -170,6 +190,9 @@ function parseFlags(value: unknown, index: number): CategorizationFlagsDto {
             flags.requiresManualReview,
             `proposals[${index}].flags.requiresManualReview`,
         ),
+        isPeriodic: requireBoolean(flags.isPeriodic, `proposals[${index}].flags.isPeriodic`),
+        isPeriodicConflict: requireBoolean(flags.isPeriodicConflict, `proposals[${index}].flags.isPeriodicConflict`),
+        isTravelWindow: optionalBoolean(flags.isTravelWindow, false),
     };
 }
 
@@ -235,6 +258,66 @@ function parseConfidenceInterval(value: unknown, index: number): ConfidenceInter
     };
 }
 
+function parsePayeeSuggestion(value: unknown, index: number): PayeeSuggestionDto | null {
+    if (value === undefined || value === null) {
+        return null;
+    }
+    if (typeof value !== 'object') {
+        throw new PredictJsonError(`proposals[${index}].payeeSuggestion must be an object or null`);
+    }
+
+    const suggestion = value as Record<string, unknown>;
+    const method = suggestion.method;
+    if (typeof method !== 'string' || !PAYEE_RESOLUTION_METHODS.has(method as PayeeResolutionMethod)) {
+        throw new PredictJsonError(`proposals[${index}].payeeSuggestion.method is invalid`);
+    }
+
+    return {
+        name: requireString(suggestion.name, `proposals[${index}].payeeSuggestion.name`),
+        method: method as PayeeResolutionMethod,
+        confidence: requireNumber(suggestion.confidence, `proposals[${index}].payeeSuggestion.confidence`),
+        needsRename: requireBoolean(suggestion.needsRename, `proposals[${index}].payeeSuggestion.needsRename`),
+    };
+}
+
+function parsePeriodicMatch(value: unknown, index: number): PeriodicMatchDto | null {
+    if (value === undefined || value === null) {
+        return null;
+    }
+    if (typeof value !== 'object') {
+        throw new PredictJsonError(`proposals[${index}].periodicMatch must be an object or null`);
+    }
+
+    const match = value as Record<string, unknown>;
+    const cadence = match.cadence;
+    if (typeof cadence !== 'string' || !PERIODIC_CADENCES.has(cadence as PeriodicCadence)) {
+        throw new PredictJsonError(`proposals[${index}].periodicMatch.cadence is invalid`);
+    }
+
+    const relatedIds = match.relatedTransactionIds;
+    if (!Array.isArray(relatedIds) || relatedIds.some((id) => typeof id !== 'string' || id.length === 0)) {
+        throw new PredictJsonError(
+            `proposals[${index}].periodicMatch.relatedTransactionIds must be an array of non-empty strings`,
+        );
+    }
+
+    const lastDate = requireString(match.lastDate, `proposals[${index}].periodicMatch.lastDate`);
+
+    return {
+        cadence: cadence as PeriodicCadence,
+        occurrenceCount: requireNumber(match.occurrenceCount, `proposals[${index}].periodicMatch.occurrenceCount`),
+        medianAmount: requireNumber(match.medianAmount, `proposals[${index}].periodicMatch.medianAmount`),
+        lastDate,
+        category: optionalNonEmptyString(match.category),
+        categoryVoteShare: requireNumber(
+            match.categoryVoteShare,
+            `proposals[${index}].periodicMatch.categoryVoteShare`,
+        ),
+        relatedTransactionIds: relatedIds.filter((id): id is string => typeof id === 'string'),
+        cadenceFit: requireNumber(match.cadenceFit, `proposals[${index}].periodicMatch.cadenceFit`),
+    };
+}
+
 function parseMethod(value: unknown, index: number, path = `proposals[${index}].method`): CategorizationMethod {
     if (typeof value !== 'string' || !CATEGORIZATION_METHODS.has(value as CategorizationMethod)) {
         throw new PredictJsonError(`${path} is invalid`);
@@ -285,6 +368,42 @@ function optionalString(value: unknown): string | null {
     return typeof value === 'string' ? value : null;
 }
 
+function optionalNonEmptyString(value: unknown): string | null {
+    return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
 function optionalNumber(value: unknown): number | null {
     return typeof value === 'number' && !Number.isNaN(value) ? value : null;
+}
+
+function optionalBoolean(value: unknown, fallback: boolean): boolean {
+    if (value === undefined) {
+        return fallback;
+    }
+    if (typeof value !== 'boolean') {
+        throw new PredictJsonError('flag boolean is invalid');
+    }
+    return value;
+}
+
+function parseTravelWindow(value: unknown, index: number): TravelWindowHitDto | null {
+    if (value === undefined || value === null) {
+        return null;
+    }
+    if (typeof value !== 'object') {
+        throw new PredictJsonError(`proposals[${index}].travelWindow must be an object or null`);
+    }
+
+    const window = value as Record<string, unknown>;
+    const kind = window.kind;
+    if (kind !== 'vacation' && kind !== 'work') {
+        throw new PredictJsonError(`proposals[${index}].travelWindow.kind is invalid`);
+    }
+
+    return {
+        id: requireString(window.id, `proposals[${index}].travelWindow.id`),
+        name: requireString(window.name, `proposals[${index}].travelWindow.name`),
+        kind,
+        targetCategory: optionalNonEmptyString(window.targetCategory),
+    };
 }

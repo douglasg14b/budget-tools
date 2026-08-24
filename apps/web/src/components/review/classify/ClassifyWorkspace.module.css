@@ -1,0 +1,26 @@
+.workspace {
+    display: grid;
+    grid-template-columns: minmax(14.5rem, 18.5rem) minmax(0, 1fr) 12.75rem;
+    gap: 1.15rem 1.35rem;
+    align-items: start;
+}
+
+.shortcuts {
+    min-width: 0;
+}
+
+@media (max-width: 72rem) {
+    .workspace {
+        grid-template-columns: minmax(14.5rem, 18.5rem) minmax(0, 1fr);
+    }
+
+    .shortcuts {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 56rem) {
+    .workspace {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,31 @@
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 0.25rem;
+    background: color-mix(in srgb, var(--tier-color) 16%, transparent);
+    color: var(--tier-color);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1.3;
+    white-space: nowrap;
+    cursor: help;
+}
+
+.badge[data-tier="AutoApply"] {
+    --tier-color: var(--app-tier-auto);
+}
+
+.badge[data-tier="Suggested"] {
+    --tier-color: var(--app-tier-suggested);
+}
+
+.badge[data-tier="Review"] {
+    --tier-color: var(--app-tier-review);
+}
+
+.badge[data-tier="Blocked"] {
+    --tier-color: var(--app-tier-blocked);
+}

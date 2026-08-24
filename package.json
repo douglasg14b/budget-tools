@@ -47,7 +47,8 @@
   "packageManager": "pnpm@9.12.0",
   "pnpm": {
     "onlyBuiltDependencies": [
-      "lefthook"
+      "lefthook",
+      "better-sqlite3"
     ]
   },
   "_moduleAliases": {

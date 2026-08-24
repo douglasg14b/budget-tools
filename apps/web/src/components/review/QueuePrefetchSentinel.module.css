@@ -1,0 +1,12 @@
+.sentinel {
+    min-height: 1px;
+}
+
+.hint {
+    margin: 0.85rem 0 0.35rem;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    color: var(--app-text-muted);
+    text-align: center;
+}

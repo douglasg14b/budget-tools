@@ -25,6 +25,7 @@ function item(overrides: {
             categoryName: null,
             importId: null,
             importPayeeName: null,
+            importPayeeNameOriginal: null,
         },
         proposal: {
             transactionId: overrides.id,
@@ -34,6 +35,9 @@ function item(overrides: {
                 isNovelImport: false,
                 isExcluded: false,
                 requiresManualReview: false,
+                isPeriodic: false,
+                isPeriodicConflict: false,
+                isTravelWindow: false,
             },
             suggestedCategory: 'Groceries',
             suggestedCategoryGroup: 'Needs',
@@ -48,8 +52,12 @@ function item(overrides: {
             confidenceInterval: { top: 0.9, second: null, third: null, spread: 0 },
             featureText: '',
             resolvedPayee: null,
+            payeeSuggestion: null,
             notes: null,
+            periodicMatch: null,
+            travelWindow: null,
         },
+        relatedTransactions: [],
     };
 }
 

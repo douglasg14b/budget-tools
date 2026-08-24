@@ -20,6 +20,8 @@ A .NET 8 console app that categorizes YNAB transactions using a tiered pipeline:
 
 **Untrained categories** (in YNAB but never classified in your history) are never auto-applied by local ML; LLM may suggest them but flags for review.
 
+**Placeholder categories** (`Uncategorized`, `Inflow:*`, Internal Master Category) are never training labels or suggestions. Pending rows still contribute to periodic cadence detection; those names do not vote as a series category.
+
 ## Approval workflow (API-ready)
 
 `PredictDetailedAsync` returns a **`CategorizationProposal`** with everything a review UI needs:
@@ -38,7 +40,9 @@ A .NET 8 console app that categorizes YNAB transactions using a tiered pipeline:
 
 ```bash
 dotnet run predict              # human-readable tier summary
-dotnet run predict-json         # JSON payload for API/UI integration
+dotnet run predict-json                # JSON payload for API/UI integration
+dotnet run predict-json --limit 50     # newest 50 pending
+dotnet run predict-json --ids id,id    # specific transactions (API cache fill)
 dotnet run feedback-stats       # approval/denial metrics
 ```
 

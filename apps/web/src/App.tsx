@@ -1,40 +1,48 @@
-import { AppShell, MantineProvider, NavLink, Text } from '@mantine/core';
+import { AppShell, MantineProvider } from '@mantine/core';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
+import classes from './App.module.css';
+import { AppNav } from './components/AppNav';
+import { NavbarHealthBadge } from './components/NavbarHealthBadge';
 import { cssVariablesResolver } from './cssVariablesResolver';
-import { HomePage } from './pages/HomePage';
+import { ClassifyPage } from './pages/ClassifyPage';
+import { ReviewQueuePage } from './pages/ReviewQueuePage';
+import { TripsPage } from './pages/TripsPage';
 import { theme } from './theme';
 
 export function App() {
     return (
         <MantineProvider defaultColorScheme="dark" theme={theme} cssVariablesResolver={cssVariablesResolver}>
             <BrowserRouter>
-                <AppShell
-                    navbar={{ width: 220, breakpoint: 'sm' }}
-                    padding="md"
-                    styles={{
-                        main: {
-                            backgroundColor: 'var(--app-bg-root)',
-                        },
-                        navbar: {
-                            backgroundColor: 'var(--app-bg-surface)',
-                        },
-                    }}
-                >
-                    <AppShell.Navbar p="md">
-                        <Text fw={700} mb="md">
-                            Budget Tools
-                        </Text>
-                        <NavLink label="Home" href="/" active />
-                        <NavLink label="Review" href="#" disabled description="Coming soon" />
-                    </AppShell.Navbar>
-                    <AppShell.Main>
-                        <Routes>
-                            <Route path="/" element={<HomePage />} />
-                        </Routes>
-                    </AppShell.Main>
-                </AppShell>
+                <AppLayout />
             </BrowserRouter>
         </MantineProvider>
+    );
+}
+
+function AppLayout() {
+    return (
+        <AppShell header={{ height: 60 }} padding={0} classNames={{ header: classes.header, main: classes.main }}>
+            <AppShell.Header withBorder={false}>
+                <div className={classes.headerInner}>
+                    <div className={classes.brand}>
+                        <span className={classes.wordmark}>Budget Tools</span>
+                        <AppNav />
+                    </div>
+                    <NavbarHealthBadge />
+                </div>
+            </AppShell.Header>
+            <AppShell.Main>
+                <div className={classes.atmosphere} aria-hidden="true" />
+                <div className={classes.page}>
+                    <Routes>
+                        <Route path="/" element={<ReviewQueuePage />} />
+                        <Route path="/classify" element={<ClassifyPage layout="card" />} />
+                        <Route path="/classify/table" element={<ClassifyPage layout="table" />} />
+                        <Route path="/trips" element={<TripsPage />} />
+                    </Routes>
+                </div>
+            </AppShell.Main>
+        </AppShell>
     );
 }

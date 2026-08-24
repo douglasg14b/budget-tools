@@ -1,0 +1,230 @@
+.workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 12.75rem;
+    gap: 1.15rem 1.35rem;
+    align-items: start;
+}
+
+.scroller {
+    min-width: 0;
+    max-height: min(72vh, 46rem);
+    overflow: auto;
+    background: var(--app-bg-surface);
+    border-radius: 0.55rem;
+    box-shadow: inset 0 0 0 1px var(--app-border);
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.45rem 0.65rem;
+    background: var(--app-bg-elevated);
+    box-shadow: 0 1px 0 var(--app-border);
+    color: var(--app-text-muted);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.num,
+.confHead,
+.amountHead {
+    text-align: right;
+}
+
+.row {
+    cursor: pointer;
+}
+
+.row td {
+    padding: 0.38rem 0.65rem;
+    border-top: 1px solid var(--app-border);
+    vertical-align: middle;
+}
+
+.row:first-child td {
+    border-top: 0;
+}
+
+.row:hover td {
+    background: var(--app-bg-hover);
+}
+
+.row[data-current] td {
+    background: var(--app-bg-elevated);
+}
+
+.row[data-current] td:first-child {
+    box-shadow: inset 2px 0 0 var(--app-tier-auto);
+}
+
+.row[data-action] {
+    opacity: 0.55;
+}
+
+.row[data-current][data-action] {
+    opacity: 1;
+}
+
+.num {
+    width: 2.1rem;
+    font-family: var(--app-font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--app-text-muted);
+    text-align: right;
+}
+
+.date {
+    white-space: nowrap;
+    color: var(--app-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.payee {
+    min-width: 8rem;
+    max-width: 16rem;
+}
+
+.payeeName {
+    display: block;
+    overflow: hidden;
+    font-weight: 700;
+    color: var(--app-text-primary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rename {
+    display: block;
+    overflow: hidden;
+    color: var(--app-text-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.memo {
+    display: block;
+    overflow: hidden;
+    color: var(--app-text-muted);
+    font-size: 0.75rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.amount {
+    font-family: var(--app-font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    color: var(--app-text-primary);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.amount[data-inflow] {
+    color: var(--app-amount-inflow);
+}
+
+.suggestion {
+    color: var(--app-text-primary);
+    white-space: nowrap;
+}
+
+.suggestionMuted {
+    color: var(--app-text-muted);
+}
+
+.conf {
+    font-family: var(--app-font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--app-text-secondary);
+    text-align: right;
+}
+
+.conf[data-certain] {
+    color: var(--app-tier-auto);
+}
+
+.alts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2rem 0.45rem;
+}
+
+.alt {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    padding: 0.05rem 0;
+    background: transparent;
+    color: var(--app-text-secondary);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.alt:hover,
+.altSelected {
+    color: var(--app-text-primary);
+}
+
+.altKey {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.1rem;
+    padding: 0.02rem 0.22rem;
+    border-radius: 0.18rem;
+    background: var(--app-bg-elevated);
+    font-family: var(--app-font-mono);
+    font-size: 0.6875rem;
+    color: var(--app-text-muted);
+}
+
+.catalog {
+    min-width: 9.5rem;
+}
+
+.status {
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--app-text-muted);
+    white-space: nowrap;
+}
+
+.status[data-action="approved"] {
+    color: var(--app-tier-auto);
+}
+
+.status[data-action="changed"] {
+    color: var(--app-tier-suggested);
+}
+
+.status[data-action="rejected"] {
+    color: var(--app-status-error);
+}
+
+.shortcuts {
+    min-width: 0;
+}
+
+@media (max-width: 72rem) {
+    .workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .shortcuts {
+        grid-column: 1;
+    }
+}

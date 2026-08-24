@@ -1,0 +1,30 @@
+.nav {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.15rem;
+    border-radius: 999px;
+    background: var(--app-bg-surface);
+    box-shadow: inset 0 0 0 1px var(--app-border);
+}
+
+.link {
+    padding: 0.35rem 0.95rem;
+    border-radius: 999px;
+    color: var(--app-text-secondary);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    line-height: 1.2;
+}
+
+.link:hover {
+    color: var(--app-text-primary);
+}
+
+.linkActive {
+    background: var(--app-bg-elevated);
+    color: var(--app-text-primary);
+    box-shadow: inset 0 0 0 1px var(--app-border-strong);
+}

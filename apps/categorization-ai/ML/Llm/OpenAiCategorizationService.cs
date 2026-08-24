@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using OpenAI.Chat;
+using Serilog;
 using YnabCategoryAi.Configuration;
 using YnabCategoryAi.Data;
 
@@ -91,7 +92,7 @@ public sealed class OpenAiCategorizationService : ILlmCategorizationService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"LLM request failed: {ex.Message}");
+            Log.Warning(ex, "LLM request failed");
             return null;
         }
     }

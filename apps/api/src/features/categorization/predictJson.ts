@@ -13,31 +13,48 @@ export type RunPredictJsonInput = {
     readonly workingDir: string;
     readonly modelsDir: string;
     readonly connectionString: string;
+    readonly sqliteDbPath: string;
     readonly timeoutMs: number;
     readonly llm: boolean;
+    readonly transactionIds: readonly string[];
 };
 
 /**
  * Spawns `dotnet run -- predict-json` and returns the parsed proposal envelope.
  */
 export async function runPredictJson(input: RunPredictJsonInput): Promise<PredictJsonEnvelope> {
-    assertModelsExist(input.modelsDir);
+    if (input.transactionIds.length === 0) {
+        throw new PredictJsonError('predict-json requires transaction ids; refusing to score the full pending set');
+    }
+
+    assertCategorizationModelsExist(input.modelsDir);
 
     const projectPath = join(input.workingDir, 'YnabCategoryAi.csproj');
     if (!existsSync(projectPath)) {
         throw new PredictJsonError(`categorization-ai project not found at ${projectPath}`);
     }
 
-    const args = ['run', '--project', projectPath, '-v', 'q', '--no-restore', '--', 'predict-json'];
+    const args = [
+        'run',
+        '--project',
+        projectPath,
+        '-v',
+        'q',
+        '--no-restore',
+        '--no-launch-profile',
+        '--',
+        'predict-json',
+    ];
     if (input.llm) {
         args.push('--llm');
     }
+    args.push('--ids', input.transactionIds.join(','));
 
     const stdout = await spawnDotnet(args, input);
     return parsePredictJsonStdout(stdout);
 }
 
-function assertModelsExist(modelsDir: string): void {
+export function assertCategorizationModelsExist(modelsDir: string): void {
     for (const fileName of MODEL_FILES) {
         const modelPath = join(modelsDir, fileName);
         if (!existsSync(modelPath)) {
@@ -57,6 +74,7 @@ function spawnDotnet(args: string[], input: RunPredictJsonInput): Promise<string
             env: {
                 ...process.env,
                 DB_CONNECTION_STRING: input.connectionString,
+                SQLITE_DB_PATH: input.sqliteDbPath,
                 ML__CategoryModelPath: join(input.modelsDir, 'category-model.zip'),
                 ML__GroupModelPath: join(input.modelsDir, 'group-model.zip'),
                 ML__PayeeModelPath: join(input.modelsDir, 'payee-model.zip'),

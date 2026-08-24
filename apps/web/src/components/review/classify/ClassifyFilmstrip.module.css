@@ -1,0 +1,111 @@
+.rail {
+    position: sticky;
+    top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.heading {
+    margin: 0;
+    padding: 0 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--app-text-muted);
+}
+
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin: 0;
+    padding: 0;
+    max-height: min(70vh, 42rem);
+    overflow: auto;
+    list-style: none;
+}
+
+.item {
+    display: grid;
+    grid-template-columns: 1.6rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding: 0.45rem 0.5rem;
+    border: 0;
+    border-radius: 0.35rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.item:hover {
+    background: var(--app-bg-hover);
+}
+
+.item[data-current] {
+    background: var(--app-bg-elevated);
+    box-shadow: inset 0 0 0 1px var(--app-border-strong);
+}
+
+.index {
+    font-family: var(--app-font-mono);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--app-text-muted);
+    text-align: right;
+}
+
+.item[data-certain]:not([data-action]):not([data-current]) .index {
+    color: var(--app-tier-auto);
+}
+
+.item[data-action="approved"],
+.item[data-action="changed"] {
+    opacity: 0.55;
+}
+
+.item[data-action="rejected"] {
+    opacity: 0.45;
+}
+
+.body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+}
+
+.payee {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--app-text-primary);
+}
+
+.meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: var(--app-text-muted);
+}
+
+.amount {
+    font-family: var(--app-font-mono);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--app-text-secondary);
+    white-space: nowrap;
+}
+
+.amount[data-inflow] {
+    color: var(--app-amount-inflow);
+}

@@ -29,7 +29,8 @@ public class ConsensusSettings
     public CategorizationMethod[] StrongSignalMethods { get; set; } =
     [
         CategorizationMethod.ImportAmountLookup,
-        CategorizationMethod.HierarchicalModel
+        CategorizationMethod.HierarchicalModel,
+        CategorizationMethod.PeriodicSeriesLookup
     ];
 
     public bool IsEligible(CategorizationMethod method) =>

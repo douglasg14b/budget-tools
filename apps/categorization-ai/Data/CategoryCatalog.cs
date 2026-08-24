@@ -35,6 +35,8 @@ public sealed class CategoryCatalog
         {
             string name = CategoryNormalizer.Normalize(c.Name)!;
             string groupName = CategoryNormalizer.Normalize(c.Group.Name)!;
+            if (CategoryNormalizer.IsExcludedName(name) || CategoryNormalizer.IsExcludedGroup(groupName))
+                continue;
 
             var info = new CategoryInfo
             {
@@ -56,6 +58,41 @@ public sealed class CategoryCatalog
         }
 
         return catalog;
+    }
+
+    public static CategoryCatalog FromCategories(
+        IEnumerable<CategoryInfo> categories,
+        int minTrainingExamplesForLocalMl = 5)
+    {
+        var catalog = new CategoryCatalog { MinTrainingExamplesForLocalMl = minTrainingExamplesForLocalMl };
+        foreach (CategoryInfo info in categories)
+        {
+            catalog._byName[info.Name] = info;
+            if (!catalog._byGroup.TryGetValue(info.GroupName, out List<CategoryInfo>? groupList))
+            {
+                groupList = [];
+                catalog._byGroup[info.GroupName] = groupList;
+            }
+
+            groupList.Add(info);
+        }
+
+        return catalog;
+    }
+
+    public bool TryGetByGroupAndName(string groupName, string categoryName, out CategoryInfo info)
+    {
+        foreach (CategoryInfo candidate in GetCategoriesInGroup(groupName))
+        {
+            if (string.Equals(candidate.Name, categoryName, StringComparison.OrdinalIgnoreCase))
+            {
+                info = candidate;
+                return true;
+            }
+        }
+
+        info = null!;
+        return false;
     }
 
     public void IndexTrainingData(IEnumerable<TrainingTransaction> transactions)

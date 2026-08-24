@@ -11,4 +11,10 @@ public class PayeeResolutionSettings
     public int OversampleDoubleWeight { get; set; } = 3;
 
     public int OversampleTripleWeight { get; set; } = 2;
+
+    /// <summary>
+    /// Minimum confidence before a resolved payee is attached to a proposal as a rename candidate.
+    /// Exact lookup uses this as min vote share; cluster and model use it as prediction confidence.
+    /// </summary>
+    public float SuggestionConfidenceThreshold { get; set; } = 0.85f;
 }

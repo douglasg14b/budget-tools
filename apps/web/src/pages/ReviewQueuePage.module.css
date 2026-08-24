@@ -1,0 +1,21 @@
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 64rem;
+    margin: 0 auto;
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.75rem 1.25rem;
+}
+
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}

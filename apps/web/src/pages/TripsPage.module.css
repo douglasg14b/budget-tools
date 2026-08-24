@@ -1,0 +1,277 @@
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    max-width: 52rem;
+    margin: 0 auto;
+}
+
+.masthead {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 0.8fr);
+    gap: 1.5rem 2rem;
+    align-items: end;
+}
+
+.mastheadCopy {
+    min-width: 0;
+}
+
+.kicker {
+    margin: 0 0 0.35rem;
+    font-family: var(--app-font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--app-text-muted);
+}
+
+.title {
+    margin: 0;
+    font-family: var(--app-font-display);
+    font-size: 2.35rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: var(--app-text-primary);
+}
+
+.lede {
+    margin: 0.65rem 0 0;
+    max-width: 36rem;
+    font-size: 1.05rem;
+    line-height: 1.45;
+    color: var(--app-text-secondary);
+}
+
+.stamp {
+    padding: 1rem 1.15rem;
+    border-radius: 0.2rem;
+    background: var(--app-bg-surface);
+    box-shadow: inset 0 0 0 1px var(--app-border-strong);
+    transform: rotate(-1.2deg);
+}
+
+.stamp[data-off] {
+    opacity: 0.72;
+    transform: rotate(0.6deg);
+}
+
+.timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.empty {
+    padding: 1.25rem 1rem;
+    color: var(--app-text-muted);
+    font-size: 1rem;
+}
+
+.ticket {
+    display: grid;
+    grid-template-columns: 4.6rem minmax(0, 1fr);
+    min-height: 6.5rem;
+    overflow: hidden;
+    background: var(--app-bg-surface);
+    box-shadow: inset 0 0 0 1px var(--app-border);
+}
+
+.ticket[data-kind="work"] {
+    box-shadow:
+        inset 3px 0 0 var(--app-tier-review),
+        inset 0 0 0 1px var(--app-border);
+}
+
+.ticket[data-kind="vacation"] {
+    box-shadow:
+        inset 3px 0 0 var(--app-tier-auto),
+        inset 0 0 0 1px var(--app-border);
+}
+
+.ticket[data-editing] {
+    box-shadow:
+        inset 3px 0 0 var(--app-text-primary),
+        inset 0 0 0 1px var(--app-border-strong);
+}
+
+.ticketRail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1rem;
+    background: repeating-linear-gradient(
+        -12deg,
+        transparent,
+        transparent 8px,
+        color-mix(in srgb, var(--app-text-primary) 5%, transparent) 8px,
+        color-mix(in srgb, var(--app-text-primary) 5%, transparent) 9px
+    );
+    border-right: 1px dashed var(--app-border-strong);
+}
+
+.ticketMonth {
+    font-family: var(--app-font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    color: var(--app-text-muted);
+}
+
+.ticketDay {
+    font-family: var(--app-font-display);
+    font-size: 1.65rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--app-text-primary);
+}
+
+.ticketBody {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.9rem 1.1rem 0.75rem;
+}
+
+.ticketHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.35rem 0.85rem;
+}
+
+.ticketName {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--app-text-primary);
+}
+
+.kindRibbon {
+    font-family: var(--app-font-mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--app-text-muted);
+}
+
+.ticketMeta {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--app-text-secondary);
+}
+
+.ticketActions {
+    display: flex;
+    gap: 0.25rem;
+    margin-top: 0.15rem;
+}
+
+.composer {
+    padding: 1.25rem 1.35rem 1.4rem;
+    background: var(--app-bg-surface);
+    box-shadow: inset 0 0 0 1px var(--app-border);
+}
+
+.composerHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.composerTitle {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--app-text-primary);
+}
+
+.form {
+    display: grid;
+    grid-template-columns: 1.4fr 0.8fr 0.8fr 0.8fr;
+    gap: 0.85rem 1rem;
+    align-items: end;
+}
+
+.nameField {
+    grid-column: 1 / -1;
+}
+
+.accountField {
+    grid-column: 1 / 3;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.fieldLabel {
+    color: var(--app-text-muted);
+    font-size: 0.875rem;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.select,
+.date {
+    width: 100%;
+    min-height: 2.6rem;
+    padding: 0.45rem 0.7rem;
+    border: 1px solid var(--app-border-strong);
+    border-radius: var(--mantine-radius-sm);
+    background: var(--app-bg-root);
+    color: var(--app-text-primary);
+    font: inherit;
+}
+
+.date {
+    font-variant-numeric: tabular-nums;
+}
+
+.formError {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--app-status-error);
+    font-size: 0.95rem;
+}
+
+.save {
+    grid-column: 4;
+    justify-self: stretch;
+}
+
+@media (max-width: 52rem) {
+    .masthead {
+        grid-template-columns: 1fr;
+    }
+
+    .stamp {
+        transform: none;
+        max-width: 22rem;
+    }
+
+    .form {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .nameField,
+    .accountField,
+    .formError,
+    .save {
+        grid-column: 1 / -1;
+    }
+}

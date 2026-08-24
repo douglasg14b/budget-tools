@@ -5,39 +5,29 @@ namespace YnabCategoryAi.Data;
 
 public static class TransactionQueries
 {
-    private static readonly string[] ExcludedCategoryPrefixes = ["Inflow:"];
-
     public static bool IsTrainingEligible(Transaction t) =>
         t.Approved
         && t.CategoryId != null
         && !string.IsNullOrWhiteSpace(t.CategoryName)
-        && !IsExcludedCategory(t.CategoryName)
+        && !CategoryNormalizer.IsExcludedName(t.CategoryName)
         && !t.Deleted
         && t.TransferAccountId == null
         && IsNonSplit(t)
-        && (t.Cleared == "cleared" || t.Cleared == "reconciled");
+        && IsCleared(t);
 
     public static bool IsPendingCategorization(Transaction t) =>
         !t.Deleted
         && t.TransferAccountId == null
         && IsNonSplit(t)
-        && (t.Cleared == "cleared" || t.Cleared == "reconciled")
-        && (!t.Approved || t.CategoryId == null || IsExcludedCategory(t.CategoryName));
+        && IsCleared(t)
+        && (!t.Approved || t.CategoryId == null || CategoryNormalizer.IsExcludedName(t.CategoryName));
 
     private static bool IsNonSplit(Transaction t) =>
         t.Subtransactions == "[]";
 
-    private static bool IsExcludedCategory(string? categoryName)
-    {
-        if (string.IsNullOrWhiteSpace(categoryName))
-            return true;
-
-        if (string.Equals(categoryName, "Uncategorized", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        return ExcludedCategoryPrefixes.Any(prefix =>
-            categoryName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
-    }
+    /// <summary>YNAB has matched this to the bank (cleared or reconciled). Uncleared rows stay out of scoring.</summary>
+    public static bool IsCleared(Transaction t) =>
+        t.Cleared == "cleared" || t.Cleared == "reconciled";
 
     public static TrainingTransaction[] GetTrainingTransactions(BudgetToolsContext db)
     {
@@ -45,19 +35,88 @@ public static class TransactionQueries
             .Include(c => c.Group)
             .ToDictionary(c => c.Id, c => (c.Name, c.Group.Name));
 
-        return db.Transactions
-            .AsEnumerable()
+        List<Transaction> rows = QueryReviewable(db.Transactions)
+            .Where(t => t.Approved && t.CategoryId != null && t.CategoryName != null && t.CategoryName != "")
+            .ToList();
+
+        return rows
             .Where(IsTrainingEligible)
             .Select(t => ToTrainingTransaction(t, categoryIndex))
             .ToArray();
     }
 
-    public static PendingTransaction[] GetPendingTransactions(BudgetToolsContext db) =>
-        db.Transactions
-            .AsEnumerable()
+    public static PendingTransaction[] GetPendingTransactions(
+        BudgetToolsContext db,
+        IReadOnlyList<string>? transactionIds = null)
+    {
+        if (transactionIds is { Count: 0 })
+        {
+            return [];
+        }
+
+        IQueryable<Transaction> query = QueryReviewable(db.Transactions)
+            .Where(t =>
+                !t.Approved
+                || t.CategoryId == null
+                || t.CategoryName == null
+                || t.CategoryName == ""
+                || t.CategoryName.ToLower() == "uncategorized"
+                || t.CategoryName.ToLower().StartsWith("inflow:"));
+
+        if (transactionIds is not null)
+        {
+            List<string> ids = transactionIds.ToList();
+            query = query.Where(t => ids.Contains(t.Id));
+        }
+
+        List<Transaction> rows = query.ToList();
+        IEnumerable<PendingTransaction> pending = rows
             .Where(IsPendingCategorization)
-            .Select(ToPendingTransaction)
+            .Select(ToPendingTransaction);
+
+        if (transactionIds is null)
+        {
+            return pending.ToArray();
+        }
+
+        Dictionary<string, PendingTransaction> byId = pending.ToDictionary(transaction => transaction.Id);
+        return transactionIds
+            .Where(byId.ContainsKey)
+            .Select(id => byId[id])
             .ToArray();
+    }
+
+    /// <summary>
+    /// Cleared, non-split, non-transfer rows used to detect cadence — includes unapproved queue items
+    /// so a backlog of pending subscription charges does not look like a series that went quiet.
+    /// </summary>
+    public static PeriodicHistoryTransaction[] GetPeriodicHistory(BudgetToolsContext db)
+    {
+        return QueryReviewable(db.Transactions)
+            .ToList()
+            .Select(t => new PeriodicHistoryTransaction(
+                t.Id,
+                t.ImportPayeeNameOriginal,
+                t.PayeeName,
+                t.PayeeId,
+                CategoryNormalizer.IsExcludedName(t.CategoryName) ? null : t.CategoryName,
+                t.Amount,
+                t.Date))
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Server-side filter for rows that can appear in training or the review queue.
+    /// Uncleared YNAB transactions are omitted — they are not settled with the bank.
+    /// Avoids pulling the entire transactions table into memory.
+    /// </summary>
+    private static IQueryable<Transaction> QueryReviewable(IQueryable<Transaction> source) =>
+        source.Where(t =>
+            !t.Deleted
+            && t.TransferAccountId == null
+            && t.Subtransactions == "[]"
+            // Inlined so EF can translate it; must stay equivalent to IsCleared.
+            && (t.Cleared == "cleared" || t.Cleared == "reconciled"));
 
     private static TrainingTransaction ToTrainingTransaction(
         Transaction t,
@@ -102,5 +161,6 @@ public static class TransactionQueries
             t.Amount,
             t.AccountName,
             t.Memo,
-            t.Date);
+            t.Date,
+            t.AccountId);
 }

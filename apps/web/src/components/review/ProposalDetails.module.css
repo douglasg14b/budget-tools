@@ -1,0 +1,74 @@
+.details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.95rem;
+    margin-top: 0.7rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--app-border);
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+}
+
+.title {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--app-text-secondary);
+}
+
+.row {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--app-text-secondary);
+    line-height: 1.45;
+}
+
+.method {
+    color: var(--app-text-secondary);
+}
+
+.category {
+    color: var(--app-text-primary);
+}
+
+.stat {
+    font-family: var(--app-font-mono);
+    font-size: 0.9375rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--app-text-secondary);
+}
+
+.interval,
+.note,
+.feature {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--app-text-secondary);
+    line-height: 1.5;
+}
+
+.feature {
+    font-family: var(--app-font-mono);
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.payee {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--app-text-secondary);
+}
+
+.periodic {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--app-text-secondary);
+    line-height: 1.5;
+}

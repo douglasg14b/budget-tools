@@ -10,6 +10,8 @@ const validProposal = {
         isNovelImport: false,
         isExcluded: false,
         requiresManualReview: false,
+        isPeriodic: false,
+        isPeriodicConflict: false,
     },
     suggestedCategory: 'Groceries',
     suggestedCategoryGroup: 'Needs',
@@ -33,7 +35,9 @@ const validProposal = {
     confidenceInterval: { top: 1, second: null, third: null, spread: 0 },
     featureText: 'GROCERIES STORE',
     resolvedPayee: 'Store',
+    payeeSuggestion: null,
     notes: 'Consensus',
+    periodicMatch: null,
 };
 
 const validEnvelope = {
@@ -75,13 +79,140 @@ describe('parsePredictJsonStdout', () => {
         expect(parsed.summary.autoApply).toBe(1);
     });
 
+    it('parses a periodic series match', () => {
+        const envelope = {
+            ...validEnvelope,
+            proposals: [
+                {
+                    ...validProposal,
+                    flags: {
+                        ...validProposal.flags,
+                        isPeriodic: true,
+                    },
+                    method: 'PeriodicSeriesLookup',
+                    periodicMatch: {
+                        cadence: 'Monthly',
+                        occurrenceCount: 12,
+                        medianAmount: -14990,
+                        lastDate: '2024-06-15',
+                        category: 'Streaming',
+                        categoryVoteShare: 1,
+                        relatedTransactionIds: ['tx-a', 'tx-b'],
+                        cadenceFit: 1,
+                    },
+                },
+            ],
+        };
+
+        const parsed = parsePredictJsonStdout(JSON.stringify(envelope));
+        expect(parsed.proposals[0]?.flags.isPeriodic).toBe(true);
+        expect(parsed.proposals[0]?.periodicMatch).toEqual({
+            cadence: 'Monthly',
+            occurrenceCount: 12,
+            medianAmount: -14990,
+            lastDate: '2024-06-15',
+            category: 'Streaming',
+            categoryVoteShare: 1,
+            relatedTransactionIds: ['tx-a', 'tx-b'],
+            cadenceFit: 1,
+        });
+    });
+
+    it('accepts a periodic series with no usable historical category', () => {
+        const envelope = {
+            ...validEnvelope,
+            proposals: [
+                {
+                    ...validProposal,
+                    flags: {
+                        ...validProposal.flags,
+                        isPeriodic: true,
+                    },
+                    periodicMatch: {
+                        cadence: 'Monthly',
+                        occurrenceCount: 5,
+                        medianAmount: -14990,
+                        lastDate: '2026-07-17',
+                        category: '',
+                        categoryVoteShare: 0,
+                        relatedTransactionIds: ['tx-a'],
+                        cadenceFit: 1,
+                    },
+                },
+            ],
+        };
+
+        const parsed = parsePredictJsonStdout(JSON.stringify(envelope));
+        expect(parsed.proposals[0]?.periodicMatch).toMatchObject({
+            category: null,
+            categoryVoteShare: 0,
+        });
+    });
+
+    it('parses a payee rename suggestion', () => {
+        const envelope = {
+            ...validEnvelope,
+            proposals: [
+                {
+                    ...validProposal,
+                    payeeSuggestion: {
+                        name: 'Stumptown',
+                        method: 'ExactLookup',
+                        confidence: 1,
+                        needsRename: true,
+                    },
+                },
+            ],
+        };
+
+        const parsed = parsePredictJsonStdout(JSON.stringify(envelope));
+        expect(parsed.proposals[0]?.payeeSuggestion).toEqual({
+            name: 'Stumptown',
+            method: 'ExactLookup',
+            confidence: 1,
+            needsRename: true,
+        });
+    });
+
+    it('defaults a missing payee suggestion to null', () => {
+        const { payeeSuggestion: _omitted, ...withoutPayee } = validProposal;
+        const parsed = parsePredictJsonStdout(JSON.stringify({ ...validEnvelope, proposals: [withoutPayee] }));
+        expect(parsed.proposals[0]?.payeeSuggestion).toBeNull();
+    });
+
     it('throws on empty stdout', () => {
         expect(() => parsePredictJsonStdout('')).toThrow(PredictJsonError);
     });
 
-    it('throws when proposals is not an array', () => {
-        expect(() => parsePredictJsonStdout(JSON.stringify({ summary: validEnvelope.summary, proposals: {} }))).toThrow(
-            PredictJsonError,
-        );
+    it('defaults omitted travel fields so older predict-json output still parses', () => {
+        const parsed = parsePredictJsonStdout(JSON.stringify(validEnvelope));
+        expect(parsed.proposals[0]?.flags.isTravelWindow).toBe(false);
+        expect(parsed.proposals[0]?.travelWindow).toBeNull();
+    });
+
+    it('parses a travel window hit', () => {
+        const envelope = {
+            ...validEnvelope,
+            proposals: [
+                {
+                    ...validProposal,
+                    flags: { ...validProposal.flags, isTravelWindow: true },
+                    travelWindow: {
+                        id: '11111111-1111-1111-1111-111111111111',
+                        name: 'Hawaii',
+                        kind: 'vacation',
+                        targetCategory: 'Vacation - Coffee',
+                    },
+                },
+            ],
+        };
+        const parsed = parsePredictJsonStdout(JSON.stringify(envelope));
+        expect(parsed.proposals[0]?.flags.isTravelWindow).toBe(true);
+        expect(parsed.proposals[0]?.travelWindow).toEqual({
+            id: '11111111-1111-1111-1111-111111111111',
+            name: 'Hawaii',
+            kind: 'vacation',
+            targetCategory: 'Vacation - Coffee',
+        });
     });
 });

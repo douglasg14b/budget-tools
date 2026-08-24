@@ -106,7 +106,7 @@ Decisions that change YNAB state are **not** sent immediately. They are persiste
 | Component | Technology | Responsibility |
 |-----------|------------|----------------|
 | `transactions-retrieval` | TypeScript, Kysely, `ynab` npm SDK | Delta sync YNAB → Postgres; categories, transactions, metrics |
-| `categorization-ai` | .NET 8, ML.NET, EF Core | **CLI only** — `predict-json` for proposals; no HTTP, no feedback writes |
+| `categorization-ai` | .NET 8, ML.NET, EF Core | **CLI only** — `predict-json` scores a requested batch of pending transactions; no HTTP, no feedback writes |
 | PostgreSQL | Docker (dev) | Shared data store |
 
 ### Pending transaction definition
@@ -118,6 +118,8 @@ A transaction appears in the review queue when it is cleared or reconciled, not 
 - Category name is excluded (e.g. `Uncategorized`, `Inflow:*`)
 
 (Source: `TransactionQueries.GetPendingTransactions`)
+
+Placeholder categories (`Uncategorized`, `Inflow:*`, Internal Master Category) are never suggested or offered as assignable picker options.
 
 ### Proposal shape
 
@@ -649,8 +651,8 @@ Implementation plans live alongside this PRD in `docs/plans/ynab-categorization-
 | `scaffolding.md` | §8 — API, web, web-sdk, Biome, Lefthook, root scripts |
 | `api-read-path.md` | Queue, categories, categorization-ai integration, DTOs |
 | `api-write-path.md` | Outbound queue, flusher, YNAB batch PATCH, mirror upsert, payee endpoint |
-| `ui-review-queue.md` | Queue view, transaction editor, proposal display, filters |
-| `ui-decisions.md` | Approve/reject/change flows, sync status, flush controls |
+| `ui-review-queue.md` | Queue view, proposal display, filters (read-only) |
+| `ui-decisions.md` | Transaction editor, approve/reject/change, sync status, flush controls |
 
 ---
 

@@ -2,6 +2,7 @@ using YnabCategoryAi.Configuration;
 using YnabCategoryAi.Data;
 using YnabCategoryAi.ML.Lookup;
 using YnabCategoryAi.ML.Llm;
+using YnabCategoryAi.ML.Travel;
 
 namespace YnabCategoryAi.ML;
 
@@ -19,6 +20,9 @@ public sealed class CategorizationPipeline
     private readonly HierarchicalClassificationModel _hierarchicalModel;
     private readonly ILlmCategorizationService _llmService;
     private readonly AmbiguousMerchantIndex _ambiguousIndex = new();
+    private readonly PeriodicSeriesIndex _periodicIndex = new();
+    private bool _travelBiasEnabled;
+    private IReadOnlyList<TravelWindowRecord> _travelWindows = [];
 
     public CategorizationPipeline(
         MlSettings settings,
@@ -37,6 +41,12 @@ public sealed class CategorizationPipeline
         _categoryModel = categoryModel;
         _hierarchicalModel = new HierarchicalClassificationModel(groupModel, categoryModel, catalog);
         _llmService = llmService;
+    }
+
+    public void ConfigureTravelBias(bool enabled, IReadOnlyList<TravelWindowRecord> windows)
+    {
+        _travelBiasEnabled = enabled;
+        _travelWindows = windows;
     }
 
     public void Train(IReadOnlyList<TrainingTransaction> transactions, bool forceRetrain = false)
@@ -59,15 +69,21 @@ public sealed class CategorizationPipeline
         _payeeLookup.Train(unambiguous, referenceDate, _settings.Ambiguity, augmentedImports);
         _payeeClusterIndex.Train(unambiguous, augmentedImports);
         _categoryLookup.Train(transactions, _ambiguousIndex, referenceDate, _settings.Ambiguity);
+        _periodicIndex.Train(transactions, _settings.PeriodicSeries);
         _payeeModel.Train(unambiguous, forceRetrain);
         _hierarchicalModel.Train(unambiguous, forceRetrain);
         _payeeModel.Load();
         _hierarchicalModel.Load();
     }
 
+    public void TrainPeriodic(IReadOnlyList<PeriodicHistoryTransaction> history) =>
+        _periodicIndex.Train(history, _settings.PeriodicSeries);
+
     public AmbiguousMerchantIndex AmbiguousIndex => _ambiguousIndex;
 
     public PayeeClusterIndex PayeeClusterIndex => _payeeClusterIndex;
+
+    public PeriodicSeriesIndex PeriodicIndex => _periodicIndex;
 
     public async Task<CategorizationResult> PredictAsync(
         PendingTransaction transaction,
@@ -86,6 +102,10 @@ public sealed class CategorizationPipeline
             transaction.PayeeName,
             transaction.Memo);
 
+        PayeeResolutionResult payeeResolution = ResolvePayee(
+            transaction,
+            _settings.PayeeResolution.SuggestionConfidenceThreshold);
+
         if (_exclusionMatcher.TryGetExclusion(
                 transaction.ImportPayeeNameOriginal,
                 transaction.ImportPayeeName,
@@ -93,13 +113,18 @@ public sealed class CategorizationPipeline
                 transaction.Memo,
                 out ExclusionKind exclusionKind))
         {
-            return CategorizationProposalBuilder.BuildExcluded(transaction, featureText, exclusionKind);
+            return CategorizationProposalBuilder.BuildExcluded(
+                transaction,
+                featureText,
+                exclusionKind,
+                payeeResolution);
         }
 
         bool isNovelImport = !_catalog.HasSeenImportString(transaction.ImportPayeeNameOriginal);
         bool isAmbiguous = _ambiguousIndex.IsAmbiguous(transaction);
+        PeriodicMatch? periodicMatch = _periodicIndex.TryMatch(transaction);
 
-        List<MethodSignal> signals = CollectMethodSignals(transaction, _settings.OptionConfidenceFloor);
+        List<MethodSignal> signals = CollectMethodSignals(transaction, _settings.OptionConfidenceFloor, periodicMatch);
 
         bool gotConsensus = AgreementAnalysis.TryGetStrictConsensus(
             signals,
@@ -107,6 +132,16 @@ public sealed class CategorizationPipeline
             out string? consensusCategory,
             out IReadOnlyList<MethodSignal> agreeing,
             out float consensusConfidence);
+
+        bool isPeriodicConflict = PeriodicScoring.IsConflict(
+            periodicMatch,
+            consensusCategory,
+            signals,
+            _settings.Consensus,
+            _settings.PeriodicSeries);
+
+        if (isPeriodicConflict)
+            gotConsensus = false;
 
         if (gotConsensus && !isAmbiguous)
         {
@@ -122,7 +157,30 @@ public sealed class CategorizationPipeline
                 consensusCategory,
                 agreeing,
                 consensusConfidence,
-                llmResult: null);
+                llmResult: null,
+                periodicMatch,
+                isPeriodicConflict: false,
+                payeeResolution);
+        }
+
+        if (isPeriodicConflict)
+        {
+            return CategorizationProposalBuilder.BuildFromPipelineState(
+                transaction,
+                featureText,
+                signals,
+                isAmbiguous,
+                isNovelImport,
+                _settings,
+                _catalog,
+                gotConsensus: false,
+                consensusCategory,
+                agreeing,
+                consensusConfidence,
+                llmResult: null,
+                periodicMatch,
+                isPeriodicConflict: true,
+                payeeResolution);
         }
 
         CategorizationResult? llmResult = null;
@@ -153,7 +211,10 @@ public sealed class CategorizationPipeline
             consensusCategory,
             agreeing,
             consensusConfidence,
-            llmResult);
+            llmResult,
+            periodicMatch,
+            isPeriodicConflict: false,
+            payeeResolution);
     }
 
     public async Task<IReadOnlyList<CategorizationProposal>> PredictPendingDetailedAsync(
@@ -165,7 +226,14 @@ public sealed class CategorizationPipeline
 
         foreach (PendingTransaction transaction in transactions)
         {
-            proposals.Add(await PredictDetailedAsync(transaction, useLlm, cancellationToken));
+            CategorizationProposal proposal = await PredictDetailedAsync(transaction, useLlm, cancellationToken);
+            proposals.Add(TravelBias.Apply(
+                proposal,
+                transaction,
+                _travelBiasEnabled,
+                _travelWindows,
+                _catalog,
+                _settings.MaxRankedOptions));
         }
 
         return proposals;
@@ -210,7 +278,10 @@ public sealed class CategorizationPipeline
     public CategorizationResult PredictForEvaluation(TrainingTransaction transaction) =>
         PredictAsync(ToPending(transaction), useLlm: false).GetAwaiter().GetResult();
 
-    public PayeeResolutionResult ResolvePayee(PendingTransaction transaction)
+    public PayeeResolutionResult ResolvePayee(PendingTransaction transaction) =>
+        ResolvePayee(transaction, minConfidence: 0f);
+
+    public PayeeResolutionResult ResolvePayee(PendingTransaction transaction, float minConfidence)
     {
         string featureText = BuildFeatureText(
             transaction.ImportPayeeNameOriginal,
@@ -221,7 +292,7 @@ public sealed class CategorizationPipeline
         if (_payeeLookup.TryResolve(
                 transaction.ImportPayeeNameOriginal,
                 transaction.ImportPayeeName,
-                minVoteShare: 0f,
+                minConfidence,
                 out LookupPrediction exact,
                 out _))
         {
@@ -236,7 +307,8 @@ public sealed class CategorizationPipeline
                 transaction.ImportPayeeName,
                 _settings.PayeeResolution,
                 _ambiguousIndex,
-                out LookupPrediction cluster))
+                out LookupPrediction cluster)
+            && cluster.Confidence >= minConfidence)
         {
             return new PayeeResolutionResult(
                 PayeeResolutionMethod.ClusterLookup,
@@ -246,7 +318,7 @@ public sealed class CategorizationPipeline
 
         if (_payeeModel.TryPredict(
                 featureText,
-                confidenceThreshold: 0f,
+                minConfidence,
                 out string modeledPayee,
                 out float payeeConfidence))
         {
@@ -411,9 +483,12 @@ public sealed class CategorizationPipeline
             .ToList();
 
     private List<MethodSignal> CollectMethodSignals(PendingTransaction transaction) =>
-        CollectMethodSignals(transaction, _settings.OptionConfidenceFloor);
+        CollectMethodSignals(transaction, _settings.OptionConfidenceFloor, periodicMatch: null);
 
-    private List<MethodSignal> CollectMethodSignals(PendingTransaction transaction, float minConfidence)
+    private List<MethodSignal> CollectMethodSignals(
+        PendingTransaction transaction,
+        float minConfidence,
+        PeriodicMatch? periodicMatch)
     {
         string featureText = BuildFeatureText(
             transaction.ImportPayeeNameOriginal,
@@ -422,6 +497,13 @@ public sealed class CategorizationPipeline
             transaction.Memo);
 
         var signals = new List<MethodSignal>();
+        periodicMatch ??= _periodicIndex.TryMatch(transaction);
+
+        if (periodicMatch != null
+            && PeriodicScoring.TryCreateSignal(periodicMatch, _settings.PeriodicSeries, out MethodSignal periodicSignal))
+        {
+            signals.Add(periodicSignal);
+        }
 
         if (_categoryLookup.TryPredictByImportAndAmount(
                 transaction.ImportPayeeNameOriginal,
@@ -522,7 +604,9 @@ public sealed class CategorizationPipeline
                 Math.Min(payeeConfidence, byModeledPayee.Confidence)));
         }
 
-        return signals;
+        return signals
+            .Where(signal => _catalog.IsValidAssignableCategory(signal.Category))
+            .ToList();
     }
 
     private async Task<CategorizationResult?> TryLlmPredictionAsync(

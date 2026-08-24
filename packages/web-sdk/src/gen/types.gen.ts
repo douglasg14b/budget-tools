@@ -4,6 +4,44 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type TravelWindowKindDto = 'vacation' | 'work';
+
+export type TravelWindowDto = {
+    accountName: string | null;
+    accountId: string | null;
+    endDate: string;
+    startDate: string;
+    kind: TravelWindowKindDto;
+    name: string;
+    id: string;
+};
+
+export type TravelWindowsDto = {
+    windows: Array<TravelWindowDto>;
+};
+
+export type TravelWindowWriteDto = {
+    accountName: string | null;
+    accountId: string | null;
+    endDate: string;
+    startDate: string;
+    kind: TravelWindowKindDto;
+    name: string;
+};
+
+export type TravelBiasDto = {
+    enabled: boolean;
+};
+
+export type AccountDto = {
+    name: string;
+    id: string;
+};
+
+export type AccountsDto = {
+    accounts: Array<AccountDto>;
+};
+
 export type HealthDto = {
     ok: true;
 };
@@ -16,7 +54,13 @@ export type QueueSummaryDto = {
     total: number;
 };
 
+/**
+ * YNAB `cleared` field. Uncleared transactions are excluded from the review queue.
+ */
+export type TransactionClearedStatus = 'uncleared' | 'cleared' | 'reconciled';
+
 export type TransactionDetailDto = {
+    importPayeeNameOriginal: string | null;
     importPayeeName: string | null;
     importId: string | null;
     categoryName: string | null;
@@ -26,7 +70,7 @@ export type TransactionDetailDto = {
     accountName: string;
     accountId: string;
     approved: boolean;
-    cleared: string;
+    cleared: TransactionClearedStatus;
     memo: string | null;
     amount: number;
     date: string;
@@ -36,17 +80,20 @@ export type TransactionDetailDto = {
 export type ApprovalTier = 'AutoApply' | 'Suggested' | 'Review' | 'Blocked';
 
 export type CategorizationFlagsDto = {
+    isTravelWindow: boolean;
+    isPeriodicConflict: boolean;
+    isPeriodic: boolean;
     requiresManualReview: boolean;
     isExcluded: boolean;
     isNovelImport: boolean;
     isAmbiguous: boolean;
 };
 
-export type CategorizationMethod = 'ImportAmountLookup' | 'ImportLookup' | 'PayeeIdLookup' | 'CanonicalPayeeLookup' | 'PayeeClusterLookup' | 'PayeeModel' | 'HierarchicalModel' | 'CategoryModel' | 'Consensus' | 'LlmCategorization' | 'Excluded' | 'ManualReview' | 'None';
+export type CategorizationMethod = 'ImportAmountLookup' | 'ImportLookup' | 'PayeeIdLookup' | 'CanonicalPayeeLookup' | 'PayeeClusterLookup' | 'PayeeModel' | 'HierarchicalModel' | 'CategoryModel' | 'PeriodicSeriesLookup' | 'Consensus' | 'LlmCategorization' | 'Excluded' | 'ManualReview' | 'None';
 
 export type CategorizationRouteReason = 'None' | 'ExcludedPayee' | 'ExcludedCheck' | 'AmbiguousMerchant' | 'UntrainedCategory' | 'NovelImportString' | 'LowConfidence';
 
-export type ProposalGapReason = 'None' | 'AmbiguousMerchant' | 'InsufficientAgreement' | 'TwoMethodSuggestion' | 'SingleMethodSuggestion' | 'ImportAmountNearMiss' | 'NoQualifiedSignals' | 'LlmSuggestion' | 'Excluded';
+export type ProposalGapReason = 'None' | 'AmbiguousMerchant' | 'InsufficientAgreement' | 'TwoMethodSuggestion' | 'SingleMethodSuggestion' | 'ImportAmountNearMiss' | 'NoQualifiedSignals' | 'LlmSuggestion' | 'Excluded' | 'PeriodicConflict';
 
 export type MethodSignalDto = {
     confidence: number;
@@ -70,8 +117,43 @@ export type ConfidenceIntervalDto = {
     top: number;
 };
 
+export type PayeeResolutionMethod = 'ExactLookup' | 'ClusterLookup' | 'Model' | 'Llm' | 'Unresolved';
+
+export type PayeeSuggestionDto = {
+    needsRename: boolean;
+    confidence: number;
+    method: PayeeResolutionMethod;
+    name: string;
+};
+
+export type PeriodicCadence = 'Weekly' | 'Biweekly' | 'Monthly' | 'Quarterly' | 'Yearly';
+
+export type PeriodicMatchDto = {
+    cadenceFit: number;
+    relatedTransactionIds: Array<string>;
+    categoryVoteShare: number;
+    /**
+     * Majority historical category, or null when the series has no usable labels.
+     */
+    category: string | null;
+    lastDate: string;
+    medianAmount: number;
+    occurrenceCount: number;
+    cadence: PeriodicCadence;
+};
+
+export type TravelWindowHitDto = {
+    targetCategory: string | null;
+    kind: 'vacation' | 'work';
+    name: string;
+    id: string;
+};
+
 export type CategorizationProposalDto = {
+    travelWindow: TravelWindowHitDto | null;
+    periodicMatch: PeriodicMatchDto | null;
     notes: string | null;
+    payeeSuggestion: PayeeSuggestionDto | null;
     resolvedPayee: string | null;
     featureText: string;
     confidenceInterval: ConfidenceIntervalDto;
@@ -91,15 +173,43 @@ export type CategorizationProposalDto = {
 };
 
 export type CategorizationQueueItemDto = {
+    /**
+     * Prior charges in this periodic series, newest first (ids from `proposal.periodicMatch`).
+     */
+    relatedTransactions: Array<TransactionDetailDto>;
     proposal: CategorizationProposalDto;
     transaction: TransactionDetailDto;
 };
 
 export type CategorizationQueueDto = {
     items: Array<CategorizationQueueItemDto>;
+    /**
+     * True when pending transactions exist that have not been scored yet.
+     */
+    hasMore: boolean;
+    /**
+     * Unfiltered scored working-set size.
+     */
+    scoredCount: number;
+    pendingCount: number;
     llm: boolean;
     generatedAt: string;
     summary: QueueSummaryDto;
+};
+
+export type LlmSuggestOverlayDto = {
+    payeeSuggestion: PayeeSuggestionDto | null;
+    notes: string | null;
+    confidence: number;
+    suggestedCategoryId: string | null;
+    suggestedCategoryGroup: string | null;
+    suggestedCategory: string | null;
+    model: string;
+    transactionId: string;
+};
+
+export type LlmSuggestRequestDto = {
+    transactionId: string;
 };
 
 export type CategoryDto = {
@@ -119,6 +229,136 @@ export type CategoryGroupDto = {
 export type CategoriesDto = {
     groups: Array<CategoryGroupDto>;
 };
+
+export type ListTravelWindowsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/travel-windows';
+};
+
+export type ListTravelWindowsResponses = {
+    /**
+     * Ok
+     */
+    200: TravelWindowsDto;
+};
+
+export type ListTravelWindowsResponse = ListTravelWindowsResponses[keyof ListTravelWindowsResponses];
+
+export type CreateTravelWindowData = {
+    body: TravelWindowWriteDto;
+    path?: never;
+    query?: never;
+    url: '/travel-windows';
+};
+
+export type CreateTravelWindowErrors = {
+    /**
+     * Overlapping travel window
+     */
+    409: unknown;
+};
+
+export type CreateTravelWindowResponses = {
+    /**
+     * Created
+     */
+    201: TravelWindowDto;
+};
+
+export type CreateTravelWindowResponse = CreateTravelWindowResponses[keyof CreateTravelWindowResponses];
+
+export type DeleteTravelWindowData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/travel-windows/{id}';
+};
+
+export type DeleteTravelWindowResponses = {
+    /**
+     * No content
+     */
+    204: void;
+};
+
+export type DeleteTravelWindowResponse = DeleteTravelWindowResponses[keyof DeleteTravelWindowResponses];
+
+export type UpdateTravelWindowData = {
+    body: TravelWindowWriteDto;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/travel-windows/{id}';
+};
+
+export type UpdateTravelWindowErrors = {
+    /**
+     * Overlapping travel window
+     */
+    409: unknown;
+};
+
+export type UpdateTravelWindowResponses = {
+    /**
+     * Ok
+     */
+    200: TravelWindowDto;
+};
+
+export type UpdateTravelWindowResponse = UpdateTravelWindowResponses[keyof UpdateTravelWindowResponses];
+
+export type GetTravelBiasData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/travel-bias';
+};
+
+export type GetTravelBiasResponses = {
+    /**
+     * Ok
+     */
+    200: TravelBiasDto;
+};
+
+export type GetTravelBiasResponse = GetTravelBiasResponses[keyof GetTravelBiasResponses];
+
+export type PatchTravelBiasData = {
+    body: TravelBiasDto;
+    path?: never;
+    query?: never;
+    url: '/travel-bias';
+};
+
+export type PatchTravelBiasResponses = {
+    /**
+     * Ok
+     */
+    200: TravelBiasDto;
+};
+
+export type PatchTravelBiasResponse = PatchTravelBiasResponses[keyof PatchTravelBiasResponses];
+
+export type ListAccountsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/accounts';
+};
+
+export type ListAccountsResponses = {
+    /**
+     * Ok
+     */
+    200: AccountsDto;
+};
+
+export type ListAccountsResponse = ListAccountsResponses[keyof ListAccountsResponses];
 
 export type GetHealthData = {
     body?: never;
@@ -149,13 +389,13 @@ export type GetCategorizationQueueData = {
          */
         accountId?: string;
         /**
-         * Enable LLM fallback for this predict run (cache key)
-         */
-        llm?: boolean;
-        /**
-         * Force a new predict-json spawn
+         * Discard cached scores and rescore the newest batch
          */
         refresh?: boolean;
+        /**
+         * Score the next never-scored batch; ignored when refresh is true
+         */
+        expand?: boolean;
     };
     url: '/categorization/queue';
 };
@@ -168,6 +408,22 @@ export type GetCategorizationQueueResponses = {
 };
 
 export type GetCategorizationQueueResponse = GetCategorizationQueueResponses[keyof GetCategorizationQueueResponses];
+
+export type PostLlmSuggestData = {
+    body: LlmSuggestRequestDto;
+    path?: never;
+    query?: never;
+    url: '/categorization/llm-suggest';
+};
+
+export type PostLlmSuggestResponses = {
+    /**
+     * Ok
+     */
+    200: LlmSuggestOverlayDto;
+};
+
+export type PostLlmSuggestResponse = PostLlmSuggestResponses[keyof PostLlmSuggestResponses];
 
 export type GetCategoriesData = {
     body?: never;

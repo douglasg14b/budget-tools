@@ -10,6 +10,7 @@ public enum CategorizationMethod
     PayeeModel,
     HierarchicalModel,
     CategoryModel,
+    PeriodicSeriesLookup,
     Consensus,
     LlmCategorization,
     Excluded,

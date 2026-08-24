@@ -1,0 +1,84 @@
+.card {
+    position: sticky;
+    top: 0.75rem;
+    padding: 0.85rem 0.9rem 0.95rem;
+    background: var(--app-bg-surface);
+    border-radius: 0.55rem;
+    box-shadow: inset 0 0 0 1px var(--app-border);
+}
+
+.heading {
+    margin: 0 0 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--app-text-muted);
+}
+
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.row[data-dimmed] {
+    opacity: 0.4;
+}
+
+.keys {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.22rem;
+}
+
+.key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.55rem;
+    padding: 0.18rem 0.38rem 0.22rem;
+    border-radius: 0.28rem;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--app-text-primary) 8%, var(--app-bg-elevated)),
+        var(--app-bg-elevated)
+    );
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, var(--app-text-primary) 14%, transparent),
+        0 1px 0 color-mix(in srgb, var(--app-bg-root) 80%, black);
+    font-family: var(--app-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+    color: var(--app-text-primary);
+}
+
+.action {
+    font-size: 0.8125rem;
+    color: var(--app-text-secondary);
+    line-height: 1.3;
+}
+
+@media (max-width: 56rem) {
+    .card {
+        position: static;
+    }
+
+    .list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+        gap: 0.4rem 0.85rem;
+    }
+}

@@ -1,0 +1,195 @@
+.card {
+    --card-accent: var(--app-tier-blocked);
+    display: grid;
+    grid-template-columns: 7.25rem minmax(0, 1fr) auto;
+    column-gap: 1.15rem;
+    row-gap: 0.35rem;
+    position: relative;
+    padding: 1.1rem 1.25rem 1.05rem 1.45rem;
+    background: var(--app-bg-surface);
+    border-radius: 0.55rem;
+    box-shadow: inset 0 0 0 1px var(--app-border);
+    transition: background-color 140ms ease;
+}
+
+.card::before {
+    content: "";
+    position: absolute;
+    top: 0.7rem;
+    bottom: 0.7rem;
+    left: 0;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--card-accent);
+}
+
+.card:hover {
+    background: var(--app-bg-hover);
+}
+
+.card[data-tier="AutoApply"] {
+    --card-accent: var(--app-tier-auto);
+}
+
+.card[data-tier="Suggested"] {
+    --card-accent: var(--app-tier-suggested);
+}
+
+.card[data-tier="Review"] {
+    --card-accent: var(--app-tier-review);
+}
+
+.card[data-tier="Blocked"] {
+    --card-accent: var(--app-tier-blocked);
+}
+
+.date {
+    grid-column: 1;
+    grid-row: 1;
+    padding-top: 0.22rem;
+    font-size: 0.9375rem;
+    color: var(--app-text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.payeeBlock {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+}
+
+.payee {
+    margin: 0;
+    font-size: 1.1875rem;
+    font-weight: 700;
+    letter-spacing: -0.018em;
+    color: var(--app-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.meta {
+    margin: 0.15rem 0 0;
+    font-size: 0.9375rem;
+    color: var(--app-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rename {
+    margin: 0.15rem 0 0;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--app-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.amount {
+    grid-column: 3;
+    grid-row: 1;
+    margin: 0;
+    padding-top: 0.12rem;
+    font-family: var(--app-font-mono);
+    font-size: 1.0625rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    color: var(--app-text-primary);
+    white-space: nowrap;
+    text-align: right;
+}
+
+.amount[data-inflow] {
+    color: var(--app-amount-inflow);
+}
+
+.proposal {
+    grid-column: 2 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.65rem;
+    margin-top: 0.35rem;
+}
+
+.suggestion {
+    font-size: 1rem;
+    color: var(--app-text-primary);
+}
+
+.suggestionMuted {
+    font-size: 1rem;
+    color: var(--app-text-secondary);
+}
+
+.confidence {
+    font-size: 0.9375rem;
+    color: var(--app-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.reason {
+    grid-column: 2 / -1;
+    margin: 0.1rem 0 0;
+    font-size: 0.9375rem;
+    color: var(--app-text-secondary);
+}
+
+.footer {
+    grid-column: 2 / -1;
+    margin-top: 0.15rem;
+}
+
+.toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    padding: 0.15rem 0;
+    color: var(--app-text-secondary);
+    font-size: 0.9375rem;
+    transition: color 140ms ease;
+}
+
+.toggle:hover {
+    color: var(--app-text-primary);
+}
+
+.chevron {
+    transition: transform 160ms ease;
+}
+
+.chevronOpen {
+    transform: rotate(180deg);
+}
+
+@media (max-width: 40rem) {
+    .card {
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding-left: 1.15rem;
+    }
+
+    .date {
+        grid-column: 1 / -1;
+        grid-row: auto;
+        padding-top: 0;
+    }
+
+    .payeeBlock {
+        grid-column: 1;
+    }
+
+    .amount {
+        grid-column: 2;
+    }
+
+    .proposal,
+    .reason,
+    .footer {
+        grid-column: 1 / -1;
+    }
+}

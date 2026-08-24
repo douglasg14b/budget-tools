@@ -14,6 +14,7 @@ public class MlSettings
     public ConsensusSettings Consensus { get; set; } = new();
     public AmbiguitySettings Ambiguity { get; set; } = new();
     public PayeeResolutionSettings PayeeResolution { get; set; } = new();
+    public PeriodicSeriesSettings PeriodicSeries { get; set; } = new();
 
     /// <summary>Minimum confidence for a category to appear in ranked Options (default 0.75).</summary>
     public float OptionConfidenceFloor { get; set; } = 0.75f;

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses } from './types.gen';
+import type { CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListTravelWindowsData, ListTravelWindowsResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostLlmSuggestData, PostLlmSuggestResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -18,6 +18,84 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
 
+export class TravelWindows {
+    /**
+     * listTravelWindows
+     */
+    public static request<ThrowOnError extends boolean = false>(options?: Options<ListTravelWindowsData, ThrowOnError>): RequestResult<ListTravelWindowsResponses, unknown, ThrowOnError> {
+        return (options?.client ?? client).get<ListTravelWindowsResponses, unknown, ThrowOnError>({ url: '/travel-windows', ...options });
+    }
+    
+    /**
+     * createTravelWindow
+     */
+    public static request2<ThrowOnError extends boolean = false>(options: Options<CreateTravelWindowData, ThrowOnError>): RequestResult<CreateTravelWindowResponses, CreateTravelWindowErrors, ThrowOnError> {
+        return (options.client ?? client).post<CreateTravelWindowResponses, CreateTravelWindowErrors, ThrowOnError>({
+            url: '/travel-windows',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    /**
+     * deleteTravelWindow
+     */
+    public static request3<ThrowOnError extends boolean = false>(options: Options<DeleteTravelWindowData, ThrowOnError>): RequestResult<DeleteTravelWindowResponses, unknown, ThrowOnError> {
+        return (options.client ?? client).delete<DeleteTravelWindowResponses, unknown, ThrowOnError>({ url: '/travel-windows/{id}', ...options });
+    }
+    
+    /**
+     * updateTravelWindow
+     */
+    public static request4<ThrowOnError extends boolean = false>(options: Options<UpdateTravelWindowData, ThrowOnError>): RequestResult<UpdateTravelWindowResponses, UpdateTravelWindowErrors, ThrowOnError> {
+        return (options.client ?? client).put<UpdateTravelWindowResponses, UpdateTravelWindowErrors, ThrowOnError>({
+            url: '/travel-windows/{id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+}
+
+export class TravelBias {
+    /**
+     * getTravelBias
+     */
+    public static request<ThrowOnError extends boolean = false>(options?: Options<GetTravelBiasData, ThrowOnError>): RequestResult<GetTravelBiasResponses, unknown, ThrowOnError> {
+        return (options?.client ?? client).get<GetTravelBiasResponses, unknown, ThrowOnError>({ url: '/travel-bias', ...options });
+    }
+    
+    /**
+     * patchTravelBias
+     */
+    public static request2<ThrowOnError extends boolean = false>(options: Options<PatchTravelBiasData, ThrowOnError>): RequestResult<PatchTravelBiasResponses, unknown, ThrowOnError> {
+        return (options.client ?? client).patch<PatchTravelBiasResponses, unknown, ThrowOnError>({
+            url: '/travel-bias',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+}
+
+export class Accounts {
+    /**
+     * listAccounts
+     *
+     * Distinct YNAB accounts present on synced transactions, for the trip card picker.
+     */
+    public static request<ThrowOnError extends boolean = false>(options?: Options<ListAccountsData, ThrowOnError>): RequestResult<ListAccountsResponses, unknown, ThrowOnError> {
+        return (options?.client ?? client).get<ListAccountsResponses, unknown, ThrowOnError>({ url: '/accounts', ...options });
+    }
+}
+
 export class Health {
     public static request<ThrowOnError extends boolean = false>(options?: Options<GetHealthData, ThrowOnError>): RequestResult<GetHealthResponses, unknown, ThrowOnError> {
         return (options?.client ?? client).get<GetHealthResponses, unknown, ThrowOnError>({ url: '/health', ...options });
@@ -26,10 +104,26 @@ export class Health {
 
 export class Categorization {
     /**
-     * Pending review queue with AI proposals joined to local transaction details.
+     * Pending review queue with locally scored AI proposals joined to transaction details.
      */
     public static request<ThrowOnError extends boolean = false>(options?: Options<GetCategorizationQueueData, ThrowOnError>): RequestResult<GetCategorizationQueueResponses, unknown, ThrowOnError> {
         return (options?.client ?? client).get<GetCategorizationQueueResponses, unknown, ThrowOnError>({ url: '/categorization/queue', ...options });
+    }
+    
+    /**
+     * postLlmSuggest
+     *
+     * Just-in-time LLM category (and optional payee) overlay for one scored queue transaction.
+     */
+    public static request2<ThrowOnError extends boolean = false>(options: Options<PostLlmSuggestData, ThrowOnError>): RequestResult<PostLlmSuggestResponses, unknown, ThrowOnError> {
+        return (options.client ?? client).post<PostLlmSuggestResponses, unknown, ThrowOnError>({
+            url: '/categorization/llm-suggest',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
     }
 }
 

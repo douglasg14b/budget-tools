@@ -132,3 +132,11 @@ apps/transaction-cleaner/data/
 
 .pnpm-store
 apps/transactions-retrieval/.env.dev
+apps/api/data/
+__data__/
+models/
+cleaning-output.json
+apps/categorization-ai/predict-output.json
+apps/categorization-ai/predict-stderr.txt
+apps/categorization-ai/transactions.json
+apps/categorization-ai/.idea/

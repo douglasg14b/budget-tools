@@ -1,0 +1,214 @@
+.overlay {
+    background: color-mix(in srgb, var(--app-bg-root) 72%, black);
+    backdrop-filter: blur(6px);
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    max-height: min(90dvh, 44rem);
+    background: var(--app-bg-surface);
+    box-shadow:
+        inset 0 0 0 1px var(--app-border-strong),
+        0 1.5rem 3rem color-mix(in srgb, var(--app-bg-root) 55%, transparent);
+    overflow: hidden;
+}
+
+.content::before {
+    content: "";
+    display: block;
+    flex-shrink: 0;
+    height: 0.28rem;
+    background: linear-gradient(
+        90deg,
+        var(--app-tier-suggested),
+        color-mix(in srgb, var(--app-tier-suggested) 20%, transparent)
+    );
+}
+
+.header {
+    flex-shrink: 0;
+    padding: 1.15rem 1.35rem 0.35rem;
+    background: transparent;
+    border-bottom: none;
+}
+
+.title {
+    font-family: var(--app-font-display);
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--app-text-primary);
+}
+
+.close {
+    color: var(--app-text-secondary);
+}
+
+.close:hover {
+    color: var(--app-text-primary);
+    background: var(--app-bg-hover);
+}
+
+.body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.35rem 1.35rem 1.4rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.lede {
+    margin: 0 0 0.95rem;
+    font-size: 0.9375rem;
+    color: var(--app-text-secondary);
+    line-height: 1.45;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem 1rem;
+    margin: 0 0 1.15rem;
+    padding: 0.8rem 0.9rem;
+    background: color-mix(in srgb, var(--app-tier-suggested) 8%, var(--app-bg-elevated));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-tier-suggested) 18%, transparent);
+}
+
+.stats dt {
+    margin: 0 0 0.2rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--app-text-muted);
+}
+
+.stats dd {
+    margin: 0;
+    font-family: var(--app-font-mono);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--app-text-primary);
+    overflow-wrap: anywhere;
+}
+
+.stats dd[data-inflow] {
+    color: var(--app-amount-inflow);
+}
+
+.conflict {
+    margin: -0.35rem 0 1.1rem;
+    padding: 0.55rem 0.7rem;
+    background: color-mix(in srgb, var(--app-status-error) 12%, transparent);
+    color: var(--app-status-error);
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.section + .section {
+    margin-top: 1.15rem;
+    padding-top: 1.05rem;
+    border-top: 1px dashed var(--app-border);
+}
+
+.sectionTitle {
+    margin: 0 0 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--app-text-muted);
+}
+
+.caption {
+    margin: -0.25rem 0 0.55rem;
+    font-size: 0.8125rem;
+    color: var(--app-text-muted);
+}
+
+.empty {
+    margin: 0;
+    color: var(--app-text-muted);
+    font-size: 0.9375rem;
+}
+
+.timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 6.75rem minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 0.75rem 0.9rem;
+    padding: 0.55rem 0.65rem;
+}
+
+.row[data-current] {
+    background: color-mix(in srgb, var(--app-tier-suggested) 12%, transparent);
+    box-shadow: inset 3px 0 0 var(--app-tier-suggested);
+}
+
+.date {
+    font-family: var(--app-font-mono);
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--app-text-muted);
+}
+
+.identity {
+    min-width: 0;
+}
+
+.payee {
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--app-text-primary);
+}
+
+.meta {
+    margin: 0.12rem 0 0;
+    font-size: 0.8125rem;
+    color: var(--app-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.amount {
+    margin: 0;
+    font-family: var(--app-font-mono);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    color: var(--app-text-primary);
+    white-space: nowrap;
+}
+
+.amount[data-inflow] {
+    color: var(--app-amount-inflow);
+}
+
+@media (max-width: 36rem) {
+    .stats {
+        grid-template-columns: 1fr;
+    }
+
+    .row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.2rem 0.75rem;
+    }
+
+    .date {
+        grid-column: 1 / -1;
+    }
+}

@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace YnabCategoryAi.ML;
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum PayeeResolutionMethod
 {
     ExactLookup,

@@ -1,5 +1,7 @@
-import '@fontsource-variable/inter';
-import '@fontsource/jetbrains-mono';
+import '@fontsource/atkinson-hyperlegible/400.css';
+import '@fontsource/atkinson-hyperlegible/700.css';
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/500.css';
 import '@mantine/core/styles.css';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

@@ -25,4 +25,18 @@ public record PendingTransaction(
     int Amount,
     string AccountName,
     string? Memo,
+    DateOnly Date,
+    string AccountId = "");
+
+/// <summary>
+/// Cleared non-split history used to detect periodic series, including unapproved queue items.
+/// Category is null when the row has no real budget category yet (including Uncategorized / Inflow placeholders).
+/// </summary>
+public record PeriodicHistoryTransaction(
+    string Id,
+    string? ImportPayeeNameOriginal,
+    string? PayeeName,
+    string? PayeeId,
+    string? CategoryName,
+    int Amount,
     DateOnly Date);

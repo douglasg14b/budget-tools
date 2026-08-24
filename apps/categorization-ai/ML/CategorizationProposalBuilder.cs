@@ -8,8 +8,11 @@ public static class CategorizationProposalBuilder
     public static CategorizationProposal BuildExcluded(
         PendingTransaction transaction,
         string featureText,
-        ExclusionKind kind) =>
-        new()
+        ExclusionKind kind,
+        PayeeResolutionResult payeeResolution)
+    {
+        PayeeProposalFields payee = BuildPayeeFields(transaction, payeeResolution);
+        return new()
         {
             TransactionId = transaction.Id,
             Tier = ApprovalTier.Blocked,
@@ -24,11 +27,13 @@ public static class CategorizationProposalBuilder
             GapReason = ProposalGapReason.Excluded,
             Method = CategorizationMethod.Excluded,
             FeatureText = featureText,
-            ResolvedPayee = transaction.PayeeName,
+            ResolvedPayee = payee.ResolvedPayee,
+            PayeeSuggestion = payee.Suggestion,
             Notes = kind == ExclusionKind.Check
                 ? "Check transaction — skipped auto-classification."
                 : "Excluded payee — skipped auto-classification."
         };
+    }
 
     public static CategorizationProposal BuildFromPipelineState(
         PendingTransaction transaction,
@@ -42,8 +47,12 @@ public static class CategorizationProposalBuilder
         string? consensusCategory,
         IReadOnlyList<MethodSignal> agreeingSignals,
         float consensusConfidence,
-        CategorizationResult? llmResult)
+        CategorizationResult? llmResult,
+        PeriodicMatch? periodicMatch = null,
+        bool isPeriodicConflict = false,
+        PayeeResolutionResult payeeResolution = default)
     {
+        PayeeProposalFields payee = BuildPayeeFields(transaction, payeeResolution);
         IReadOnlyList<MethodSignalDto> signalDtos = ToDtos(signals);
         IReadOnlyList<CategoryOptionDto> options = CategoryOptionRanker.Rank(
             signals,
@@ -76,9 +85,10 @@ public static class CategorizationProposalBuilder
                 Signals = signalDtos,
                 AgreeingSignals = ToDtos(agreeingSignals),
                 FeatureText = featureText,
-                ResolvedPayee = transaction.PayeeName,
+                ResolvedPayee = payee.ResolvedPayee,
+                PayeeSuggestion = payee.Suggestion,
                 Notes = $"Consensus: {string.Join(", ", agreeingSignals.Select(s => s.Method))}"
-            }, options, interval);
+            }, options, interval, periodicMatch, isPeriodicConflict);
         }
 
         if (llmResult?.PredictedCategory != null)
@@ -102,9 +112,10 @@ public static class CategorizationProposalBuilder
                 Signals = signalDtos,
                 AgreeingSignals = [],
                 FeatureText = featureText,
-                ResolvedPayee = transaction.PayeeName,
+                ResolvedPayee = payee.ResolvedPayee,
+                PayeeSuggestion = payee.Suggestion,
                 Notes = llmResult.Notes
-            }, options, interval, llmResult.PredictedCategory);
+            }, options, interval, periodicMatch, isPeriodicConflict, llmResult.PredictedCategory);
         }
 
         ProposalAnalysis analysis = AnalyzeEligibleSignals(signals, consensusSettings, isAmbiguous, gotConsensus);
@@ -145,9 +156,10 @@ public static class CategorizationProposalBuilder
                 Signals = signalDtos,
                 AgreeingSignals = ToDtos(analysis.AgreeingSignals),
                 FeatureText = featureText,
-                ResolvedPayee = transaction.PayeeName,
-                Notes = BuildReviewNotes(analysis, isAmbiguous)
-            }, options, interval);
+                ResolvedPayee = payee.ResolvedPayee,
+                PayeeSuggestion = payee.Suggestion,
+                Notes = BuildReviewNotes(analysis, isAmbiguous, isPeriodicConflict)
+            }, options, interval, periodicMatch, isPeriodicConflict);
         }
 
         return Finalize(new CategorizationProposal
@@ -169,19 +181,22 @@ public static class CategorizationProposalBuilder
             Method = CategorizationMethod.ManualReview,
             Signals = signalDtos,
             FeatureText = featureText,
-            ResolvedPayee = transaction.PayeeName,
+            ResolvedPayee = payee.ResolvedPayee,
+            PayeeSuggestion = payee.Suggestion,
             Notes = isAmbiguous
                 ? "Ambiguous merchant — pick a category or choose an option below."
                 : options.Count > 0
                     ? "Pick the best option below or search for another category."
                     : "No strong local prediction — search for a category."
-        }, options, interval);
+        }, options, interval, periodicMatch, isPeriodicConflict);
     }
 
     private static CategorizationProposal Finalize(
         CategorizationProposal draft,
         IReadOnlyList<CategoryOptionDto> options,
         ConfidenceIntervalDto interval,
+        PeriodicMatch? periodicMatch,
+        bool isPeriodicConflict,
         string? preferredCategory = null)
     {
         CategoryOptionDto? top = options.FirstOrDefault();
@@ -190,25 +205,41 @@ public static class CategorizationProposalBuilder
             suggestedCategory != null
             && CategoryNormalizer.AreEquivalent(o.Category, suggestedCategory));
 
+        ApprovalTier tier = isPeriodicConflict ? ApprovalTier.Review : draft.Tier;
+        ProposalGapReason gapReason = isPeriodicConflict ? ProposalGapReason.PeriodicConflict : draft.GapReason;
+        string? notes = isPeriodicConflict
+            ? "Periodic series category disagrees with other methods — confirm before accepting."
+            : draft.Notes;
+
         return new CategorizationProposal
         {
             TransactionId = draft.TransactionId,
-            Tier = draft.Tier,
-            Flags = draft.Flags,
+            Tier = tier,
+            Flags = new CategorizationFlags
+            {
+                IsAmbiguous = draft.Flags.IsAmbiguous,
+                IsNovelImport = draft.Flags.IsNovelImport,
+                IsExcluded = draft.Flags.IsExcluded,
+                RequiresManualReview = isPeriodicConflict || draft.Flags.RequiresManualReview,
+                IsPeriodic = periodicMatch != null,
+                IsPeriodicConflict = isPeriodicConflict
+            },
             SuggestedCategory = suggestedCategory,
             SuggestedCategoryGroup = draft.SuggestedCategoryGroup ?? matchingOption?.CategoryGroup,
             SuggestedCategoryId = draft.SuggestedCategoryId ?? matchingOption?.CategoryId,
             Confidence = draft.Confidence > 0 ? draft.Confidence : matchingOption?.Confidence ?? 0,
             Method = draft.Method,
             RouteReason = draft.RouteReason,
-            GapReason = draft.GapReason,
+            GapReason = gapReason,
             Signals = draft.Signals,
             AgreeingSignals = draft.AgreeingSignals,
             Options = options,
             ConfidenceInterval = interval,
             FeatureText = draft.FeatureText,
             ResolvedPayee = draft.ResolvedPayee,
-            Notes = draft.Notes
+            PayeeSuggestion = draft.PayeeSuggestion,
+            Notes = notes,
+            PeriodicMatch = periodicMatch
         };
     }
 
@@ -351,8 +382,11 @@ public static class CategorizationProposalBuilder
         id = null;
     }
 
-    private static string BuildReviewNotes(ProposalAnalysis analysis, bool isAmbiguous)
+    private static string BuildReviewNotes(ProposalAnalysis analysis, bool isAmbiguous, bool isPeriodicConflict)
     {
+        if (isPeriodicConflict)
+            return "Periodic series category disagrees with other methods — confirm before accepting.";
+
         if (isAmbiguous && analysis.GapReason == ProposalGapReason.AmbiguousMerchant)
             return "Consensus would apply but merchant is ambiguous — confirm before accepting.";
 
@@ -372,4 +406,33 @@ public static class CategorizationProposalBuilder
         CategorySuggestionDto? BestSuggestion,
         IReadOnlyList<MethodSignal> AgreeingSignals,
         ProposalGapReason GapReason);
+
+    private static PayeeProposalFields BuildPayeeFields(
+        PendingTransaction transaction,
+        PayeeResolutionResult resolution)
+    {
+        if (resolution.Method == PayeeResolutionMethod.Unresolved
+            || string.IsNullOrWhiteSpace(resolution.ResolvedPayee))
+        {
+            return new PayeeProposalFields(transaction.PayeeName, null);
+        }
+
+        bool needsRename = PayeeRename.NeedsRename(
+            transaction.PayeeName,
+            resolution.ResolvedPayee,
+            transaction.ImportPayeeNameOriginal,
+            transaction.ImportPayeeName);
+
+        return new PayeeProposalFields(
+            resolution.ResolvedPayee,
+            new PayeeSuggestionDto(
+                resolution.ResolvedPayee,
+                resolution.Method,
+                resolution.Confidence,
+                needsRename));
+    }
+
+    private readonly record struct PayeeProposalFields(
+        string? ResolvedPayee,
+        PayeeSuggestionDto? Suggestion);
 }

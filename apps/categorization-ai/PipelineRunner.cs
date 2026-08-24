@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -5,16 +6,38 @@ using CsvHelper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.ML;
+using Serilog;
 using YnabCategoryAi.Configuration;
 using YnabCategoryAi.Data;
+using YnabCategoryAi.Data.Entities;
 using YnabCategoryAi.ML;
 using YnabCategoryAi.ML.Llm;
+using YnabCategoryAi.ML.Travel;
 
 namespace YnabCategoryAi;
 
 public static class PipelineRunner
 {
     public static async Task<int> RunAsync(string[] args)
+    {
+        string mode = args.Length > 0 ? args[0].ToLowerInvariant() : "run";
+        SessionLog.Start(jsonStdout: mode == "predict-json");
+        try
+        {
+            return await RunLoggedAsync(args, mode);
+        }
+        catch (Exception exception)
+        {
+            Log.Fatal(exception, "Unhandled exception");
+            return 1;
+        }
+        finally
+        {
+            await SessionLog.ShutdownAsync();
+        }
+    }
+
+    private static async Task<int> RunLoggedAsync(string[] args, string mode)
     {
         IConfiguration config = new ConfigurationBuilder()
             .AddJsonFile("appsettings.json", optional: true)
@@ -33,11 +56,9 @@ public static class PipelineRunner
                 ?? string.Empty;
         }
 
-        string connectionString = config["DB_CONNECTION_STRING"]
-            ?? config.GetConnectionString("BudgetTools")
-            ?? throw new InvalidOperationException(
-                "Database connection string not found. " +
-                "Set DB_CONNECTION_STRING or ConnectionStrings:BudgetTools in appsettings.json.");
+        string connectionString = PostgresConnectionString.Resolve(
+            config["DB_CONNECTION_STRING"],
+            config.GetConnectionString("BudgetTools"));
 
         var dbOptions = new DbContextOptionsBuilder<BudgetToolsContext>()
             .UseNpgsql(connectionString)
@@ -46,12 +67,14 @@ public static class PipelineRunner
 
         await using var db = new BudgetToolsContext(dbOptions);
 
-        string mode = args.Length > 0 ? args[0].ToLowerInvariant() : "run";
         TextWriter diagnostics = mode == "predict-json" ? Console.Error : Console.Out;
         bool forceRetrain = args.Contains("--force", StringComparer.OrdinalIgnoreCase);
         bool useLlm = args.Contains("--llm", StringComparer.OrdinalIgnoreCase) || llmSettings.Enabled;
 
-        CategoryCatalog catalog = CategoryCatalog.Load(db, mlSettings.MinCategoryTrainingExamples);
+        CategoryCatalog catalog = Time(
+            diagnostics,
+            "load category catalog",
+            () => CategoryCatalog.Load(db, mlSettings.MinCategoryTrainingExamples));
 
         var mlContext = new MLContext(seed: 0);
         var payeeModel = new PayeeMappingModel(mlContext, mlSettings);
@@ -71,7 +94,10 @@ public static class PipelineRunner
             categoryModel,
             llmService);
 
-        TrainingTransaction[] allTraining = TransactionQueries.GetTrainingTransactions(db);
+        TrainingTransaction[] allTraining = Time(
+            diagnostics,
+            "load training transactions",
+            () => TransactionQueries.GetTrainingTransactions(db));
         if (allTraining.Length == 0)
         {
             diagnostics.WriteLine("No accepted, categorized transactions found in the database.");
@@ -94,7 +120,8 @@ public static class PipelineRunner
             "diagnose" => Diagnose(pipeline, trainSet, evalSet, mlSettings),
             "analyze-gap" => AnalyzeGap(pipeline, trainSet, evalSet, catalog, mlSettings),
             "predict" => await PredictAfterTrainAsync(pipeline, allTraining, db, mlSettings, useLlm, forceRetrain),
-            "predict-json" => await PredictJsonAsync(pipeline, allTraining, db, mlSettings, useLlm, forceRetrain, diagnostics),
+            "predict-json" => await PredictJsonAsync(
+                pipeline, allTraining, db, mlSettings, useLlm, forceRetrain, diagnostics, args),
             "feedback-stats" => await FeedbackStatsAsync(db),
             "run" => await RunAllAsync(
                 pipeline, allTraining, trainSet, evalSet, categoryModel, db, mlSettings, useLlm, forceRetrain),
@@ -137,7 +164,11 @@ public static class PipelineRunner
     {
         TextWriter output = diagnostics ?? Console.Out;
         output.WriteLine($"Training on {trainSet.Length} accepted, categorized transactions...");
-        pipeline.Train(trainSet, forceRetrain);
+        Time(output, "rebuild lookups + load models", () =>
+        {
+            pipeline.Train(trainSet, forceRetrain);
+            return 0;
+        });
         output.WriteLine(
             $"Training complete. Ambiguous merchants indexed: " +
             $"{pipeline.AmbiguousIndex.AmbiguousPayeeCount} payees, " +
@@ -552,6 +583,7 @@ public static class PipelineRunner
         bool forceRetrain)
     {
         Train(pipeline, trainingData, forceRetrain);
+        RebuildPeriodicIndex(pipeline, db, Console.Out);
         return await PredictAsync(pipeline, db, settings, useLlm);
     }
 
@@ -565,6 +597,8 @@ public static class PipelineRunner
         Console.WriteLine();
         Console.WriteLine($"=== Predicting categories for {pending.Length} pending transactions ===");
         Console.WriteLine(useLlm ? "LLM routing: enabled" : "LLM routing: disabled (pass --llm or set Llm:Enabled)");
+
+        ConfigureTravelBias(pipeline);
 
         IReadOnlyList<CategorizationProposal> proposals =
             await pipeline.PredictPendingDetailedAsync(pending, useLlm);
@@ -604,12 +638,25 @@ public static class PipelineRunner
         MlSettings settings,
         bool useLlm,
         bool forceRetrain,
-        TextWriter diagnostics)
+        TextWriter diagnostics,
+        string[] args)
     {
         Train(pipeline, trainingData, forceRetrain, diagnostics);
-        PendingTransaction[] pending = TransactionQueries.GetPendingTransactions(db);
-        IReadOnlyList<CategorizationProposal> proposals =
-            await pipeline.PredictPendingDetailedAsync(pending, useLlm);
+        RebuildPeriodicIndex(pipeline, db, diagnostics);
+        IReadOnlyList<string>? transactionIds = ParseCsvOption(args, "--ids");
+        int? limit = ParsePositiveIntOption(args, "--limit");
+        PendingTransaction[] pending = Time(
+            diagnostics,
+            "load pending transactions",
+            () => SelectPendingTransactions(db, transactionIds, limit));
+        diagnostics.WriteLine($"[timing] pending count: {pending.Length}");
+
+        ConfigureTravelBias(pipeline);
+
+        IReadOnlyList<CategorizationProposal> proposals = await TimeAsync(
+            diagnostics,
+            "score pending transactions",
+            () => pipeline.PredictPendingDetailedAsync(pending, useLlm));
 
         var jsonOptions = new JsonSerializerOptions
         {
@@ -624,8 +671,19 @@ public static class PipelineRunner
             proposals
         };
 
-        Console.WriteLine(JsonSerializer.Serialize(payload, jsonOptions));
+        string json = Time(
+            diagnostics,
+            "serialize json",
+            () => JsonSerializer.Serialize(payload, jsonOptions));
+        Console.WriteLine(json);
         return 0;
+    }
+
+    private static void ConfigureTravelBias(CategorizationPipeline pipeline)
+    {
+        (bool enabled, IReadOnlyList<TravelWindowRecord> windows) =
+            TravelSqliteStore.Load(Environment.GetEnvironmentVariable("SQLITE_DB_PATH"));
+        pipeline.ConfigureTravelBias(enabled, windows);
     }
 
     private static async Task<int> FeedbackStatsAsync(BudgetToolsContext db)
@@ -713,7 +771,10 @@ public static class PipelineRunner
               dotnet run diagnose                Show misclassification examples under strict consensus
               dotnet run analyze-gap             Break down manual-review gap and recoverable coverage
               dotnet run predict [--force]       Categorize pending transactions (tiered output)
-              dotnet run predict-json [--force]  Emit JSON proposals for API/UI integration
+              dotnet run predict-json [--force] [--limit N] [--ids id,id]
+                                         Emit JSON proposals for API/UI integration
+                                         --ids scores those transactions (order preserved)
+                                         --limit scores the N newest pending (ignored when --ids is set)
               dotnet run feedback-stats          Summarize recorded approval/denial feedback
               dotnet run predict --llm           Include LLM for ambiguous/novel transactions
               dotnet run export                  Export training CSV from database
@@ -721,5 +782,117 @@ public static class PipelineRunner
             LLM config: Llm:Enabled + Llm:ApiKey in appsettings.json or OPENAI_API_KEY env var
             """);
         return 1;
+    }
+
+    private static PendingTransaction[] SelectPendingTransactions(
+        BudgetToolsContext db,
+        IReadOnlyList<string>? transactionIds,
+        int? limit)
+    {
+        if (transactionIds is not null)
+        {
+            return TransactionQueries.GetPendingTransactions(db, transactionIds);
+        }
+
+        PendingTransaction[] pending = TransactionQueries.GetPendingTransactions(db);
+        if (limit is null)
+        {
+            return pending;
+        }
+
+        return pending
+            .OrderByDescending(transaction => transaction.Date)
+            .ThenBy(transaction => transaction.Id, StringComparer.Ordinal)
+            .Take(limit.Value)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<string>? ParseCsvOption(string[] args, string name)
+    {
+        string? raw = GetOptionValue(args, name);
+        if (raw is null)
+        {
+            return null;
+        }
+
+        return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private static int? ParsePositiveIntOption(string[] args, string name)
+    {
+        string? raw = GetOptionValue(args, name);
+        if (raw is null)
+        {
+            return null;
+        }
+
+        if (!int.TryParse(raw, out int value) || value < 1)
+        {
+            throw new InvalidOperationException($"{name} must be a positive integer.");
+        }
+
+        return value;
+    }
+
+    private static string? GetOptionValue(string[] args, string name)
+    {
+        for (int index = 0; index < args.Length; index++)
+        {
+            string argument = args[index];
+            if (argument.Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                if (index + 1 >= args.Length || args[index + 1].StartsWith("--", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException($"{name} requires a value.");
+                }
+
+                return args[index + 1];
+            }
+
+            string prefix = name + "=";
+            if (argument.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                string value = argument[prefix.Length..];
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    throw new InvalidOperationException($"{name} requires a value.");
+                }
+
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private static void RebuildPeriodicIndex(
+        CategorizationPipeline pipeline,
+        BudgetToolsContext db,
+        TextWriter diagnostics)
+    {
+        PeriodicHistoryTransaction[] history = Time(
+            diagnostics,
+            "load periodic history",
+            () => TransactionQueries.GetPeriodicHistory(db));
+        pipeline.TrainPeriodic(history);
+        diagnostics.WriteLine(
+            $"[timing] periodic series index: {pipeline.PeriodicIndex.LastTrainElapsed.TotalMilliseconds:F1}ms " +
+            $"({pipeline.PeriodicIndex.SeriesCount} series from {history.Length} history rows)");
+    }
+
+    private static T Time<T>(TextWriter output, string label, Func<T> action)
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        T result = action();
+        output.WriteLine($"[timing] {label}: {stopwatch.Elapsed.TotalSeconds:F1}s");
+        return result;
+    }
+
+    private static async Task<T> TimeAsync<T>(TextWriter output, string label, Func<Task<T>> action)
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        T result = await action();
+        output.WriteLine($"[timing] {label}: {stopwatch.Elapsed.TotalSeconds:F1}s");
+        return result;
     }
 }

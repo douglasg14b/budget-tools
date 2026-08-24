@@ -32,7 +32,8 @@ public enum ProposalGapReason
     ImportAmountNearMiss,
     NoQualifiedSignals,
     LlmSuggestion,
-    Excluded
+    Excluded,
+    PeriodicConflict
 }
 
 public sealed class CategorizationFlags
@@ -41,12 +42,29 @@ public sealed class CategorizationFlags
     public bool IsNovelImport { get; init; }
     public bool IsExcluded { get; init; }
     public bool RequiresManualReview { get; init; }
+    public bool IsPeriodic { get; init; }
+    public bool IsPeriodicConflict { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsTravelWindow { get; init; }
 }
+
+public sealed record TravelWindowHitDto(
+    Guid Id,
+    string Name,
+    string Kind,
+    string? TargetCategory);
 
 public sealed record MethodSignalDto(
     CategorizationMethod Method,
     string Category,
     float Confidence);
+
+public sealed record PayeeSuggestionDto(
+    string Name,
+    PayeeResolutionMethod Method,
+    float Confidence,
+    bool NeedsRename);
 
 public sealed record CategorySuggestionDto(
     string Category,
@@ -98,7 +116,19 @@ public sealed class CategorizationProposal
 
     public string FeatureText { get; init; } = string.Empty;
     public string? ResolvedPayee { get; init; }
+
+    /// <summary>
+    /// Canonical payee predicted from the bank import string. Null when unresolved or below threshold.
+    /// <see cref="PayeeSuggestionDto.NeedsRename"/> is true only when the current YNAB payee still
+    /// looks like the import text.
+    /// </summary>
+    public PayeeSuggestionDto? PayeeSuggestion { get; init; }
+
     public string? Notes { get; init; }
+    public PeriodicMatch? PeriodicMatch { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TravelWindowHitDto? TravelWindow { get; init; }
 
     public CategorizationResult ToResult()
     {

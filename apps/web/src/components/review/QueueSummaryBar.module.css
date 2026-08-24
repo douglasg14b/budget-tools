@@ -1,0 +1,110 @@
+.bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem 0.85rem;
+}
+
+.pending {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--app-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.instrument {
+    display: inline-flex;
+    align-items: stretch;
+    position: relative;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 999px;
+    background: var(--app-bg-surface);
+}
+
+.legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0.5rem 1rem;
+    border: 0;
+    border-right: 1px solid var(--app-border);
+    background: transparent;
+    color: var(--app-text-secondary);
+    font: inherit;
+    font-size: 0.9375rem;
+    line-height: 1.2;
+    cursor: pointer;
+    transition:
+        background-color 140ms ease,
+        color 140ms ease;
+}
+
+.chip:last-child {
+    border-right: 0;
+}
+
+.chip:hover {
+    color: var(--app-text-primary);
+    background: var(--app-bg-hover);
+}
+
+.chip:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--chip-color) 70%, white);
+    outline-offset: -2px;
+}
+
+.chipActive {
+    color: var(--app-text-primary);
+    background: color-mix(in srgb, var(--chip-color) 18%, transparent);
+}
+
+.chip[data-tier="AutoApply"] {
+    --chip-color: var(--app-tier-auto);
+}
+
+.chip[data-tier="Suggested"] {
+    --chip-color: var(--app-tier-suggested);
+}
+
+.chip[data-tier="Review"] {
+    --chip-color: var(--app-tier-review);
+}
+
+.chip[data-tier="Blocked"] {
+    --chip-color: var(--app-tier-blocked);
+}
+
+.label {
+    letter-spacing: 0.01em;
+}
+
+.count {
+    font-family: var(--app-font-mono);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--chip-color);
+    opacity: 0.9;
+}
+
+.certainHint {
+    cursor: help;
+    text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent);
+    text-underline-offset: 0.18em;
+}
