@@ -6,4 +6,5 @@ public sealed record TravelWindowRecord(
     string Kind,
     DateOnly StartDate,
     DateOnly EndDate,
-    string? AccountId);
+    string? Location,
+    IReadOnlyList<string> AccountIds);

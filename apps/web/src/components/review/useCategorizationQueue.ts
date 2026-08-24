@@ -14,7 +14,8 @@ export function expandQueueRequest(): { query: { expand: true } } {
 let warmPrefetchStarted = false;
 
 /**
- * Shared locally scored queue query. Filters stay on the list page; classify uses the same cache.
+ * Review-list queue: full scored working set, expand older only.
+ * Classify uses `useClassifyQueue` so it does not share this cache.
  */
 export function useCategorizationQueue() {
     const queryClient = useQueryClient();

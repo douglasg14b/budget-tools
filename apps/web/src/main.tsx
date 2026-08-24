@@ -3,6 +3,7 @@ import '@fontsource/atkinson-hyperlegible/700.css';
 import '@fontsource/ibm-plex-mono/400.css';
 import '@fontsource/ibm-plex-mono/500.css';
 import '@mantine/core/styles.css';
+import '@mantine/dates/styles.css';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';

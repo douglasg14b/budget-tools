@@ -17,6 +17,7 @@ import {
     writeProposalCache,
 } from './cache/proposalCache';
 import { selectScoringBatch } from './cache/selectScoringBatch';
+import { selectWindowScoring } from './cache/selectWindowSlice';
 import type { CachedProposalEntry, ProposalCacheFile } from './cache/types';
 import type {
     CategorizationQueueDto,
@@ -32,7 +33,16 @@ import { summarizeQueue } from './summarizeQueue';
 type QueueSnapshot = {
     generatedAt: string;
     pendingCount: number;
+    scoredCount: number;
+    hasMoreNewer: boolean;
+    hasMoreOlder: boolean;
     items: CategorizationQueueItemDto[];
+};
+
+type WindowQuery = {
+    around?: string;
+    olderThan?: string;
+    newerThan?: string;
 };
 
 let queueLoadChain: Promise<unknown> = Promise.resolve();
@@ -44,7 +54,8 @@ let queueLoadChain: Promise<unknown> = Promise.resolve();
 export async function loadCategorizationQueue(query: CategorizationQueueQuery): Promise<CategorizationQueueDto> {
     const refresh = query.refresh === true;
     const expand = query.expand === true && !refresh;
-    const snapshot = await getQueueSnapshot(refresh, expand);
+    const windowQuery = refresh ? undefined : readWindowQuery(query);
+    const snapshot = await getQueueSnapshot(refresh, expand, windowQuery);
     const filteredItems = filterAndSortQueueItems(snapshot.items, {
         tiers: parseTierFilter(query.tier),
         accountId: query.accountId,
@@ -55,14 +66,31 @@ export async function loadCategorizationQueue(query: CategorizationQueueQuery): 
         generatedAt: snapshot.generatedAt,
         llm: false,
         pendingCount: snapshot.pendingCount,
-        scoredCount: snapshot.items.length,
-        hasMore: snapshot.pendingCount > snapshot.items.length,
+        scoredCount: snapshot.scoredCount,
+        hasMore: windowQuery ? snapshot.hasMoreOlder : snapshot.pendingCount > snapshot.scoredCount,
+        hasMoreNewer: snapshot.hasMoreNewer,
+        hasMoreOlder: snapshot.hasMoreOlder,
         items: filteredItems,
     };
 }
 
-async function getQueueSnapshot(refresh: boolean, expand: boolean): Promise<QueueSnapshot> {
-    const run = (): Promise<QueueSnapshot> => loadQueueSnapshot(refresh, expand);
+function readWindowQuery(query: CategorizationQueueQuery): WindowQuery | undefined {
+    if (query.olderThan || query.newerThan || query.around) {
+        return {
+            around: query.around,
+            olderThan: query.olderThan,
+            newerThan: query.newerThan,
+        };
+    }
+    return undefined;
+}
+
+async function getQueueSnapshot(
+    refresh: boolean,
+    expand: boolean,
+    windowQuery: WindowQuery | undefined,
+): Promise<QueueSnapshot> {
+    const run = (): Promise<QueueSnapshot> => loadQueueSnapshot(refresh, expand, windowQuery);
     const result = queueLoadChain.then(run, run);
     queueLoadChain = result.then(
         () => undefined,
@@ -71,24 +99,47 @@ async function getQueueSnapshot(refresh: boolean, expand: boolean): Promise<Queu
     return result;
 }
 
-async function loadQueueSnapshot(refresh: boolean, expand: boolean): Promise<QueueSnapshot> {
+async function loadQueueSnapshot(
+    refresh: boolean,
+    expand: boolean,
+    windowQuery: WindowQuery | undefined,
+): Promise<QueueSnapshot> {
     assertCategorizationModelsExist(CATEGORIZATION_MODELS_DIR);
 
     const pending = await listPendingTransactions();
+    const pendingIds = pending.map((row) => row.id);
     const signature = modelSignature(CATEGORIZATION_MODELS_DIR);
     const travelSignature = await loadTravelWindowsSignature();
     const path = cacheFilePath(CATEGORIZATION_QUEUE_CACHE_DIR, false);
     const cache = await readProposalCache(path);
     const fingerprints = new Map(pending.map((row) => [row.id, row.fingerprint]));
-    const batch = selectScoringBatch({
-        pendingIds: pending.map((row) => row.id),
-        fingerprints,
-        cacheEntries: cacheEntriesMap(cache),
-        cacheUsable: isCacheUsable(cache, false, signature, travelSignature),
-        batchSize: CATEGORIZATION_QUEUE_BATCH_SIZE,
-        refresh,
-        expand,
-    });
+    const cacheEntries = cacheEntriesMap(cache);
+    const cacheUsable = isCacheUsable(cache, false, signature, travelSignature);
+
+    const windowScoring = windowQuery
+        ? selectWindowScoring({
+              pendingIds,
+              fingerprints,
+              cacheEntries,
+              cacheUsable,
+              batchSize: CATEGORIZATION_QUEUE_BATCH_SIZE,
+              around: windowQuery.around,
+              olderThan: windowQuery.olderThan,
+              newerThan: windowQuery.newerThan,
+          })
+        : undefined;
+
+    const batch = windowScoring
+        ? { kept: windowScoring.kept, idsToScore: windowScoring.idsToScore }
+        : selectScoringBatch({
+              pendingIds,
+              fingerprints,
+              cacheEntries,
+              cacheUsable,
+              batchSize: CATEGORIZATION_QUEUE_BATCH_SIZE,
+              refresh,
+              expand,
+          });
 
     let kept = batch.kept;
     let generatedAt = latestGeneratedAt(kept) ?? new Date().toISOString();
@@ -127,8 +178,12 @@ async function loadQueueSnapshot(refresh: boolean, expand: boolean): Promise<Que
     }
 
     const proposalsById = new Map(kept.map((entry) => [entry.proposal.transactionId, entry.proposal]));
+    const sliceIds = windowScoring ? new Set(windowScoring.ids) : undefined;
     const scoredItems: Array<Omit<CategorizationQueueItemDto, 'relatedTransactions'>> = [];
     for (const row of pending) {
+        if (sliceIds && !sliceIds.has(row.id)) {
+            continue;
+        }
         const proposal = proposalsById.get(row.id);
         if (!proposal) {
             continue;
@@ -136,10 +191,17 @@ async function loadQueueSnapshot(refresh: boolean, expand: boolean): Promise<Que
         scoredItems.push({ transaction: toTransactionDetail(row), proposal });
     }
     const items = await hydrateRelatedTransactions(scoredItems);
+    const hasMoreNewer = windowScoring ? windowScoring.startIndex > 0 : false;
+    const hasMoreOlder = windowScoring
+        ? windowScoring.endIndexExclusive < pending.length
+        : pending.length > items.length;
 
     return {
         generatedAt,
         pendingCount: pending.length,
+        scoredCount: windowScoring ? kept.length : items.length,
+        hasMoreNewer,
+        hasMoreOlder,
         items,
     };
 }

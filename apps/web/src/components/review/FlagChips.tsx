@@ -34,26 +34,61 @@ type FlagChipsProps = {
     travelWindow?: TravelWindowHitDto | null;
 };
 
-export function travelWindowTooltip(window: Pick<TravelWindowHitDto, 'name' | 'kind'>): string {
-    const kindLabel = window.kind === 'work' ? 'Work' : 'Vacation';
-    return `${window.name} · ${kindLabel}`;
+export function travelWindowChipLabel(window: TravelWindowHitDto | null | undefined): string {
+    if (!window) {
+        return 'During trip';
+    }
+    if (window.locationMatch === 'mismatch') {
+        return `During ${window.name}`;
+    }
+    return window.kind === 'work' ? 'Work trip' : 'Vacation';
+}
+
+export function travelWindowTooltip(window: TravelWindowHitDto): string {
+    const parts = [window.name, window.kind === 'work' ? 'Work' : 'Vacation'];
+    if (window.location) {
+        parts.push(`destination ${window.location}`);
+    }
+    if (window.merchantCity) {
+        parts.push(`merchant ${window.merchantCity}`);
+    }
+    if (window.locationMatch === 'match') {
+        parts.push('city matches');
+    }
+    if (window.locationMatch === 'mismatch') {
+        parts.push('city does not match');
+    }
+    return parts.join(' · ');
+}
+
+export function TravelWindowChip({ travelWindow }: { travelWindow: TravelWindowHitDto }) {
+    const mismatch = travelWindow.locationMatch === 'mismatch';
+    return (
+        <Tooltip label={travelWindowTooltip(travelWindow)}>
+            <span
+                className={
+                    mismatch ? `${classes.chip} ${classes.chipTravelMismatch}` : `${classes.chip} ${classes.chipTravel}`
+                }
+            >
+                {travelWindowChipLabel(travelWindow)}
+            </span>
+        </Tooltip>
+    );
 }
 
 export function FlagChips({ flags, hide = [], travelWindow }: FlagChipsProps) {
     const hidden = new Set(hide);
     const active = FLAG_CHIPS.filter(([key]) => flags[key] && !hidden.has(key));
-    if (active.length === 0 && !travelWindow) {
+    const showTravel = Boolean(travelWindow) || flags.isTravelWindow;
+    if (active.length === 0 && !showTravel) {
         return null;
     }
 
     return (
         <span className={classes.flags}>
-            {travelWindow ? (
-                <Tooltip label={travelWindowTooltip(travelWindow)}>
-                    <span className={`${classes.chip} ${classes.chipTravel}`}>
-                        {travelWindow.kind === 'work' ? 'Work trip' : 'Vacation'}
-                    </span>
-                </Tooltip>
+            {travelWindow ? <TravelWindowChip travelWindow={travelWindow} /> : null}
+            {!travelWindow && flags.isTravelWindow ? (
+                <span className={`${classes.chip} ${classes.chipTravel}`}>{travelWindowChipLabel(null)}</span>
             ) : null}
             {active.map(([key, label, explanation]) => (
                 <Tooltip key={key} label={explanation}>

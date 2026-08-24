@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { PayeeSuggestionDto, TransactionDetailDto } from '../categorizationDtos';
-import { applyLlmPayee } from '../llm/applyLlmPayee';
+import type { PayeeSuggestionDto, TransactionDetailDto } from '../../categorizationDtos';
+import { applyLlmPayee } from '../applyLlmPayee';
 
 describe('applyLlmPayee', () => {
     it('returns null when local rename already exists', () => {

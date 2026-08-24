@@ -14,6 +14,7 @@ import type {
     PredictJsonEnvelope,
     ProposalGapReason,
     QueueSummaryDto,
+    TravelLocationMatch,
     TravelWindowHitDto,
 } from './categorizationDtos';
 
@@ -38,6 +39,7 @@ const CATEGORIZATION_METHODS = new Set<CategorizationMethod>([
     'PeriodicSeriesLookup',
     'Consensus',
     'LlmCategorization',
+    'TravelWindow',
     'Excluded',
     'ManualReview',
     'None',
@@ -75,6 +77,8 @@ const PAYEE_RESOLUTION_METHODS = new Set<PayeeResolutionMethod>([
     'Llm',
     'Unresolved',
 ]);
+
+const TRAVEL_LOCATION_MATCHES = new Set<TravelLocationMatch>(['match', 'mismatch', 'unknown', 'unspecified']);
 
 /**
  * Extracts the first JSON object from CLI stdout, ignoring any leading `dotnet` banners.
@@ -400,10 +404,21 @@ function parseTravelWindow(value: unknown, index: number): TravelWindowHitDto | 
         throw new PredictJsonError(`proposals[${index}].travelWindow.kind is invalid`);
     }
 
+    const locationMatch = window.locationMatch;
+    if (locationMatch !== undefined && typeof locationMatch !== 'string') {
+        throw new PredictJsonError(`proposals[${index}].travelWindow.locationMatch is invalid`);
+    }
+    if (locationMatch !== undefined && !TRAVEL_LOCATION_MATCHES.has(locationMatch as TravelLocationMatch)) {
+        throw new PredictJsonError(`proposals[${index}].travelWindow.locationMatch is invalid`);
+    }
+
     return {
         id: requireString(window.id, `proposals[${index}].travelWindow.id`),
         name: requireString(window.name, `proposals[${index}].travelWindow.name`),
         kind,
         targetCategory: optionalNonEmptyString(window.targetCategory),
+        location: optionalNonEmptyString(window.location),
+        locationMatch: (locationMatch as TravelLocationMatch | undefined) ?? 'unspecified',
+        merchantCity: optionalNonEmptyString(window.merchantCity),
     };
 }

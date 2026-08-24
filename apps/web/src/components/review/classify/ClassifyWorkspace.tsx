@@ -1,7 +1,7 @@
 import type { CategorizationQueueItemDto, CategoryGroupDto } from '@budget-tools/web-sdk';
 import { useEffect, useRef } from 'react';
 
-import { shouldPrefetchMore } from '../shouldPrefetchMore';
+import { shouldPrefetchMore, shouldPrefetchNewer } from '../shouldPrefetchMore';
 import { nextUncertainRemaining } from './applyLlmOverlay';
 import { ClassifyFilmstrip } from './ClassifyFilmstrip';
 import { ClassifyProgress } from './ClassifyProgress';
@@ -14,17 +14,35 @@ import { useLlmOverlay } from './useLlmOverlay';
 
 type ClassifyWorkspaceProps = {
     categoryGroups: readonly CategoryGroupDto[];
-    hasMore: boolean;
-    isExpanding: boolean;
+    hasMoreNewer: boolean;
+    hasMoreOlder: boolean;
+    isExpandingNewer: boolean;
+    isExpandingOlder: boolean;
     items: readonly CategorizationQueueItemDto[];
-    onNeedMore: () => void;
+    onNeedNewer: () => void;
+    onNeedOlder: () => void;
+    onCurrentIdChange?: (transactionId: string | undefined) => void;
+    requestedId?: string;
 };
 
-export function ClassifyWorkspace({ categoryGroups, hasMore, isExpanding, items, onNeedMore }: ClassifyWorkspaceProps) {
+export function ClassifyWorkspace({
+    categoryGroups,
+    hasMoreNewer,
+    hasMoreOlder,
+    isExpandingNewer,
+    isExpandingOlder,
+    items,
+    onCurrentIdChange,
+    onNeedNewer,
+    onNeedOlder,
+    requestedId,
+}: ClassifyWorkspaceProps) {
     const displayedItemRef = useRef<CategorizationQueueItemDto | undefined>(undefined);
     const classify = useClassifySession(items, categoryGroups, {
         displayedItemRef,
         navigate: 'remaining',
+        onCurrentIdChange,
+        requestedId,
     });
     const current = classify.current;
     const remaining = remainingItems(items, classify.session);
@@ -37,10 +55,13 @@ export function ClassifyWorkspace({ categoryGroups, hasMore, isExpanding, items,
     displayedItemRef.current = displayItem;
 
     useEffect(() => {
-        if (shouldPrefetchMore(classify.position, items.length, hasMore)) {
-            onNeedMore();
+        if (shouldPrefetchMore(classify.position, items.length, hasMoreOlder)) {
+            onNeedOlder();
         }
-    }, [classify.position, hasMore, items.length, onNeedMore]);
+        if (shouldPrefetchNewer(classify.position, hasMoreNewer)) {
+            onNeedNewer();
+        }
+    }, [classify.position, hasMoreNewer, hasMoreOlder, items.length, onNeedNewer, onNeedOlder]);
 
     if (!current || !displayItem) {
         return null;
@@ -53,8 +74,8 @@ export function ClassifyWorkspace({ categoryGroups, hasMore, isExpanding, items,
             <ClassifyProgress
                 certainCount={classify.certainRemaining.length}
                 completeHint="Batch reviewed. Select any row to edit, or undo."
-                hasMore={hasMore}
-                isExpanding={isExpanding}
+                hasMore={hasMoreOlder}
+                isExpanding={isExpandingOlder}
                 itemCount={items.length}
                 onAcceptAllCertain={classify.acceptAllCertain}
                 position={classify.position}
@@ -62,11 +83,14 @@ export function ClassifyWorkspace({ categoryGroups, hasMore, isExpanding, items,
             />
             <ClassifyFilmstrip
                 currentId={currentId}
-                hasMore={hasMore}
-                isExpanding={isExpanding}
+                hasMoreNewer={hasMoreNewer}
+                hasMoreOlder={hasMoreOlder}
+                isExpandingNewer={isExpandingNewer}
+                isExpandingOlder={isExpandingOlder}
                 items={items}
                 session={classify.session}
-                onNeedMore={onNeedMore}
+                onNeedNewer={onNeedNewer}
+                onNeedOlder={onNeedOlder}
                 onSelect={classify.setCurrentId}
             />
             <ClassifyStage

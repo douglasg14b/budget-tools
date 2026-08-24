@@ -3,6 +3,7 @@ import { Migrator } from 'kysely';
 
 import type { AppDatabase } from './database';
 import * as createTravelTables from './migrations/2026-08-23-Create_Travel_Tables';
+import * as travelWindowLocationAndAccounts from './migrations/2026-08-23-Travel_Window_Location_And_Accounts';
 
 /**
  * Explicit migration registry. Dynamic filesystem imports break on Windows paths
@@ -11,6 +12,7 @@ import * as createTravelTables from './migrations/2026-08-23-Create_Travel_Table
  */
 export const MIGRATIONS: Record<string, Migration> = {
     '2026-08-23-Create_Travel_Tables': createTravelTables,
+    '2026-08-23-Travel_Window_Location_And_Accounts': travelWindowLocationAndAccounts,
 };
 
 class StaticMigrationProvider implements MigrationProvider {

@@ -32,6 +32,7 @@ import {
     previousRowId,
     rejectItem,
     remainingItems,
+    resolveClassifyFocus,
     tallySession,
     undoLast,
 } from './sessionDecisions';
@@ -46,6 +47,8 @@ type UseClassifySessionOptions = {
      * Deciding still advances to the next undecided item either way.
      */
     navigate: 'remaining' | 'rows';
+    requestedId?: string;
+    onCurrentIdChange?: (transactionId: string | undefined) => void;
 };
 
 export function useClassifySession(
@@ -55,7 +58,7 @@ export function useClassifySession(
 ) {
     const [session, setSession] = useState(emptySession);
     const [payeeEdits, setPayeeEdits] = useState<PayeeEdits>(emptyPayeeEdits);
-    const [currentId, setCurrentId] = useState<string | undefined>(items[0]?.transaction.id);
+    const [currentId, setCurrentId] = useState<string | undefined>(options.requestedId ?? items[0]?.transaction.id);
 
     const choices = useMemo(() => flattenCategoryChoices(categoryGroups), [categoryGroups]);
     const selectGroups = useMemo(() => categorySelectGroups(choices), [choices]);
@@ -68,12 +71,26 @@ export function useClassifySession(
     const position = current ? items.findIndex((item) => item.transaction.id === current.transaction.id) + 1 : 0;
 
     useEffect(() => {
-        if (currentId && items.some((item) => item.transaction.id === currentId)) {
-            return;
+        if (options.requestedId) {
+            setCurrentId(options.requestedId);
         }
-        const leftover = remainingItems(items, session);
-        setCurrentId(leftover[0]?.transaction.id ?? items[0]?.transaction.id);
-    }, [currentId, items, session]);
+    }, [options.requestedId]);
+
+    useEffect(() => {
+        const nextId = resolveClassifyFocus({
+            currentId,
+            items,
+            requestedId: options.requestedId,
+            session,
+        });
+        if (nextId !== currentId) {
+            setCurrentId(nextId);
+        }
+    }, [currentId, items, options.requestedId, session]);
+
+    useEffect(() => {
+        options.onCurrentIdChange?.(currentId);
+    }, [currentId, options.onCurrentIdChange]);
 
     function commit(decision: SessionDecision): void {
         const nextSession = applyDecision(session, decision);

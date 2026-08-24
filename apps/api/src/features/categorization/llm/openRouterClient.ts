@@ -8,12 +8,15 @@ export type OpenRouterChatInput = {
     readonly system: string;
     readonly user: string;
     readonly timeoutMs: number;
+    readonly requireAlternate?: boolean;
     readonly signal?: AbortSignal;
 };
 
 export type OpenRouterPrediction = {
     readonly categoryName: string | null;
     readonly categoryGroupName: string | null;
+    readonly alternateCategoryName: string | null;
+    readonly alternateCategoryGroupName: string | null;
     readonly confidence: number;
     readonly rationale: string | null;
     readonly payeeName: string | null;
@@ -27,18 +30,31 @@ export type OpenRouterUsage = {
     readonly costUsd: number | null;
 };
 
-const JSON_SCHEMA = {
-    type: 'object',
-    properties: {
-        categoryName: { type: 'string' },
-        categoryGroupName: { type: 'string' },
-        confidence: { type: 'number' },
-        rationale: { type: 'string' },
-        payeeName: { type: ['string', 'null'] },
-    },
-    required: ['categoryName', 'categoryGroupName', 'confidence', 'rationale', 'payeeName'],
-    additionalProperties: false,
-} as const;
+function predictionSchema(requireAlternate: boolean) {
+    const alternateType = requireAlternate ? { type: 'string' } : { type: ['string', 'null'] };
+    return {
+        type: 'object',
+        properties: {
+            categoryName: { type: 'string' },
+            categoryGroupName: { type: 'string' },
+            alternateCategoryName: alternateType,
+            alternateCategoryGroupName: alternateType,
+            confidence: { type: 'number' },
+            rationale: { type: 'string' },
+            payeeName: { type: ['string', 'null'] },
+        },
+        required: [
+            'categoryName',
+            'categoryGroupName',
+            'alternateCategoryName',
+            'alternateCategoryGroupName',
+            'confidence',
+            'rationale',
+            'payeeName',
+        ],
+        additionalProperties: false,
+    };
+}
 
 type ChatCompletionResponse = {
     id?: string;
@@ -85,7 +101,7 @@ export async function completeLlmPrediction(input: OpenRouterChatInput): Promise
                     json_schema: {
                         name: 'category_prediction',
                         strict: true,
-                        schema: JSON_SCHEMA,
+                        schema: predictionSchema(Boolean(input.requireAlternate)),
                     },
                 },
                 messages: [
@@ -211,14 +227,26 @@ function parsePrediction(content: string): OpenRouterPrediction {
     const record = parsed as Record<string, unknown>;
     const confidenceRaw = record.confidence;
     const confidence = typeof confidenceRaw === 'number' && !Number.isNaN(confidenceRaw) ? confidenceRaw : 0;
+    const categoryName = optionalText(record.categoryName);
+    const alternateCategoryName = optionalText(record.alternateCategoryName);
 
     return {
-        categoryName: optionalText(record.categoryName),
+        categoryName,
         categoryGroupName: optionalText(record.categoryGroupName),
+        alternateCategoryName:
+            alternateCategoryName && alternateCategoryName !== categoryName ? alternateCategoryName : null,
+        alternateCategoryGroupName: optionalText(record.alternateCategoryGroupName),
         confidence: Math.min(1, Math.max(0, confidence)),
         rationale: optionalText(record.rationale),
         payeeName: optionalText(record.payeeName),
     };
+}
+
+/**
+ * Parses a constrained JSON completion into a category prediction.
+ */
+export function parseOpenRouterPrediction(content: string): OpenRouterPrediction {
+    return parsePrediction(content);
 }
 
 function optionalText(value: unknown): string | null {

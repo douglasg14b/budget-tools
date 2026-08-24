@@ -1,4 +1,9 @@
-import type { CategorizationProposalDto, CategoryOptionDto, MethodSignalDto } from '@budget-tools/web-sdk';
+import type {
+    CategorizationProposalDto,
+    CategoryOptionDto,
+    MethodSignalDto,
+    TravelWindowHitDto,
+} from '@budget-tools/web-sdk';
 import type { ReactNode } from 'react';
 
 import { formatConfidence } from './formatConfidence';
@@ -12,6 +17,7 @@ type ProposalDetailsProps = {
 export function ProposalDetails({ proposal }: ProposalDetailsProps) {
     return (
         <div className={classes.details}>
+            {proposal.travelWindow ? <p className={classes.travel}>{formatTravelHit(proposal.travelWindow)}</p> : null}
             {proposal.periodicMatch ? (
                 <p className={classes.periodic}>
                     {humanizeEnum(proposal.periodicMatch.cadence)}
@@ -123,4 +129,33 @@ function formatConfidenceInterval(proposal: CategorizationProposalDto): string {
 
 function signalKey(signal: MethodSignalDto, scope: string): string {
     return `${scope}-${signal.method}-${signal.category}`;
+}
+
+export function formatTravelHit(hit: TravelWindowHitDto): string {
+    const kind = hit.kind === 'work' ? 'Work trip' : 'Vacation';
+    const parts = [hit.name, kind];
+    if (hit.location) {
+        parts.push(`destination ${hit.location}`);
+    }
+    if (hit.merchantCity) {
+        parts.push(`merchant city ${hit.merchantCity}`);
+    }
+    parts.push(locationMatchCopy(hit.locationMatch));
+    if (hit.targetCategory) {
+        parts.push(`option ${hit.targetCategory}`);
+    }
+    return parts.join(' · ');
+}
+
+function locationMatchCopy(match: TravelWindowHitDto['locationMatch']): string {
+    switch (match) {
+        case 'match':
+            return 'city matches destination';
+        case 'mismatch':
+            return 'city does not match destination';
+        case 'unknown':
+            return 'no city confirmation';
+        case 'unspecified':
+            return 'in window by date and card';
+    }
 }

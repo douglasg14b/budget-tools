@@ -72,3 +72,10 @@
     color: var(--app-text-secondary);
     line-height: 1.5;
 }
+
+.travel {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: var(--app-text-secondary);
+    line-height: 1.5;
+}

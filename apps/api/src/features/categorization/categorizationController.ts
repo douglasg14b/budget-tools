@@ -14,6 +14,9 @@ export class CategorizationController {
      * @param accountId Filter to a single YNAB account id
      * @param refresh Discard cached scores and rescore the newest batch
      * @param expand Score the next never-scored batch; ignored when refresh is true
+     * @param around Center a scored window on this pending transaction id
+     * @param olderThan Next older batch after this pending transaction id
+     * @param newerThan Next newer batch before this pending transaction id
      */
     @Get('queue')
     public async getCategorizationQueue(
@@ -21,12 +24,18 @@ export class CategorizationController {
         @Query() accountId?: string,
         @Query() refresh?: boolean,
         @Query() expand?: boolean,
+        @Query() around?: string,
+        @Query() olderThan?: string,
+        @Query() newerThan?: string,
     ): Promise<CategorizationQueueDto> {
         return await loadCategorizationQueue({
             tier,
             accountId,
             refresh,
             expand,
+            around,
+            olderThan,
+            newerThan,
         });
     }
 

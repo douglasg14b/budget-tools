@@ -6,9 +6,14 @@ export type ClientOptions = {
 
 export type TravelWindowKindDto = 'vacation' | 'work';
 
+export type TravelWindowAccountDto = {
+    name: string;
+    id: string;
+};
+
 export type TravelWindowDto = {
-    accountName: string | null;
-    accountId: string | null;
+    accounts: Array<TravelWindowAccountDto>;
+    location: string | null;
     endDate: string;
     startDate: string;
     kind: TravelWindowKindDto;
@@ -21,8 +26,8 @@ export type TravelWindowsDto = {
 };
 
 export type TravelWindowWriteDto = {
-    accountName: string | null;
-    accountId: string | null;
+    accounts: Array<TravelWindowAccountDto>;
+    location: string | null;
     endDate: string;
     startDate: string;
     kind: TravelWindowKindDto;
@@ -89,7 +94,7 @@ export type CategorizationFlagsDto = {
     isAmbiguous: boolean;
 };
 
-export type CategorizationMethod = 'ImportAmountLookup' | 'ImportLookup' | 'PayeeIdLookup' | 'CanonicalPayeeLookup' | 'PayeeClusterLookup' | 'PayeeModel' | 'HierarchicalModel' | 'CategoryModel' | 'PeriodicSeriesLookup' | 'Consensus' | 'LlmCategorization' | 'Excluded' | 'ManualReview' | 'None';
+export type CategorizationMethod = 'ImportAmountLookup' | 'ImportLookup' | 'PayeeIdLookup' | 'CanonicalPayeeLookup' | 'PayeeClusterLookup' | 'PayeeModel' | 'HierarchicalModel' | 'CategoryModel' | 'PeriodicSeriesLookup' | 'Consensus' | 'LlmCategorization' | 'TravelWindow' | 'Excluded' | 'ManualReview' | 'None';
 
 export type CategorizationRouteReason = 'None' | 'ExcludedPayee' | 'ExcludedCheck' | 'AmbiguousMerchant' | 'UntrainedCategory' | 'NovelImportString' | 'LowConfidence';
 
@@ -142,7 +147,12 @@ export type PeriodicMatchDto = {
     cadence: PeriodicCadence;
 };
 
+export type TravelLocationMatch = 'match' | 'mismatch' | 'unknown' | 'unspecified';
+
 export type TravelWindowHitDto = {
+    merchantCity: string | null;
+    locationMatch: TravelLocationMatch;
+    location: string | null;
     targetCategory: string | null;
     kind: 'vacation' | 'work';
     name: string;
@@ -184,6 +194,14 @@ export type CategorizationQueueItemDto = {
 export type CategorizationQueueDto = {
     items: Array<CategorizationQueueItemDto>;
     /**
+     * True when older pending rows exist after this response window.
+     */
+    hasMoreOlder: boolean;
+    /**
+     * True when newer pending rows exist before this response window.
+     */
+    hasMoreNewer: boolean;
+    /**
      * True when pending transactions exist that have not been scored yet.
      */
     hasMore: boolean;
@@ -198,6 +216,10 @@ export type CategorizationQueueDto = {
 };
 
 export type LlmSuggestOverlayDto = {
+    /**
+     * Ranked LLM categories: primary first, then an optional everyday/trip counterpart.
+     */
+    options: Array<CategoryOptionDto>;
     payeeSuggestion: PayeeSuggestionDto | null;
     notes: string | null;
     confidence: number;
@@ -396,6 +418,18 @@ export type GetCategorizationQueueData = {
          * Score the next never-scored batch; ignored when refresh is true
          */
         expand?: boolean;
+        /**
+         * Center a scored window on this pending transaction id
+         */
+        around?: string;
+        /**
+         * Next older batch after this pending transaction id
+         */
+        olderThan?: string;
+        /**
+         * Next newer batch before this pending transaction id
+         */
+        newerThan?: string;
     };
     url: '/categorization/queue';
 };

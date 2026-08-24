@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CategoryGroupDto } from '../../categories/categoriesDtos';
-import { assignableCategories, buildNearbyCategories, resolveAssignableCategory } from '../llm/nearbyCategories';
-import type { RankedSimilarTransaction } from '../pickSimilarTransactions';
+import type { CategoryGroupDto } from '../../../categories/categoriesDtos';
+import type { RankedSimilarTransaction } from '../../pickSimilarTransactions';
+import { assignableCategories, buildNearbyCategories, resolveAssignableCategory } from '../nearbyCategories';
 
 describe('assignableCategories', () => {
     it('omits placeholders and hidden rows', () => {
@@ -112,11 +112,57 @@ describe('buildNearbyCategories', () => {
                 name: 'Hawaii',
                 kind: 'vacation',
                 targetCategory: 'Vacation - Coffee',
+                location: 'Maui',
+                locationMatch: 'match',
+                merchantCity: 'KAHULUI',
             },
         });
 
         expect(nearby.likely.map((category) => category.name)).toContain('Vacation - Coffee');
         expect(nearby.likely.map((category) => category.name)).not.toContain('✈️ Trips + Vacations');
+    });
+
+    it('tags the vacation counterpart of similar everyday categories', () => {
+        const catalog = assignableCategories([
+            {
+                id: 'everyday',
+                name: 'Everyday',
+                hidden: false,
+                categories: [
+                    { id: 'coffee', name: 'Coffee', hidden: false, note: null },
+                    { id: 'outing', name: 'Outing / Theater', hidden: false, note: null },
+                ],
+            },
+            {
+                id: 'vac',
+                name: '🌴 Vacation',
+                hidden: false,
+                categories: [
+                    { id: 'vac-coffee', name: 'Vacation - Coffee', hidden: false, note: null },
+                    { id: 'vac-outing', name: 'Vacation - Outing', hidden: false, note: null },
+                    { id: 'trips', name: '✈️ Trips + Vacations', hidden: false, note: null },
+                ],
+            },
+        ]);
+        const nearby = buildNearbyCategories({
+            catalog,
+            similar: [example('Outing / Theater', 'Everyday')],
+            options: [],
+            periodicCategory: null,
+            travelWindow: {
+                id: 'trip-1',
+                name: 'DefCon',
+                kind: 'vacation',
+                targetCategory: null,
+                location: 'Las Vegas',
+                locationMatch: 'unspecified',
+                merchantCity: null,
+            },
+        });
+
+        const outing = nearby.likely.find((category) => category.name === 'Vacation - Outing');
+        expect(outing?.why).toContain('vacation counterpart of Outing / Theater');
+        expect(nearby.likely.map((category) => category.name)).toContain('Outing / Theater');
     });
 
     it('biases likely categories toward Transient / Reimbursable when travelWindow is work', () => {
@@ -144,10 +190,53 @@ describe('buildNearbyCategories', () => {
                 name: 'Austin',
                 kind: 'work',
                 targetCategory: '🔄 Transient / Reimbursable',
+                location: 'Austin',
+                locationMatch: 'unspecified',
+                merchantCity: null,
             },
         });
 
         expect(nearby.likely.map((category) => category.name)).toContain('🔄 Transient / Reimbursable');
+    });
+
+    it('keeps the mapped trip category on the pick list without preferring it on city mismatch', () => {
+        const catalog = assignableCategories([
+            {
+                id: 'everyday',
+                name: 'Everyday',
+                hidden: false,
+                categories: [{ id: 'coffee', name: 'Coffee', hidden: false, note: null }],
+            },
+            {
+                id: 'vac',
+                name: '🌴 Vacation',
+                hidden: false,
+                categories: [
+                    { id: 'vac-coffee', name: 'Vacation - Coffee', hidden: false, note: null },
+                    { id: 'trips', name: '✈️ Trips + Vacations', hidden: false, note: null },
+                ],
+            },
+        ]);
+        const nearby = buildNearbyCategories({
+            catalog,
+            similar: [example('Coffee', 'Everyday')],
+            options: [],
+            periodicCategory: null,
+            travelWindow: {
+                id: 'trip-3',
+                name: 'Nashville',
+                kind: 'vacation',
+                targetCategory: 'Vacation - Coffee',
+                location: 'Nashville',
+                locationMatch: 'mismatch',
+                merchantCity: 'SEATTLE',
+            },
+        });
+
+        expect(nearby.likely.map((category) => category.name)).toEqual(['Coffee']);
+        expect(nearby.likely.map((category) => category.name)).not.toContain('Vacation - Coffee');
+        expect(nearby.siblings.map((category) => category.name)).toContain('Vacation - Coffee');
+        expect(nearby.pickList.map((category) => category.name)).toContain('Vacation - Coffee');
     });
 });
 

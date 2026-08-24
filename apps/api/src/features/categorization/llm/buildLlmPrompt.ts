@@ -49,20 +49,15 @@ export function buildLlmPrompt(input: {
 }): LlmPrompt {
     const system = [
         "You categorize personal budget transactions into this household's YNAB categories.",
-        'Pick exactly one category from the pick list. Never invent a category name.',
-        'When similar finalized transactions exist and clearly agree, follow that household history.',
+        'categoryName is the primary pick from the pick list. Never invent a category name.',
+        'Set alternateCategoryName to a second pick-list category when a trip/vacation category and an everyday category both fit, or when two categories are genuinely relevant. Otherwise set it to null unless trip context requires both.',
+        'When similar finalized transactions exist and clearly agree, follow that household history for what kind of spend this is.',
         'When similar transactions are missing or disagree, use the merchant name and the pick list.',
         "Grocery stores (Safeway, Kroger, Whole Foods, Trader Joe's, and similar) belong in Groceries when that category is on the pick list.",
         'If similar transactions disagree, set confidence below 0.5.',
         'payeeName is a short canonical merchant name, or null if the current payee is already clean.',
         'Do not echo the raw bank import string as the payee.',
-        ...(input.proposal.travelWindow
-            ? [
-                  input.proposal.travelWindow.kind === 'work'
-                      ? `This charge happened during work trip "${input.proposal.travelWindow.name}". Prefer Transient / Reimbursable.`
-                      : `This charge happened during vacation "${input.proposal.travelWindow.name}". Prefer a Vacation-group category, not the Trips + Vacations savings category.`,
-              ]
-            : []),
+        ...(input.proposal.travelWindow ? [travelSystemNote(input.proposal.travelWindow)] : []),
     ].join(' ');
 
     const lines: string[] = [];
@@ -94,6 +89,36 @@ export function buildLlmPrompt(input: {
     const agreedPayee = agreedSimilarPayee(input.similar);
     if (agreedPayee) {
         lines.push(`- Household payee for similar txs: ${agreedPayee}`);
+    }
+
+    const travel = input.proposal.travelWindow;
+    if (travel) {
+        lines.push('');
+        lines.push('Trip context:');
+        lines.push(`- Name: ${travel.name}`);
+        lines.push(`- Kind: ${travel.kind}`);
+        lines.push('- In window by date and card');
+        if (travel.location) {
+            lines.push(`- Destination: ${travel.location}`);
+        }
+        if (travel.merchantCity) {
+            lines.push(`- Merchant city: ${travel.merchantCity} (${locationMatchLabel(travel.locationMatch)})`);
+        } else if (travel.locationMatch === 'unknown') {
+            lines.push('- Merchant city: not visible on the import name');
+        }
+        if (travel.targetCategory) {
+            lines.push(`- Mapped trip category: ${travel.targetCategory}`);
+        }
+        if (travel.kind === 'vacation' && travel.locationMatch !== 'mismatch') {
+            lines.push(
+                '- Always return two pick-list categories: Vacation-group as categoryName, everyday counterpart as alternateCategoryName. Never leave alternateCategoryName null.',
+            );
+        }
+        if (travel.kind === 'work' && travel.locationMatch !== 'mismatch') {
+            lines.push(
+                '- Always return two pick-list categories: Transient / Reimbursable as categoryName, everyday counterpart as alternateCategoryName. Never leave alternateCategoryName null.',
+            );
+        }
     }
 
     lines.push('');
@@ -131,10 +156,56 @@ export function buildLlmPrompt(input: {
     }
 
     lines.push('');
-    lines.push('Pick list (choose exactly one):');
+    lines.push('Pick list:');
     for (const category of input.nearby.pickList) {
         lines.push(`- ${category.name} | ${category.groupName}`);
     }
 
     return { system, user: lines.join('\n') };
+}
+
+function travelSystemNote(window: NonNullable<CategorizationProposalDto['travelWindow']>): string {
+    const inWindow = `This charge is in trip "${window.name}" by date and card.`;
+    const vacationPrefer =
+        'Always set both fields. categoryName must be a Vacation-group category, not the Trips + Vacations savings category. alternateCategoryName must be the matching everyday category from the pick list. Never set alternateCategoryName to null.';
+    const workPrefer =
+        'Always set both fields. categoryName must be Transient / Reimbursable. alternateCategoryName must be the matching everyday category from the pick list. Never set alternateCategoryName to null.';
+    switch (window.locationMatch) {
+        case 'match': {
+            const destination = window.location ? ` ${window.location}` : '';
+            const merchant = window.merchantCity ? ` ${window.merchantCity}` : '';
+            return window.kind === 'work'
+                ? `${inWindow} Merchant city${merchant} matches destination${destination}. ${workPrefer}`
+                : `${inWindow} Merchant city matches destination${destination}. ${vacationPrefer}`;
+        }
+        case 'mismatch': {
+            const merchant = window.merchantCity
+                ? ` looks like ${window.merchantCity}`
+                : ' looks like a different city';
+            const destination = window.location ? `, not ${window.location}` : '';
+            const allowed =
+                window.targetCategory ??
+                (window.kind === 'work' ? 'Transient / Reimbursable' : 'a Vacation-group category');
+            return `${inWindow} Merchant${merchant}${destination}. Do not assume the trip category; ${allowed} remains allowed. Leave alternateCategoryName null unless two everyday categories both fit.`;
+        }
+        case 'unknown':
+            return window.kind === 'work'
+                ? `${inWindow} No city confirmation on the import name. ${workPrefer}`
+                : `${inWindow} No city confirmation on the import name. ${vacationPrefer}`;
+        case 'unspecified':
+            return window.kind === 'work' ? `${inWindow} ${workPrefer}` : `${inWindow} ${vacationPrefer}`;
+    }
+}
+
+function locationMatchLabel(match: NonNullable<CategorizationProposalDto['travelWindow']>['locationMatch']): string {
+    switch (match) {
+        case 'match':
+            return 'matches destination';
+        case 'mismatch':
+            return 'does not match destination';
+        case 'unknown':
+            return 'not confirmed';
+        case 'unspecified':
+            return 'destination not specified';
+    }
 }

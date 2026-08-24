@@ -22,3 +22,8 @@
     border-color: color-mix(in srgb, var(--app-tier-auto) 45%, var(--app-border-strong));
     color: color-mix(in srgb, var(--app-tier-auto) 85%, var(--app-text-secondary));
 }
+
+.chipTravelMismatch {
+    border-color: color-mix(in srgb, var(--app-tier-review) 40%, var(--app-border-strong));
+    color: color-mix(in srgb, var(--app-tier-review) 80%, var(--app-text-secondary));
+}

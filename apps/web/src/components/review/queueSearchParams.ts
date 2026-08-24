@@ -10,6 +10,7 @@ export const APPROVAL_TIERS = [
 export type QueueSearchState = {
     tiers: ApprovalTier[] | undefined;
     accountId: string | undefined;
+    transactionId: string | undefined;
 };
 
 const APPROVAL_TIER_SET: ReadonlySet<string> = new Set(APPROVAL_TIERS);
@@ -23,9 +24,10 @@ function isApprovalTier(value: string): value is ApprovalTier {
  */
 export function parseQueueSearchParams(searchParams: URLSearchParams): QueueSearchState {
     const accountId = searchParams.get('accountId')?.trim() || undefined;
+    const transactionId = searchParams.get('transactionId')?.trim() || undefined;
     const tierRaw = searchParams.get('tier');
     if (!tierRaw?.trim()) {
-        return { tiers: undefined, accountId };
+        return { tiers: undefined, accountId, transactionId };
     }
 
     const selected = new Set<ApprovalTier>();
@@ -40,6 +42,7 @@ export function parseQueueSearchParams(searchParams: URLSearchParams): QueueSear
     return {
         tiers: tiers.length > 0 ? tiers : undefined,
         accountId,
+        transactionId,
     };
 }
 
@@ -53,6 +56,9 @@ export function serializeQueueSearchParams(state: QueueSearchState): URLSearchPa
     }
     if (state.accountId) {
         params.set('accountId', state.accountId);
+    }
+    if (state.transactionId) {
+        params.set('transactionId', state.transactionId);
     }
     return params;
 }

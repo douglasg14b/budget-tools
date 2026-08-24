@@ -22,10 +22,22 @@ public sealed class TravelWindowMatcherTests
     [Fact]
     public void IgnoresCardScopedWindowOnADifferentAccount()
     {
-        TravelWindowRecord window = Window("Hawaii", "vacation", "2026-07-01", "2026-07-10", "card-a");
+        TravelWindowRecord window = Window("Hawaii", "vacation", "2026-07-01", "2026-07-10", ["card-a"]);
         PendingTransaction transaction = Pending(date: "2026-07-05", amount: -12000, accountId: "card-b");
 
         Assert.Null(TravelWindowMatcher.Match(transaction, periodicMatch: null, [window]));
+    }
+
+    [Fact]
+    public void MatchesWhenTheAccountIsInTheWindowList()
+    {
+        TravelWindowRecord window = Window("Hawaii", "vacation", "2026-07-01", "2026-07-10", ["card-a", "card-c"]);
+        PendingTransaction transaction = Pending(date: "2026-07-05", amount: -12000, accountId: "card-c");
+
+        TravelWindowRecord? match = TravelWindowMatcher.Match(transaction, periodicMatch: null, [window]);
+
+        Assert.NotNull(match);
+        Assert.Equal(window.Id, match.Id);
     }
 
     [Fact]
@@ -55,8 +67,8 @@ public sealed class TravelWindowMatcherTests
         string kind,
         string start,
         string end,
-        string? accountId = null) =>
-        new(Guid.NewGuid(), name, kind, DateOnly.Parse(start), DateOnly.Parse(end), accountId);
+        IReadOnlyList<string>? accountIds = null) =>
+        new(Guid.NewGuid(), name, kind, DateOnly.Parse(start), DateOnly.Parse(end), Location: null, accountIds ?? []);
 
     private static PendingTransaction Pending(string date, int amount, string accountId) =>
         new(

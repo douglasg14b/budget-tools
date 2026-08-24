@@ -122,6 +122,11 @@
     white-space: nowrap;
 }
 
+.travelChip {
+    display: inline-flex;
+    margin-top: 0.25rem;
+}
+
 .amount {
     font-family: var(--app-font-mono);
     font-variant-numeric: tabular-nums;

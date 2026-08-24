@@ -1,13 +1,18 @@
 export type TravelWindowKindDto = 'vacation' | 'work';
 
+export type TravelWindowAccountDto = {
+    id: string;
+    name: string;
+};
+
 export type TravelWindowDto = {
     id: string;
     name: string;
     kind: TravelWindowKindDto;
     startDate: string;
     endDate: string;
-    accountId: string | null;
-    accountName: string | null;
+    location: string | null;
+    accounts: TravelWindowAccountDto[];
 };
 
 export type TravelWindowsDto = {
@@ -19,8 +24,8 @@ export type TravelWindowWriteDto = {
     kind: TravelWindowKindDto;
     startDate: string;
     endDate: string;
-    accountId: string | null;
-    accountName: string | null;
+    location: string | null;
+    accounts: TravelWindowAccountDto[];
 };
 
 export type TravelBiasDto = {

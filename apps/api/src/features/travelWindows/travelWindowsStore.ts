@@ -16,6 +16,7 @@ import { ConflictError, NotFoundError } from './HttpError';
 import type {
     AccountDto,
     TravelBiasDto,
+    TravelWindowAccountDto,
     TravelWindowDto,
     TravelWindowKindDto,
     TravelWindowWriteDto,
@@ -93,7 +94,8 @@ export async function loadTravelWindowsSignature(): Promise<string> {
             kind: window.kind,
             startDate: formatTransactionDate(window.startDate),
             endDate: formatTransactionDate(window.endDate),
-            accountId: window.accountId,
+            location: window.location,
+            accountIds: window.accountIds,
         })),
     });
 }
@@ -105,13 +107,13 @@ async function assertNoOverlap(candidate: TravelWindowWriteDto, excludeId: strin
             id: excludeId,
             startDate: candidate.startDate,
             endDate: candidate.endDate,
-            accountId: candidate.accountId,
+            accountIds: candidate.accounts.map((account) => account.id),
         },
         existing.map((window) => ({
             id: window.id,
             startDate: window.startDate,
             endDate: window.endDate,
-            accountId: window.accountId,
+            accountIds: window.accounts.map((account) => account.id),
         })),
     );
     if (!overlap) {
@@ -137,16 +139,29 @@ function validateWrite(input: TravelWindowWriteDto): TravelWindowWriteDto {
         throw new QueryValidationError('startDate must be on or before endDate');
     }
 
-    const accountId = input.accountId?.trim() ? input.accountId.trim() : null;
-    const accountName = input.accountName?.trim() ? input.accountName.trim() : null;
+    const location = input.location?.trim() ? input.location.trim() : null;
     return {
         name,
         kind: input.kind,
         startDate: input.startDate,
         endDate: input.endDate,
-        accountId,
-        accountName: accountId ? accountName : null,
+        location,
+        accounts: uniqueAccounts(input.accounts),
     };
+}
+
+function uniqueAccounts(accounts: readonly TravelWindowAccountDto[]): TravelWindowAccountDto[] {
+    const seen = new Set<string>();
+    const unique: TravelWindowAccountDto[] = [];
+    for (const account of accounts) {
+        const id = account.id.trim();
+        if (!id || seen.has(id)) {
+            continue;
+        }
+        seen.add(id);
+        unique.push({ id, name: account.name.trim() || id });
+    }
+    return unique;
 }
 
 function toWindowDto(row: {
@@ -155,8 +170,8 @@ function toWindowDto(row: {
     kind: TravelWindowKindDto;
     startDate: Date | string;
     endDate: Date | string;
-    accountId: string | null;
-    accountName: string | null;
+    location: string | null;
+    accounts: TravelWindowAccountDto[];
 }): TravelWindowDto {
     return {
         id: row.id,
@@ -164,7 +179,7 @@ function toWindowDto(row: {
         kind: row.kind,
         startDate: formatTransactionDate(row.startDate),
         endDate: formatTransactionDate(row.endDate),
-        accountId: row.accountId,
-        accountName: row.accountName,
+        location: row.location,
+        accounts: row.accounts,
     };
 }

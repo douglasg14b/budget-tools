@@ -12,6 +12,7 @@ import {
     previousRowId,
     rejectItem,
     remainingItems,
+    resolveClassifyFocus,
     tallySession,
     undoLast,
 } from '../sessionDecisions';
@@ -63,8 +64,8 @@ describe('sessionDecisions', () => {
         const session = applyDecision(emptySession(), rejectItem(second));
         expect(remainingItems(items, session).map((entry) => entry.transaction.id)).toEqual(['a', 'c']);
         expect(nextRemainingId(items, session, 'a')).toBe('c');
-        expect(nextRemainingId(items, session, 'c')).toBe('a');
-        expect(previousRemainingId(items, session, 'a')).toBe('c');
+        expect(nextRemainingId(items, session, 'c')).toBeUndefined();
+        expect(previousRemainingId(items, session, 'a')).toBeUndefined();
     });
 
     it('walks adjacent table rows without wrapping or skipping', () => {
@@ -76,6 +77,47 @@ describe('sessionDecisions', () => {
 
     it('does not approve when there is no suggestion', () => {
         expect(approveSuggestion(third)).toBeUndefined();
+    });
+
+    it('keeps an in-list currentId when the URL id is stale', () => {
+        expect(
+            resolveClassifyFocus({
+                currentId: 'b',
+                items,
+                requestedId: 'a',
+                session: emptySession(),
+            }),
+        ).toBe('b');
+    });
+
+    it('adopts requestedId once it appears in the loaded window', () => {
+        expect(
+            resolveClassifyFocus({
+                currentId: 'gone',
+                items,
+                requestedId: 'c',
+                session: emptySession(),
+            }),
+        ).toBe('c');
+    });
+
+    it('does not snap to the first row while a missing URL id is still loading', () => {
+        expect(
+            resolveClassifyFocus({
+                currentId: 'gone',
+                items,
+                requestedId: 'gone',
+                session: emptySession(),
+            }),
+        ).toBe('gone');
+        expect(
+            resolveClassifyFocus({
+                currentId: 'gone',
+                items: [],
+                requestedId: 'gone',
+                session: emptySession(),
+            }),
+        ).toBe('gone');
     });
 });
 

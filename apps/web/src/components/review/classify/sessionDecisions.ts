@@ -48,6 +48,37 @@ export function remainingItems(
     return items.filter((item) => !session.byId[item.transaction.id]);
 }
 
+function hasTransaction(items: readonly CategorizationQueueItemDto[], transactionId: string | undefined): boolean {
+    return Boolean(transactionId && items.some((item) => item.transaction.id === transactionId));
+}
+
+/**
+ * Focus after items change. Keeps an in-list currentId even when the URL still
+ * has a stale id (click/j/k write the param asynchronously).
+ */
+export function resolveClassifyFocus(input: {
+    readonly items: readonly CategorizationQueueItemDto[];
+    readonly currentId: string | undefined;
+    readonly requestedId: string | undefined;
+    readonly session: SessionDecisions;
+}): string | undefined {
+    const { items, currentId, requestedId, session } = input;
+    if (hasTransaction(items, currentId)) {
+        return currentId;
+    }
+    if (items.length === 0) {
+        return currentId ?? requestedId;
+    }
+    if (hasTransaction(items, requestedId)) {
+        return requestedId;
+    }
+    if (requestedId && currentId === requestedId) {
+        return currentId;
+    }
+    const leftover = remainingItems(items, session);
+    return leftover[0]?.transaction.id ?? items[0]?.transaction.id;
+}
+
 export function nextRemainingId(
     items: readonly CategorizationQueueItemDto[],
     session: SessionDecisions,
@@ -63,14 +94,14 @@ export function nextRemainingId(
         return remaining[0]?.transaction.id;
     }
 
-    for (let offset = 1; offset <= items.length; offset += 1) {
-        const candidate = items[(currentIndex + offset) % items.length];
+    for (let offset = 1; offset < items.length - currentIndex; offset += 1) {
+        const candidate = items[currentIndex + offset];
         if (!session.byId[candidate.transaction.id]) {
             return candidate.transaction.id;
         }
     }
 
-    return remaining[0]?.transaction.id;
+    return undefined;
 }
 
 export function previousRemainingId(
@@ -88,15 +119,14 @@ export function previousRemainingId(
         return remaining[remaining.length - 1]?.transaction.id;
     }
 
-    for (let offset = 1; offset <= items.length; offset += 1) {
-        const index = (currentIndex - offset + items.length) % items.length;
-        const candidate = items[index];
+    for (let offset = 1; offset <= currentIndex; offset += 1) {
+        const candidate = items[currentIndex - offset];
         if (!session.byId[candidate.transaction.id]) {
             return candidate.transaction.id;
         }
     }
 
-    return remaining[remaining.length - 1]?.transaction.id;
+    return undefined;
 }
 
 /**

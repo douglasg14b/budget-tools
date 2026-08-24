@@ -53,7 +53,10 @@ public sealed record TravelWindowHitDto(
     Guid Id,
     string Name,
     string Kind,
-    string? TargetCategory);
+    string? TargetCategory,
+    string? Location,
+    string LocationMatch,
+    string? MerchantCity);
 
 public sealed record MethodSignalDto(
     CategorizationMethod Method,

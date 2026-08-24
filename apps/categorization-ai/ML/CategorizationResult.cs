@@ -13,6 +13,7 @@ public enum CategorizationMethod
     PeriodicSeriesLookup,
     Consensus,
     LlmCategorization,
+    TravelWindow,
     Excluded,
     ManualReview,
     None

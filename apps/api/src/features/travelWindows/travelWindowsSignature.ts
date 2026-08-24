@@ -7,7 +7,8 @@ export type TravelWindowSignatureRow = {
     readonly kind: string;
     readonly startDate: string;
     readonly endDate: string;
-    readonly accountId: string | null;
+    readonly location: string | null;
+    readonly accountIds: readonly string[];
 };
 
 /**
@@ -23,7 +24,10 @@ export function travelWindowsSignature(input: {
     }
 
     const payload = [...input.windows]
-        .map((window) => `${window.id}|${window.kind}|${window.startDate}|${window.endDate}|${window.accountId ?? ''}`)
+        .map((window) => {
+            const accounts = [...window.accountIds].sort().join(',');
+            return `${window.id}|${window.kind}|${window.startDate}|${window.endDate}|${window.location ?? ''}|${accounts}`;
+        })
         .sort()
         .join('\n');
     return createHash('sha256').update(payload).digest('hex');

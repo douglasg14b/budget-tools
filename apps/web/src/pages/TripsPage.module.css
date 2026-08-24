@@ -204,12 +204,17 @@
     align-items: end;
 }
 
-.nameField {
+.nameField,
+.locationField {
     grid-column: 1 / -1;
 }
 
 .accountField {
     grid-column: 1 / 3;
+}
+
+.datesField {
+    grid-column: 2 / -1;
 }
 
 .field {
@@ -226,8 +231,7 @@
     text-transform: uppercase;
 }
 
-.select,
-.date {
+.select {
     width: 100%;
     min-height: 2.6rem;
     padding: 0.45rem 0.7rem;
@@ -236,10 +240,6 @@
     background: var(--app-bg-root);
     color: var(--app-text-primary);
     font: inherit;
-}
-
-.date {
-    font-variant-numeric: tabular-nums;
 }
 
 .formError {
@@ -269,6 +269,8 @@
     }
 
     .nameField,
+    .locationField,
+    .datesField,
     .accountField,
     .formError,
     .save {

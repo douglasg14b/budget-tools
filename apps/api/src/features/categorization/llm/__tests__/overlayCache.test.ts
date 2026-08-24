@@ -51,5 +51,6 @@ function sampleOverlay(transactionId: string): LlmSuggestOverlayDto {
         confidence: 0.5,
         notes: null,
         payeeSuggestion: null,
+        options: [],
     };
 }

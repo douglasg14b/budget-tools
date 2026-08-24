@@ -7,6 +7,7 @@ describe('parseQueueSearchParams', () => {
         expect(parseQueueSearchParams(new URLSearchParams())).toEqual({
             tiers: undefined,
             accountId: undefined,
+            transactionId: undefined,
         });
     });
 
@@ -26,6 +27,15 @@ describe('parseQueueSearchParams', () => {
         expect(parseQueueSearchParams(new URLSearchParams('accountId=acct-1'))).toEqual({
             tiers: undefined,
             accountId: 'acct-1',
+            transactionId: undefined,
+        });
+    });
+
+    it('parses transactionId', () => {
+        expect(parseQueueSearchParams(new URLSearchParams('transactionId=tx-9'))).toEqual({
+            tiers: undefined,
+            accountId: undefined,
+            transactionId: 'tx-9',
         });
     });
 
@@ -33,17 +43,32 @@ describe('parseQueueSearchParams', () => {
         expect(parseQueueSearchParams(new URLSearchParams('llm=true'))).toEqual({
             tiers: undefined,
             accountId: undefined,
+            transactionId: undefined,
         });
     });
 });
 
 describe('serializeQueueSearchParams', () => {
     it('round-trips a filtered state', () => {
-        const state = { tiers: ['Blocked'] as const, accountId: 'acct-1' };
+        const state = { tiers: ['Blocked'] as const, accountId: 'acct-1', transactionId: undefined };
         const serialized = serializeQueueSearchParams({ ...state, tiers: [...state.tiers] });
         expect(parseQueueSearchParams(serialized)).toEqual({
             tiers: ['Blocked'],
             accountId: 'acct-1',
+            transactionId: undefined,
+        });
+    });
+
+    it('preserves transactionId with filters', () => {
+        const serialized = serializeQueueSearchParams({
+            tiers: ['Review'],
+            accountId: 'acct-1',
+            transactionId: 'tx-9',
+        });
+        expect(parseQueueSearchParams(serialized)).toEqual({
+            tiers: ['Review'],
+            accountId: 'acct-1',
+            transactionId: 'tx-9',
         });
     });
 
@@ -51,6 +76,7 @@ describe('serializeQueueSearchParams', () => {
         const serialized = serializeQueueSearchParams({
             tiers: undefined,
             accountId: undefined,
+            transactionId: undefined,
         });
         expect(serialized.toString()).toBe('');
     });

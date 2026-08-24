@@ -23,24 +23,39 @@ public static class TravelBias
             ? VacationCategoryMapper.MapWork(catalog)
             : VacationCategoryMapper.MapVacation(proposal.SuggestedCategory ?? string.Empty, catalog);
 
-        return Rewrite(proposal, window, mapped, catalog, maxRankedOptions);
+        string? importText = transaction.ImportPayeeNameOriginal ?? transaction.ImportPayeeName;
+        MerchantCityEvidence evidence = MerchantCity.Classify(window.Location, importText);
+        return Rewrite(proposal, window, mapped, evidence, catalog, maxRankedOptions);
     }
 
     private static CategorizationProposal Rewrite(
         CategorizationProposal proposal,
         TravelWindowRecord window,
         CategoryInfo? mapped,
+        MerchantCityEvidence evidence,
         CategoryCatalog catalog,
         int maxRankedOptions)
     {
+        bool mismatch = evidence.LocationMatch == TravelLocationMatch.Mismatch;
+        bool steer = mapped != null && !mismatch;
         string? originalCategory = proposal.SuggestedCategory;
-        bool promote = mapped != null
+        bool alreadyMapped = mapped != null
             && originalCategory != null
-            && !string.Equals(mapped.Name, originalCategory, StringComparison.OrdinalIgnoreCase);
+            && string.Equals(mapped.Name, originalCategory, StringComparison.OrdinalIgnoreCase);
 
-        IReadOnlyList<CategoryOptionDto> options = promote
-            ? PromoteMappedOption(proposal.Options, mapped!, originalCategory!, catalog, maxRankedOptions)
-            : proposal.Options;
+        IReadOnlyList<CategoryOptionDto> options = proposal.Options;
+        if (mapped != null && steer && !alreadyMapped)
+        {
+            options = PromoteMappedOption(proposal.Options, mapped, originalCategory, catalog, maxRankedOptions);
+        }
+        else if (mapped != null && mismatch && !alreadyMapped)
+        {
+            options = InsertMappedAfterFirst(proposal.Options, mapped, maxRankedOptions);
+        }
+        else if (mapped != null)
+        {
+            options = TagMappedOption(proposal.Options, mapped, proposal.Confidence);
+        }
 
         return new CategorizationProposal
         {
@@ -56,14 +71,14 @@ public static class TravelBias
                 IsPeriodicConflict = proposal.Flags.IsPeriodicConflict,
                 IsTravelWindow = true
             },
-            SuggestedCategory = promote ? mapped!.Name : proposal.SuggestedCategory,
-            SuggestedCategoryGroup = promote ? mapped!.GroupName : proposal.SuggestedCategoryGroup,
-            SuggestedCategoryId = promote ? mapped!.Id : proposal.SuggestedCategoryId,
+            SuggestedCategory = steer && mapped != null ? mapped.Name : proposal.SuggestedCategory,
+            SuggestedCategoryGroup = steer && mapped != null ? mapped.GroupName : proposal.SuggestedCategoryGroup,
+            SuggestedCategoryId = steer && mapped != null ? mapped.Id : proposal.SuggestedCategoryId,
             Confidence = proposal.Confidence,
             Method = proposal.Method,
             RouteReason = proposal.RouteReason,
             GapReason = proposal.GapReason,
-            Signals = proposal.Signals,
+            Signals = AppendTravelSignal(proposal.Signals, mapped?.Name ?? originalCategory ?? window.Name, proposal.Confidence),
             AgreeingSignals = proposal.AgreeingSignals,
             Options = options,
             ConfidenceInterval = proposal.ConfidenceInterval,
@@ -76,31 +91,36 @@ public static class TravelBias
                 window.Id,
                 window.Name,
                 window.Kind,
-                mapped?.Name)
+                mapped?.Name,
+                window.Location,
+                evidence.LocationMatch,
+                evidence.MerchantCity)
         };
     }
 
     private static IReadOnlyList<CategoryOptionDto> PromoteMappedOption(
         IReadOnlyList<CategoryOptionDto> existing,
         CategoryInfo mapped,
-        string originalCategory,
+        string? originalCategory,
         CategoryCatalog catalog,
         int maxRankedOptions)
     {
-        CategoryOptionDto mappedOption = existing.FirstOrDefault(option =>
-            SameCategory(option, mapped.Name, mapped.Id))
+        CategoryOptionDto mappedOption = WithTravelSupport(
+            existing.FirstOrDefault(option => SameCategory(option, mapped.Name, mapped.Id))
             ?? new CategoryOptionDto(
                 Rank: 1,
                 Category: mapped.Name,
                 CategoryGroup: mapped.GroupName,
                 CategoryId: mapped.Id,
                 Confidence: existing.FirstOrDefault()?.Confidence ?? 0,
-                SupportingMethods: []);
+                SupportingMethods: []),
+            mapped);
 
-        CategoryOptionDto? originalOption = existing.FirstOrDefault(option =>
-            SameCategory(option, originalCategory, categoryId: null));
+        CategoryOptionDto? originalOption = originalCategory == null
+            ? null
+            : existing.FirstOrDefault(option => SameCategory(option, originalCategory, categoryId: null));
 
-        if (originalOption == null)
+        if (originalOption == null && originalCategory != null)
         {
             catalog.TryResolveCategory(originalCategory, out CategoryInfo originalInfo);
             originalOption = new CategoryOptionDto(
@@ -115,15 +135,94 @@ public static class TravelBias
         var rest = existing
             .Where(option =>
                 !SameCategory(option, mapped.Name, mapped.Id)
-                && !SameCategory(option, originalCategory, categoryId: null))
+                && (originalCategory == null || !SameCategory(option, originalCategory, categoryId: null)))
             .ToList();
 
-        int remainingSlots = Math.Max(0, maxRankedOptions - 2);
-        List<CategoryOptionDto> combined = [mappedOption, originalOption, .. rest.Take(remainingSlots)];
+        int reserved = originalOption == null ? 1 : 2;
+        int remainingSlots = Math.Max(0, maxRankedOptions - reserved);
+        List<CategoryOptionDto> combined = originalOption == null
+            ? [mappedOption, .. rest.Take(remainingSlots)]
+            : [mappedOption, originalOption, .. rest.Take(remainingSlots)];
 
         return combined
             .Select((option, index) => option with { Rank = index + 1 })
             .ToList();
+    }
+
+    private static IReadOnlyList<CategoryOptionDto> InsertMappedAfterFirst(
+        IReadOnlyList<CategoryOptionDto> existing,
+        CategoryInfo mapped,
+        int maxRankedOptions)
+    {
+        CategoryOptionDto mappedOption = WithTravelSupport(
+            existing.FirstOrDefault(option => SameCategory(option, mapped.Name, mapped.Id))
+            ?? new CategoryOptionDto(
+                Rank: 2,
+                Category: mapped.Name,
+                CategoryGroup: mapped.GroupName,
+                CategoryId: mapped.Id,
+                Confidence: existing.FirstOrDefault()?.Confidence ?? 0,
+                SupportingMethods: []),
+            mapped);
+
+        if (existing.Count == 0)
+            return [mappedOption with { Rank = 1 }];
+
+        CategoryOptionDto first = existing[0];
+        if (SameCategory(first, mapped.Name, mapped.Id))
+            return TagMappedOption(existing, mapped, mappedOption.Confidence);
+
+        var rest = existing.Skip(1)
+            .Where(option => !SameCategory(option, mapped.Name, mapped.Id))
+            .ToList();
+        int remainingSlots = Math.Max(0, maxRankedOptions - 2);
+        List<CategoryOptionDto> combined = [first, mappedOption, .. rest.Take(remainingSlots)];
+
+        return combined
+            .Select((option, index) => option with { Rank = index + 1 })
+            .ToList();
+    }
+
+    private static IReadOnlyList<CategoryOptionDto> TagMappedOption(
+        IReadOnlyList<CategoryOptionDto> existing,
+        CategoryInfo mapped,
+        float confidence)
+    {
+        return existing
+            .Select(option =>
+                SameCategory(option, mapped.Name, mapped.Id)
+                    ? WithTravelSupport(option, mapped, confidence)
+                    : option)
+            .ToList();
+    }
+
+    private static IReadOnlyList<MethodSignalDto> AppendTravelSignal(
+        IReadOnlyList<MethodSignalDto> signals,
+        string category,
+        float confidence)
+    {
+        if (signals.Any(signal => signal.Method == CategorizationMethod.TravelWindow))
+            return signals;
+
+        return [.. signals, new MethodSignalDto(CategorizationMethod.TravelWindow, category, confidence)];
+    }
+
+    private static CategoryOptionDto WithTravelSupport(
+        CategoryOptionDto option,
+        CategoryInfo mapped,
+        float? confidence = null)
+    {
+        if (option.SupportingMethods.Any(signal => signal.Method == CategorizationMethod.TravelWindow))
+            return option;
+
+        return option with
+        {
+            SupportingMethods =
+            [
+                .. option.SupportingMethods,
+                new MethodSignalDto(CategorizationMethod.TravelWindow, mapped.Name, confidence ?? option.Confidence)
+            ]
+        };
     }
 
     private static bool SameCategory(CategoryOptionDto option, string name, string? categoryId) =>

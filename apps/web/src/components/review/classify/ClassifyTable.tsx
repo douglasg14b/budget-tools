@@ -6,12 +6,14 @@ import type {
 } from '@budget-tools/web-sdk';
 import { Select, UnstyledButton } from '@mantine/core';
 import type { Ref } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
+import { TravelWindowChip } from '../FlagChips';
 import { formatConfidence } from '../formatConfidence';
 import { formatTransactionDate } from '../formatTransactionDate';
 import { formatYnabAmount } from '../formatYnabAmount';
 import { QueuePrefetchSentinel } from '../QueuePrefetchSentinel';
+import { shouldPrefetchMore, shouldPrefetchNewer } from '../shouldPrefetchMore';
 import { alternativeOptions } from './alternativeOptions';
 import { ClassifyPayee } from './ClassifyPayee';
 import { ClassifyProgress } from './ClassifyProgress';
@@ -25,21 +27,61 @@ import { useClassifySession } from './useClassifySession';
 
 type ClassifyTableProps = {
     categoryGroups: readonly CategoryGroupDto[];
-    hasMore: boolean;
-    isExpanding: boolean;
+    hasMoreNewer: boolean;
+    hasMoreOlder: boolean;
+    isExpandingNewer: boolean;
+    isExpandingOlder: boolean;
     items: readonly CategorizationQueueItemDto[];
-    onNeedMore: () => void;
+    onCurrentIdChange?: (transactionId: string | undefined) => void;
+    onNeedNewer: () => void;
+    onNeedOlder: () => void;
+    requestedId?: string;
 };
 
 /** Table layout never requests JIT LLM overlays — that lives on the classify card. */
-export function ClassifyTable({ categoryGroups, hasMore, isExpanding, items, onNeedMore }: ClassifyTableProps) {
-    const classify = useClassifySession(items, categoryGroups, { navigate: 'rows' });
+export function ClassifyTable({
+    categoryGroups,
+    hasMoreNewer,
+    hasMoreOlder,
+    isExpandingNewer,
+    isExpandingOlder,
+    items,
+    onCurrentIdChange,
+    onNeedNewer,
+    onNeedOlder,
+    requestedId,
+}: ClassifyTableProps) {
+    const classify = useClassifySession(items, categoryGroups, {
+        navigate: 'rows',
+        onCurrentIdChange,
+        requestedId,
+    });
     const currentRef = useRef<HTMLTableRowElement>(null);
     const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+    const previousFirstId = useRef<string | undefined>(undefined);
+    const previousScrollHeight = useRef(0);
+
+    useLayoutEffect(() => {
+        const firstId = items[0]?.transaction.id;
+        if (scroller && previousFirstId.current && firstId !== previousFirstId.current) {
+            scroller.scrollTop += scroller.scrollHeight - previousScrollHeight.current;
+        }
+        previousFirstId.current = firstId;
+        previousScrollHeight.current = scroller?.scrollHeight ?? 0;
+    }, [items, scroller]);
 
     useEffect(() => {
         currentRef.current?.scrollIntoView({ block: 'nearest' });
     }, [classify.current?.transaction.id]);
+
+    useEffect(() => {
+        if (shouldPrefetchMore(classify.position, items.length, hasMoreOlder)) {
+            onNeedOlder();
+        }
+        if (shouldPrefetchNewer(classify.position, hasMoreNewer)) {
+            onNeedNewer();
+        }
+    }, [classify.position, hasMoreNewer, hasMoreOlder, items.length, onNeedNewer, onNeedOlder]);
 
     if (!classify.current) {
         return null;
@@ -50,14 +92,21 @@ export function ClassifyTable({ categoryGroups, hasMore, isExpanding, items, onN
             <ClassifyProgress
                 certainCount={classify.certainRemaining.length}
                 completeHint="Batch reviewed. Select any row to edit, or undo."
-                hasMore={hasMore}
-                isExpanding={isExpanding}
+                hasMore={hasMoreOlder}
+                isExpanding={isExpandingOlder}
                 itemCount={items.length}
                 onAcceptAllCertain={classify.acceptAllCertain}
                 position={classify.position}
                 tally={classify.tally}
             />
             <div ref={setScroller} className={classes.scroller}>
+                <QueuePrefetchSentinel
+                    enabled={hasMoreNewer}
+                    isLoading={isExpandingNewer}
+                    requireScroll
+                    root={scroller}
+                    onNeedMore={onNeedNewer}
+                />
                 <table className={classes.table}>
                     <thead>
                         <tr>
@@ -100,11 +149,11 @@ export function ClassifyTable({ categoryGroups, hasMore, isExpanding, items, onN
                     </tbody>
                 </table>
                 <QueuePrefetchSentinel
-                    enabled={hasMore}
-                    isLoading={isExpanding}
+                    enabled={hasMoreOlder}
+                    isLoading={isExpandingOlder}
                     requireScroll
                     root={scroller}
-                    onNeedMore={onNeedMore}
+                    onNeedMore={onNeedOlder}
                 />
             </div>
             <div className={classes.shortcuts}>
@@ -156,6 +205,7 @@ function TableRow({
             className={classes.row}
             data-action={decision?.action}
             data-current={isCurrent || undefined}
+            data-travel={proposal.flags.isTravelWindow || undefined}
             onClick={() => {
                 onSelect(transaction.id);
             }}
@@ -171,6 +221,11 @@ function TableRow({
                     onDismissRename={onDismissRename}
                 />
                 {transaction.memo ? <span className={classes.memo}>{transaction.memo}</span> : null}
+                {proposal.travelWindow ? (
+                    <span className={classes.travelChip}>
+                        <TravelWindowChip travelWindow={proposal.travelWindow} />
+                    </span>
+                ) : null}
             </td>
             <td className={classes.amount} data-inflow={transaction.amount >= 0 || undefined}>
                 {formatYnabAmount(transaction.amount)}

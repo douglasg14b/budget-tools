@@ -27,9 +27,14 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["vacation"]},{"dataType":"enum","enums":["work"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "TravelWindowAccountDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"name":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "TravelWindowDto": {
         "dataType": "refAlias",
-        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"accountName":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"accountId":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"endDate":{"dataType":"string","required":true},"startDate":{"dataType":"string","required":true},"kind":{"ref":"TravelWindowKindDto","required":true},"name":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"validators":{}},
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"accounts":{"dataType":"array","array":{"dataType":"refAlias","ref":"TravelWindowAccountDto"},"required":true},"location":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"endDate":{"dataType":"string","required":true},"startDate":{"dataType":"string","required":true},"kind":{"ref":"TravelWindowKindDto","required":true},"name":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "TravelWindowsDto": {
@@ -39,7 +44,7 @@ const models: TsoaRoute.Models = {
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "TravelWindowWriteDto": {
         "dataType": "refAlias",
-        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"accountName":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"accountId":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"endDate":{"dataType":"string","required":true},"startDate":{"dataType":"string","required":true},"kind":{"ref":"TravelWindowKindDto","required":true},"name":{"dataType":"string","required":true}},"validators":{}},
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"accounts":{"dataType":"array","array":{"dataType":"refAlias","ref":"TravelWindowAccountDto"},"required":true},"location":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"endDate":{"dataType":"string","required":true},"startDate":{"dataType":"string","required":true},"kind":{"ref":"TravelWindowKindDto","required":true},"name":{"dataType":"string","required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "TravelBiasDto": {
@@ -89,7 +94,7 @@ const models: TsoaRoute.Models = {
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "CategorizationMethod": {
         "dataType": "refAlias",
-        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["ImportAmountLookup"]},{"dataType":"enum","enums":["ImportLookup"]},{"dataType":"enum","enums":["PayeeIdLookup"]},{"dataType":"enum","enums":["CanonicalPayeeLookup"]},{"dataType":"enum","enums":["PayeeClusterLookup"]},{"dataType":"enum","enums":["PayeeModel"]},{"dataType":"enum","enums":["HierarchicalModel"]},{"dataType":"enum","enums":["CategoryModel"]},{"dataType":"enum","enums":["PeriodicSeriesLookup"]},{"dataType":"enum","enums":["Consensus"]},{"dataType":"enum","enums":["LlmCategorization"]},{"dataType":"enum","enums":["Excluded"]},{"dataType":"enum","enums":["ManualReview"]},{"dataType":"enum","enums":["None"]}],"validators":{}},
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["ImportAmountLookup"]},{"dataType":"enum","enums":["ImportLookup"]},{"dataType":"enum","enums":["PayeeIdLookup"]},{"dataType":"enum","enums":["CanonicalPayeeLookup"]},{"dataType":"enum","enums":["PayeeClusterLookup"]},{"dataType":"enum","enums":["PayeeModel"]},{"dataType":"enum","enums":["HierarchicalModel"]},{"dataType":"enum","enums":["CategoryModel"]},{"dataType":"enum","enums":["PeriodicSeriesLookup"]},{"dataType":"enum","enums":["Consensus"]},{"dataType":"enum","enums":["LlmCategorization"]},{"dataType":"enum","enums":["TravelWindow"]},{"dataType":"enum","enums":["Excluded"]},{"dataType":"enum","enums":["ManualReview"]},{"dataType":"enum","enums":["None"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "CategorizationRouteReason": {
@@ -137,9 +142,14 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"cadenceFit":{"dataType":"double","required":true},"relatedTransactionIds":{"dataType":"array","array":{"dataType":"string"},"required":true},"categoryVoteShare":{"dataType":"double","required":true},"category":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"lastDate":{"dataType":"string","required":true},"medianAmount":{"dataType":"double","required":true},"occurrenceCount":{"dataType":"double","required":true},"cadence":{"ref":"PeriodicCadence","required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "TravelLocationMatch": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["match"]},{"dataType":"enum","enums":["mismatch"]},{"dataType":"enum","enums":["unknown"]},{"dataType":"enum","enums":["unspecified"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "TravelWindowHitDto": {
         "dataType": "refAlias",
-        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"targetCategory":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"kind":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["vacation"]},{"dataType":"enum","enums":["work"]}],"required":true},"name":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"validators":{}},
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"merchantCity":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"locationMatch":{"ref":"TravelLocationMatch","required":true},"location":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"targetCategory":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"kind":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["vacation"]},{"dataType":"enum","enums":["work"]}],"required":true},"name":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "CategorizationProposalDto": {
@@ -154,12 +164,12 @@ const models: TsoaRoute.Models = {
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "CategorizationQueueDto": {
         "dataType": "refAlias",
-        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"items":{"dataType":"array","array":{"dataType":"refAlias","ref":"CategorizationQueueItemDto"},"required":true},"hasMore":{"dataType":"boolean","required":true},"scoredCount":{"dataType":"double","required":true},"pendingCount":{"dataType":"double","required":true},"llm":{"dataType":"boolean","required":true},"generatedAt":{"dataType":"string","required":true},"summary":{"ref":"QueueSummaryDto","required":true}},"validators":{}},
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"items":{"dataType":"array","array":{"dataType":"refAlias","ref":"CategorizationQueueItemDto"},"required":true},"hasMoreOlder":{"dataType":"boolean","required":true},"hasMoreNewer":{"dataType":"boolean","required":true},"hasMore":{"dataType":"boolean","required":true},"scoredCount":{"dataType":"double","required":true},"pendingCount":{"dataType":"double","required":true},"llm":{"dataType":"boolean","required":true},"generatedAt":{"dataType":"string","required":true},"summary":{"ref":"QueueSummaryDto","required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "LlmSuggestOverlayDto": {
         "dataType": "refAlias",
-        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"payeeSuggestion":{"dataType":"union","subSchemas":[{"ref":"PayeeSuggestionDto"},{"dataType":"enum","enums":[null]}],"required":true},"notes":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"confidence":{"dataType":"double","required":true},"suggestedCategoryId":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"suggestedCategoryGroup":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"suggestedCategory":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"model":{"dataType":"string","required":true},"transactionId":{"dataType":"string","required":true}},"validators":{}},
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"options":{"dataType":"array","array":{"dataType":"refAlias","ref":"CategoryOptionDto"},"required":true},"payeeSuggestion":{"dataType":"union","subSchemas":[{"ref":"PayeeSuggestionDto"},{"dataType":"enum","enums":[null]}],"required":true},"notes":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"confidence":{"dataType":"double","required":true},"suggestedCategoryId":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"suggestedCategoryGroup":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"suggestedCategory":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"model":{"dataType":"string","required":true},"transactionId":{"dataType":"string","required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "LlmSuggestRequestDto": {
@@ -441,6 +451,9 @@ export function RegisterRoutes(app: Router) {
                 accountId: {"in":"query","name":"accountId","dataType":"string"},
                 refresh: {"in":"query","name":"refresh","dataType":"boolean"},
                 expand: {"in":"query","name":"expand","dataType":"boolean"},
+                around: {"in":"query","name":"around","dataType":"string"},
+                olderThan: {"in":"query","name":"olderThan","dataType":"string"},
+                newerThan: {"in":"query","name":"newerThan","dataType":"string"},
         };
         app.get('/api/categorization/queue',
             ...(fetchMiddlewares<RequestHandler>(CategorizationController)),

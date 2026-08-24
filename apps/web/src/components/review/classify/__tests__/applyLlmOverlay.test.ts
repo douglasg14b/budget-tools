@@ -68,10 +68,55 @@ describe('applyLlmOverlay', () => {
         expect(merged.proposal.method).toBe('LlmCategorization');
         expect(merged.proposal.gapReason).toBe('LlmSuggestion');
         expect(merged.proposal.tier).toBe('Suggested');
-        expect(merged.proposal.options).toEqual(local.proposal.options);
+        expect(merged.proposal.options.map((option) => option.category)).toEqual(['Dining Out', 'Groceries']);
         expect(merged.proposal.signals).toEqual([
             { method: 'CategoryModel', category: 'Groceries', confidence: 0.55 },
             { method: 'LlmCategorization', category: 'Dining Out', confidence: 0.71 },
+        ]);
+    });
+
+    it('puts an LLM alternate ahead of leftover local options', () => {
+        const local = item({
+            confidence: 0.4,
+            suggestedCategory: 'Groceries',
+            suggestedCategoryId: 'cat-1',
+        });
+        const merged = applyLlmOverlay(
+            local,
+            overlay({
+                suggestedCategory: 'Vacation - Outing',
+                suggestedCategoryGroup: 'Vacation',
+                suggestedCategoryId: 'vac-outing',
+                confidence: 0.8,
+                options: [
+                    {
+                        rank: 1,
+                        category: 'Vacation - Outing',
+                        categoryGroup: 'Vacation',
+                        categoryId: 'vac-outing',
+                        confidence: 0.8,
+                        supportingMethods: [
+                            { method: 'LlmCategorization', category: 'Vacation - Outing', confidence: 0.8 },
+                        ],
+                    },
+                    {
+                        rank: 2,
+                        category: 'Outing / Theater',
+                        categoryGroup: 'Fun',
+                        categoryId: 'outing',
+                        confidence: 0.8,
+                        supportingMethods: [
+                            { method: 'LlmCategorization', category: 'Outing / Theater', confidence: 0.8 },
+                        ],
+                    },
+                ],
+            }),
+        );
+        expect(merged.proposal.suggestedCategory).toBe('Vacation - Outing');
+        expect(merged.proposal.options.map((option) => option.category)).toEqual([
+            'Vacation - Outing',
+            'Outing / Theater',
+            'Groceries',
         ]);
     });
 
@@ -114,6 +159,7 @@ function overlay(overrides: Partial<LlmSuggestOverlayDto>): LlmSuggestOverlayDto
         confidence: 0,
         notes: null,
         payeeSuggestion: null,
+        options: [],
         ...overrides,
     };
 }

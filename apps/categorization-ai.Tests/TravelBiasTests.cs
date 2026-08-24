@@ -20,6 +20,8 @@ public sealed class TravelBiasTests
         Assert.True(rewritten.Flags.IsTravelWindow);
         Assert.Equal("Coffee", rewritten.Options[1].Category);
         Assert.Equal("Coffee", rewritten.Signals[0].Category);
+        Assert.Contains(rewritten.Signals, signal => signal.Method == CategorizationMethod.TravelWindow);
+        Assert.Contains(rewritten.Options[0].SupportingMethods, signal => signal.Method == CategorizationMethod.TravelWindow);
         Assert.DoesNotContain(rewritten.Options, option => option.Category == "🌴☕ Vacation - Coffee" && option.Rank != 1);
     }
 
@@ -150,17 +152,73 @@ public sealed class TravelBiasTests
         Assert.Equal(2, rewritten.Options.Count);
     }
 
+    [Fact]
+    public void MatchPromotesMappedCategoryAndRecordsCityEvidence()
+    {
+        CategorizationProposal rewritten = Apply(
+            suggestion: "Coffee",
+            options: [Option(1, "Coffee", "Everyday", "coffee")],
+            kind: "vacation",
+            location: "Nashville",
+            importOriginal: "SQ *COFFEE NASHVILLE TN");
+
+        Assert.Equal("🌴☕ Vacation - Coffee", rewritten.SuggestedCategory);
+        Assert.True(rewritten.Flags.IsTravelWindow);
+        Assert.Equal(TravelLocationMatch.Match, rewritten.TravelWindow?.LocationMatch);
+        Assert.Equal("NASHVILLE", rewritten.TravelWindow?.MerchantCity);
+        Assert.Equal("Nashville", rewritten.TravelWindow?.Location);
+        Assert.Contains(rewritten.Signals, signal => signal.Method == CategorizationMethod.TravelWindow);
+        Assert.Contains(rewritten.Options[0].SupportingMethods, signal => signal.Method == CategorizationMethod.TravelWindow);
+    }
+
+    [Fact]
+    public void MismatchKeepsMlWinnerAndInsertsTripCategoryAsAShortcut()
+    {
+        CategorizationProposal rewritten = Apply(
+            suggestion: "Coffee",
+            options: [Option(1, "Coffee", "Everyday", "coffee"), Option(2, "Dining", "Everyday", "dining")],
+            kind: "vacation",
+            location: "Nashville",
+            importOriginal: "SAFEWAY SEATTLE WA");
+
+        Assert.Equal("Coffee", rewritten.SuggestedCategory);
+        Assert.Equal(CategorizationMethod.ImportAmountLookup, rewritten.Method);
+        Assert.True(rewritten.Flags.IsTravelWindow);
+        Assert.Equal(TravelLocationMatch.Mismatch, rewritten.TravelWindow?.LocationMatch);
+        Assert.Equal("SEATTLE", rewritten.TravelWindow?.MerchantCity);
+        Assert.Equal("🌴☕ Vacation - Coffee", rewritten.Options[1].Category);
+        Assert.Contains(rewritten.Options[1].SupportingMethods, signal => signal.Method == CategorizationMethod.TravelWindow);
+        Assert.Contains(rewritten.Signals, signal => signal.Method == CategorizationMethod.TravelWindow);
+    }
+
+    [Fact]
+    public void UnknownCityStillSteersToTheMappedTripCategory()
+    {
+        CategorizationProposal rewritten = Apply(
+            suggestion: "Coffee",
+            options: [Option(1, "Coffee", "Everyday", "coffee")],
+            kind: "vacation",
+            location: "Nashville",
+            importOriginal: "AMAZON.COM AMZN.COM/BILL");
+
+        Assert.Equal("🌴☕ Vacation - Coffee", rewritten.SuggestedCategory);
+        Assert.Equal(TravelLocationMatch.Unknown, rewritten.TravelWindow?.LocationMatch);
+        Assert.True(rewritten.Flags.IsTravelWindow);
+    }
+
     private static CategorizationProposal Apply(
         string suggestion,
         IReadOnlyList<CategoryOptionDto> options,
         string kind,
         ApprovalTier tier = ApprovalTier.Review,
-        int maxRankedOptions = 5) =>
+        int maxRankedOptions = 5,
+        string? location = null,
+        string importOriginal = "SQ *COFFEE") =>
         TravelBias.Apply(
             Proposal(suggestion, options, tier),
-            Pending(),
+            Pending(importOriginal: importOriginal),
             enabled: true,
-            [Window(kind)],
+            [Window(kind, location)],
             VacationCategoryMapperTests.Catalog(),
             maxRankedOptions);
 
@@ -191,14 +249,14 @@ public sealed class TravelBiasTests
     private static CategoryOptionDto Option(int rank, string category, string group, string id) =>
         new(rank, category, group, id, 0.99f, []);
 
-    private static TravelWindowRecord Window(string kind) =>
+    private static TravelWindowRecord Window(string kind, string? location = null) =>
         new(Guid.NewGuid(), kind == "work" ? "Austin client" : "Hawaii", kind,
-            new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 10), null);
+            new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 10), location, []);
 
-    private static PendingTransaction Pending(int amount = -12000) =>
+    private static PendingTransaction Pending(int amount = -12000, string importOriginal = "SQ *COFFEE") =>
         new(
             "tx-1",
-            "SQ *COFFEE",
+            importOriginal,
             "Coffee",
             "Coffee",
             "payee-1",

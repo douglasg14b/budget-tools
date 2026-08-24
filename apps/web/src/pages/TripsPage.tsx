@@ -10,7 +10,8 @@ import {
     patchTravelBiasMutation,
     updateTravelWindowMutation,
 } from '@budget-tools/web-sdk';
-import { Button, Switch, TextInput } from '@mantine/core';
+import { Button, MultiSelect, Switch, TextInput } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
@@ -22,7 +23,8 @@ type Draft = {
     kind: TravelWindowKindDto;
     startDate: string;
     endDate: string;
-    accountId: string;
+    location: string;
+    accountIds: string[];
 };
 
 const emptyDraft: Draft = {
@@ -30,7 +32,8 @@ const emptyDraft: Draft = {
     kind: 'vacation',
     startDate: '',
     endDate: '',
-    accountId: '',
+    location: '',
+    accountIds: [],
 };
 
 export function TripsPage() {
@@ -111,14 +114,25 @@ export function TripsPage() {
             return;
         }
 
-        const account = accounts.find((item) => item.id === draft.accountId);
+        const selectedAccounts = draft.accountIds
+            .map((accountId) => {
+                const fromCatalog = accounts.find((item) => item.id === accountId);
+                if (fromCatalog) {
+                    return { id: fromCatalog.id, name: fromCatalog.name };
+                }
+                const editing = editingId ? windows.find((window) => window.id === editingId) : undefined;
+                const fromWindow = editing?.accounts.find((item) => item.id === accountId);
+                return fromWindow ? { id: fromWindow.id, name: fromWindow.name } : null;
+            })
+            .filter((account): account is { id: string; name: string } => account !== null);
+        const location = draft.location.trim();
         const body: TravelWindowWriteDto = {
             name,
             kind: draft.kind,
             startDate: draft.startDate,
             endDate: draft.endDate,
-            accountId: account?.id ?? null,
-            accountName: account?.name ?? null,
+            location: location || null,
+            accounts: selectedAccounts,
         };
         setFormError(null);
         if (editingId) {
@@ -135,13 +149,28 @@ export function TripsPage() {
             kind: window.kind,
             startDate: window.startDate,
             endDate: window.endDate,
-            accountId: window.accountId ?? '',
+            location: window.location ?? '',
+            accountIds: window.accounts.map((account) => account.id),
         });
         setFormError(null);
     }
 
     function patchDraft(patch: Partial<Draft>): void {
         setDraft((current) => ({ ...current, ...patch }));
+    }
+
+    function accountSelectData(): Array<{ value: string; label: string }> {
+        const data = accounts.map((account) => ({ value: account.id, label: account.name }));
+        const knownIds = new Set(data.map((item) => item.value));
+        for (const accountId of draft.accountIds) {
+            if (knownIds.has(accountId)) {
+                continue;
+            }
+            const fromWindow = windows.flatMap((window) => window.accounts).find((account) => account.id === accountId);
+            data.push({ value: accountId, label: fromWindow?.name ?? accountId });
+            knownIds.add(accountId);
+        }
+        return data;
     }
 
     const saving = createMutation.isPending || updateMutation.isPending;
@@ -201,8 +230,14 @@ export function TripsPage() {
                             </div>
                             <p className={classes.ticketMeta}>
                                 {formatRange(window.startDate, window.endDate)}
+                                {window.location ? (
+                                    <>
+                                        <span aria-hidden="true"> · </span>
+                                        {window.location}
+                                    </>
+                                ) : null}
                                 <span aria-hidden="true"> · </span>
-                                {window.accountName ?? 'Every card'}
+                                {formatAccounts(window.accounts)}
                             </p>
                             <div className={classes.ticketActions}>
                                 <Button
@@ -268,6 +303,16 @@ export function TripsPage() {
                             patchDraft({ name: event.currentTarget.value });
                         }}
                     />
+                    <TextInput
+                        className={classes.locationField}
+                        label="Destination"
+                        placeholder="Nashville, TN"
+                        description="Optional. Compared to the city on the bank import name."
+                        value={draft.location}
+                        onChange={(event) => {
+                            patchDraft({ location: event.currentTarget.value });
+                        }}
+                    />
                     <label className={classes.field}>
                         <span className={classes.fieldLabel}>Kind</span>
                         <select
@@ -284,45 +329,37 @@ export function TripsPage() {
                             <option value="work">Work</option>
                         </select>
                     </label>
-                    <label className={classes.field}>
-                        <span className={classes.fieldLabel}>Starts</span>
-                        <input
-                            className={classes.date}
-                            type="date"
-                            value={draft.startDate}
-                            onChange={(event) => {
-                                patchDraft({ startDate: event.currentTarget.value });
-                            }}
-                        />
-                    </label>
-                    <label className={classes.field}>
-                        <span className={classes.fieldLabel}>Ends</span>
-                        <input
-                            className={classes.date}
-                            type="date"
-                            value={draft.endDate}
-                            onChange={(event) => {
-                                patchDraft({ endDate: event.currentTarget.value });
-                            }}
-                        />
-                    </label>
-                    <label className={`${classes.field} ${classes.accountField}`}>
-                        <span className={classes.fieldLabel}>Card</span>
-                        <select
-                            className={classes.select}
-                            value={draft.accountId}
-                            onChange={(event) => {
-                                patchDraft({ accountId: event.currentTarget.value });
-                            }}
-                        >
-                            <option value="">Every card</option>
-                            {accounts.map((account) => (
-                                <option key={account.id} value={account.id}>
-                                    {account.name}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
+                    <DatePickerInput
+                        className={classes.datesField}
+                        type="range"
+                        allowSingleDateInRange
+                        clearable
+                        numberOfColumns={2}
+                        size="md"
+                        label="Dates"
+                        placeholder="Pick start and end"
+                        valueFormat="MMM D, YYYY"
+                        value={[draft.startDate || null, draft.endDate || null]}
+                        onChange={(range) => {
+                            patchDraft({
+                                startDate: range[0] ?? '',
+                                endDate: range[1] ?? '',
+                            });
+                        }}
+                    />
+                    <MultiSelect
+                        className={classes.accountField}
+                        label="Cards"
+                        description="Leave empty to include every card."
+                        placeholder="Every card"
+                        data={accountSelectData()}
+                        value={draft.accountIds}
+                        searchable
+                        clearable
+                        onChange={(accountIds) => {
+                            patchDraft({ accountIds });
+                        }}
+                    />
                     {formError ? <p className={classes.formError}>{formError}</p> : null}
                     <Button className={classes.save} type="submit" loading={saving}>
                         {editingId ? 'Save changes' : 'Add trip'}
@@ -353,6 +390,13 @@ function formatRange(startDate: string, endDate: string): string {
         timeZone: 'UTC',
     });
     return `${startText} – ${endText}`;
+}
+
+function formatAccounts(accounts: ReadonlyArray<{ name: string }>): string {
+    if (accounts.length === 0) {
+        return 'Every card';
+    }
+    return accounts.map((account) => account.name).join(', ');
 }
 
 function parseIsoDate(isoDate: string): Date {

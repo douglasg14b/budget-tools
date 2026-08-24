@@ -213,6 +213,47 @@ describe('parsePredictJsonStdout', () => {
             name: 'Hawaii',
             kind: 'vacation',
             targetCategory: 'Vacation - Coffee',
+            location: null,
+            locationMatch: 'unspecified',
+            merchantCity: null,
         });
+    });
+
+    it('parses travel window city evidence and the TravelWindow method', () => {
+        const envelope = {
+            ...validEnvelope,
+            proposals: [
+                {
+                    ...validProposal,
+                    flags: { ...validProposal.flags, isTravelWindow: true },
+                    method: 'TravelWindow',
+                    signals: [
+                        { method: 'ImportAmountLookup', category: 'Coffee', confidence: 1 },
+                        { method: 'TravelWindow', category: 'Vacation - Coffee', confidence: 1 },
+                    ],
+                    travelWindow: {
+                        id: '11111111-1111-1111-1111-111111111111',
+                        name: 'Nashville',
+                        kind: 'vacation',
+                        targetCategory: 'Vacation - Coffee',
+                        location: 'Nashville',
+                        locationMatch: 'match',
+                        merchantCity: 'NASHVILLE',
+                    },
+                },
+            ],
+        };
+        const parsed = parsePredictJsonStdout(JSON.stringify(envelope));
+        expect(parsed.proposals[0]?.method).toBe('TravelWindow');
+        expect(parsed.proposals[0]?.travelWindow).toEqual({
+            id: '11111111-1111-1111-1111-111111111111',
+            name: 'Nashville',
+            kind: 'vacation',
+            targetCategory: 'Vacation - Coffee',
+            location: 'Nashville',
+            locationMatch: 'match',
+            merchantCity: 'NASHVILLE',
+        });
+        expect(parsed.proposals[0]?.signals.map((signal) => signal.method)).toContain('TravelWindow');
     });
 });

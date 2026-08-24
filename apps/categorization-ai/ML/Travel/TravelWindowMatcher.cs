@@ -18,8 +18,8 @@ public static class TravelWindowMatcher
             if (!DateInRange(transaction.Date, window.StartDate, window.EndDate))
                 continue;
 
-            if (window.AccountId != null
-                && !string.Equals(window.AccountId, transaction.AccountId, StringComparison.Ordinal))
+            if (window.AccountIds.Count > 0
+                && !window.AccountIds.Contains(transaction.AccountId, StringComparer.Ordinal))
             {
                 continue;
             }

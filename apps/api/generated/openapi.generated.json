@@ -14,13 +14,30 @@
 					"work"
 				]
 			},
+			"TravelWindowAccountDto": {
+				"properties": {
+					"name": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"name",
+					"id"
+				],
+				"type": "object"
+			},
 			"TravelWindowDto": {
 				"properties": {
-					"accountName": {
-						"type": "string",
-						"nullable": true
+					"accounts": {
+						"items": {
+							"$ref": "#/components/schemas/TravelWindowAccountDto"
+						},
+						"type": "array"
 					},
-					"accountId": {
+					"location": {
 						"type": "string",
 						"nullable": true
 					},
@@ -41,8 +58,8 @@
 					}
 				},
 				"required": [
-					"accountName",
-					"accountId",
+					"accounts",
+					"location",
 					"endDate",
 					"startDate",
 					"kind",
@@ -67,11 +84,13 @@
 			},
 			"TravelWindowWriteDto": {
 				"properties": {
-					"accountName": {
-						"type": "string",
-						"nullable": true
+					"accounts": {
+						"items": {
+							"$ref": "#/components/schemas/TravelWindowAccountDto"
+						},
+						"type": "array"
 					},
-					"accountId": {
+					"location": {
 						"type": "string",
 						"nullable": true
 					},
@@ -89,8 +108,8 @@
 					}
 				},
 				"required": [
-					"accountName",
-					"accountId",
+					"accounts",
+					"location",
 					"endDate",
 					"startDate",
 					"kind",
@@ -328,6 +347,7 @@
 					"PeriodicSeriesLookup",
 					"Consensus",
 					"LlmCategorization",
+					"TravelWindow",
 					"Excluded",
 					"ManualReview",
 					"None"
@@ -539,8 +559,28 @@
 				],
 				"type": "object"
 			},
+			"TravelLocationMatch": {
+				"type": "string",
+				"enum": [
+					"match",
+					"mismatch",
+					"unknown",
+					"unspecified"
+				]
+			},
 			"TravelWindowHitDto": {
 				"properties": {
+					"merchantCity": {
+						"type": "string",
+						"nullable": true
+					},
+					"locationMatch": {
+						"$ref": "#/components/schemas/TravelLocationMatch"
+					},
+					"location": {
+						"type": "string",
+						"nullable": true
+					},
 					"targetCategory": {
 						"type": "string",
 						"nullable": true
@@ -560,6 +600,9 @@
 					}
 				},
 				"required": [
+					"merchantCity",
+					"locationMatch",
+					"location",
 					"targetCategory",
 					"kind",
 					"name",
@@ -715,6 +758,14 @@
 						},
 						"type": "array"
 					},
+					"hasMoreOlder": {
+						"type": "boolean",
+						"description": "True when older pending rows exist after this response window."
+					},
+					"hasMoreNewer": {
+						"type": "boolean",
+						"description": "True when newer pending rows exist before this response window."
+					},
 					"hasMore": {
 						"type": "boolean",
 						"description": "True when pending transactions exist that have not been scored yet."
@@ -740,6 +791,8 @@
 				},
 				"required": [
 					"items",
+					"hasMoreOlder",
+					"hasMoreNewer",
 					"hasMore",
 					"scoredCount",
 					"pendingCount",
@@ -751,6 +804,13 @@
 			},
 			"LlmSuggestOverlayDto": {
 				"properties": {
+					"options": {
+						"items": {
+							"$ref": "#/components/schemas/CategoryOptionDto"
+						},
+						"type": "array",
+						"description": "Ranked LLM categories: primary first, then an optional everyday/trip counterpart."
+					},
 					"payeeSuggestion": {
 						"allOf": [
 							{
@@ -787,6 +847,7 @@
 					}
 				},
 				"required": [
+					"options",
 					"payeeSuggestion",
 					"notes",
 					"confidence",
@@ -1162,6 +1223,33 @@
 						"required": false,
 						"schema": {
 							"type": "boolean"
+						}
+					},
+					{
+						"description": "Center a scored window on this pending transaction id",
+						"in": "query",
+						"name": "around",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"description": "Next older batch after this pending transaction id",
+						"in": "query",
+						"name": "olderThan",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"description": "Next newer batch before this pending transaction id",
+						"in": "query",
+						"name": "newerThan",
+						"required": false,
+						"schema": {
+							"type": "string"
 						}
 					}
 				]

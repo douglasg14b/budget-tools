@@ -8,12 +8,18 @@ export type TravelWindowsTable = {
     kind: TravelWindowKind;
     startDate: string;
     endDate: string;
-    accountId: string | null;
-    accountName: string | null;
+    location: string | null;
     createdAt: ColumnType<Date, string | Date, string | Date>;
     updatedAt: ColumnType<Date, string | Date, string | Date>;
+};
+
+export type TravelWindowAccountsTable = {
+    windowId: string;
+    accountId: string;
+    accountName: string;
 };
 
 export type TravelWindowRow = Selectable<TravelWindowsTable>;
 export type NewTravelWindowRow = Insertable<TravelWindowsTable>;
 export type TravelWindowRowUpdate = Updateable<TravelWindowsTable>;
+export type TravelWindowAccountRow = Selectable<TravelWindowAccountsTable>;

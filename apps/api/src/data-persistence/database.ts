@@ -6,7 +6,7 @@ import { CamelCasePlugin, Kysely, SqliteDialect } from 'kysely';
 
 import { getSqliteDbPath } from '../environment';
 import type { TravelBiasConfigTable } from '../features/travelWindows/data/travelBiasConfigSchema';
-import type { TravelWindowsTable } from '../features/travelWindows/data/travelWindowsSchema';
+import type { TravelWindowAccountsTable, TravelWindowsTable } from '../features/travelWindows/data/travelWindowsSchema';
 import { migrateToLatest } from './migrate';
 import { SqlDatePlugin } from './plugins/sqlDatePlugin';
 import { SqliteBindingPlugin } from './plugins/sqliteBindingPlugin';
@@ -17,6 +17,7 @@ import { SqliteBindingPlugin } from './plugins/sqliteBindingPlugin';
  */
 export type AppDatabase = {
     travel_windows: TravelWindowsTable;
+    travel_window_accounts: TravelWindowAccountsTable;
     travel_bias_config: TravelBiasConfigTable;
 };
 

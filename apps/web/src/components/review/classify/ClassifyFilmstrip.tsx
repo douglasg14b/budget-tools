@@ -1,6 +1,7 @@
 import type { CategorizationQueueItemDto } from '@budget-tools/web-sdk';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
+import { travelWindowChipLabel } from '../FlagChips';
 import { formatTransactionDate } from '../formatTransactionDate';
 import { formatYnabAmount } from '../formatYnabAmount';
 import { humanizeEnum } from '../humanizeEnum';
@@ -11,25 +12,42 @@ import type { SessionDecision, SessionDecisions } from './sessionDecisions';
 
 type ClassifyFilmstripProps = {
     currentId: string | undefined;
-    hasMore: boolean;
-    isExpanding: boolean;
+    hasMoreNewer: boolean;
+    hasMoreOlder: boolean;
+    isExpandingNewer: boolean;
+    isExpandingOlder: boolean;
     items: readonly CategorizationQueueItemDto[];
-    onNeedMore: () => void;
+    onNeedNewer: () => void;
+    onNeedOlder: () => void;
     onSelect: (transactionId: string) => void;
     session: SessionDecisions;
 };
 
 export function ClassifyFilmstrip({
     currentId,
-    hasMore,
-    isExpanding,
+    hasMoreNewer,
+    hasMoreOlder,
+    isExpandingNewer,
+    isExpandingOlder,
     items,
-    onNeedMore,
+    onNeedNewer,
+    onNeedOlder,
     onSelect,
     session,
 }: ClassifyFilmstripProps) {
     const currentRef = useRef<HTMLButtonElement>(null);
     const [listEl, setListEl] = useState<HTMLOListElement | null>(null);
+    const previousFirstId = useRef<string | undefined>(undefined);
+    const previousScrollHeight = useRef(0);
+
+    useLayoutEffect(() => {
+        const firstId = items[0]?.transaction.id;
+        if (listEl && previousFirstId.current && firstId !== previousFirstId.current) {
+            listEl.scrollTop += listEl.scrollHeight - previousScrollHeight.current;
+        }
+        previousFirstId.current = firstId;
+        previousScrollHeight.current = listEl?.scrollHeight ?? 0;
+    }, [items, listEl]);
 
     useEffect(() => {
         currentRef.current?.scrollIntoView({ block: 'nearest' });
@@ -39,6 +57,15 @@ export function ClassifyFilmstrip({
         <nav className={classes.rail} aria-label="Review queue">
             <p className={classes.heading}>Queue</p>
             <ol ref={setListEl} className={classes.list}>
+                <li>
+                    <QueuePrefetchSentinel
+                        enabled={hasMoreNewer}
+                        isLoading={isExpandingNewer}
+                        requireScroll
+                        root={listEl}
+                        onNeedMore={onNeedNewer}
+                    />
+                </li>
                 {items.map((item, index) => {
                     const decision = session.byId[item.transaction.id];
                     const isCurrent = item.transaction.id === currentId;
@@ -52,6 +79,7 @@ export function ClassifyFilmstrip({
                                 data-current={isCurrent || undefined}
                                 data-action={decision?.action}
                                 data-certain={isCertainProposal(item.proposal) || undefined}
+                                data-travel={item.proposal.flags.isTravelWindow || undefined}
                                 onClick={() => {
                                     onSelect(item.transaction.id);
                                 }}
@@ -63,6 +91,9 @@ export function ClassifyFilmstrip({
                                         {formatTransactionDate(item.transaction.date)}
                                         {item.proposal.periodicMatch
                                             ? ` · ${humanizeEnum(item.proposal.periodicMatch.cadence)}`
+                                            : null}
+                                        {item.proposal.flags.isTravelWindow
+                                            ? ` · ${travelWindowChipLabel(item.proposal.travelWindow)}`
                                             : null}
                                         {decision ? ` · ${decisionVerb(decision)}` : null}
                                         {!decision && isCertainProposal(item.proposal) ? ' · Certain' : null}
@@ -80,11 +111,11 @@ export function ClassifyFilmstrip({
                 })}
                 <li>
                     <QueuePrefetchSentinel
-                        enabled={hasMore}
-                        isLoading={isExpanding}
+                        enabled={hasMoreOlder}
+                        isLoading={isExpandingOlder}
                         requireScroll
                         root={listEl}
-                        onNeedMore={onNeedMore}
+                        onNeedMore={onNeedOlder}
                     />
                 </li>
             </ol>

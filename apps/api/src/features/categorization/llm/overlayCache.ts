@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 
 import type { LlmSuggestOverlayDto } from '../categorizationDtos';
 
-const OVERLAY_CACHE_VERSION = 2;
+const OVERLAY_CACHE_VERSION = 4;
 
 type OverlayCacheFile = {
     readonly version: number;

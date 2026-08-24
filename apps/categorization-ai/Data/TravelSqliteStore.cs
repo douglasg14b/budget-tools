@@ -51,24 +51,48 @@ public static class TravelSqliteStore
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT id, name, kind, start_date, end_date, account_id
-            FROM travel_windows
+            SELECT w.id, w.name, w.kind, w.start_date, w.end_date, w.location, a.account_id
+            FROM travel_windows w
+            LEFT JOIN travel_window_accounts a ON a.window_id = w.id
             """;
 
-        var windows = new List<TravelWindowRecord>();
+        var grouped = new Dictionary<Guid, WindowAccumulator>();
         using SqliteDataReader reader = command.ExecuteReader();
         while (reader.Read())
         {
-            windows.Add(
-                new TravelWindowRecord(
-                    Guid.Parse(reader.GetString(0)),
+            Guid id = Guid.Parse(reader.GetString(0));
+            if (!grouped.TryGetValue(id, out WindowAccumulator? accumulator))
+            {
+                accumulator = new WindowAccumulator(
+                    id,
                     reader.GetString(1),
                     reader.GetString(2),
                     DateOnly.Parse(reader.GetString(3), CultureInfo.InvariantCulture),
                     DateOnly.Parse(reader.GetString(4), CultureInfo.InvariantCulture),
-                    reader.IsDBNull(5) ? null : reader.GetString(5)));
+                    reader.IsDBNull(5) ? null : reader.GetString(5));
+                grouped[id] = accumulator;
+            }
+
+            if (!reader.IsDBNull(6))
+            {
+                accumulator.AccountIds.Add(reader.GetString(6));
+            }
         }
 
-        return windows;
+        return grouped.Values.Select(window => window.ToRecord()).ToList();
+    }
+
+    private sealed class WindowAccumulator(
+        Guid id,
+        string name,
+        string kind,
+        DateOnly startDate,
+        DateOnly endDate,
+        string? location)
+    {
+        public List<string> AccountIds { get; } = [];
+
+        public TravelWindowRecord ToRecord() =>
+            new(id, name, kind, startDate, endDate, location, AccountIds);
     }
 }

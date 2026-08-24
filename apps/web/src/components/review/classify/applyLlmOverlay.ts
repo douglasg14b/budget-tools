@@ -1,4 +1,4 @@
-import type { CategorizationQueueItemDto, LlmSuggestOverlayDto } from '@budget-tools/web-sdk';
+import type { CategorizationQueueItemDto, CategoryOptionDto, LlmSuggestOverlayDto } from '@budget-tools/web-sdk';
 
 import { isCertainProposal } from './isCertainProposal';
 
@@ -67,6 +67,7 @@ export function applyLlmOverlay(
             gapReason: 'LlmSuggestion',
             notes: overlay.notes ?? item.proposal.notes,
             payeeSuggestion,
+            options: mergeOverlayOptions(overlay, item.proposal.options),
             signals: alreadyHasLlmSignal
                 ? item.proposal.signals
                 : [
@@ -79,6 +80,54 @@ export function applyLlmOverlay(
                   ],
         },
     };
+}
+
+function mergeOverlayOptions(
+    overlay: LlmSuggestOverlayDto,
+    localOptions: readonly CategoryOptionDto[],
+): CategoryOptionDto[] {
+    const overlayOptions = overlay.options.length > 0 ? overlay.options : overlayPrimaryOption(overlay);
+    const merged: CategoryOptionDto[] = [];
+    const seen = new Set<string>();
+
+    function take(option: CategoryOptionDto): void {
+        const key = option.categoryId ?? option.category.trim().toLowerCase();
+        if (seen.has(key)) {
+            return;
+        }
+        seen.add(key);
+        merged.push({ ...option, rank: merged.length + 1 });
+    }
+
+    for (const option of overlayOptions) {
+        take(option);
+    }
+    for (const option of localOptions) {
+        take(option);
+    }
+    return merged;
+}
+
+function overlayPrimaryOption(overlay: LlmSuggestOverlayDto): CategoryOptionDto[] {
+    if (!overlay.suggestedCategory) {
+        return [];
+    }
+    return [
+        {
+            rank: 1,
+            category: overlay.suggestedCategory,
+            categoryGroup: overlay.suggestedCategoryGroup,
+            categoryId: overlay.suggestedCategoryId,
+            confidence: overlay.confidence,
+            supportingMethods: [
+                {
+                    method: 'LlmCategorization',
+                    category: overlay.suggestedCategory,
+                    confidence: overlay.confidence,
+                },
+            ],
+        },
+    ];
 }
 
 export function overlayQueryKey(item: CategorizationQueueItemDto): readonly string[] {

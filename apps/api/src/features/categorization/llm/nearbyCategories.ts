@@ -1,6 +1,7 @@
 import type { CategoryGroupDto } from '../../categories/categoriesDtos';
 import type { CategoryOptionDto, TravelWindowHitDto } from '../categorizationDtos';
 import type { RankedSimilarTransaction } from '../pickSimilarTransactions';
+import { isTripsSavingsName, isVacationGroupName, mapVacationCategory } from './vacationCategoryMap';
 
 export type AssignableCategory = {
     readonly id: string;
@@ -123,6 +124,22 @@ export function buildNearbyCategories(input: {
         likelyByKey.set(key, { ...resolved, why });
     }
 
+    const travelExtras: AssignableCategory[] = [];
+
+    function addTravelCategory(name: string, groupName: string | null, why: string, prefer: boolean): void {
+        if (prefer) {
+            addLikely(name, groupName, why);
+            return;
+        }
+        const resolved =
+            (groupName ? byKey.get(categoryKey(name, groupName)) : undefined) ??
+            input.catalog.find((category) => normalizeLabel(category.name) === normalizeLabel(name));
+        if (!resolved) {
+            return;
+        }
+        travelExtras.push(resolved);
+    }
+
     const similarCounts = new Map<string, { count: number; groupName: string; name: string }>();
     for (const example of input.similar) {
         const key = categoryKey(example.categoryName, example.categoryGroup);
@@ -151,13 +168,29 @@ export function buildNearbyCategories(input: {
 
     const travel = input.travelWindow;
     if (travel) {
+        const prefer = travel.locationMatch !== 'mismatch';
+        const travelWhy = travel.kind === 'work' ? 'work travel window' : 'vacation travel window';
         if (travel.kind === 'work') {
             const workName = travel.targetCategory ?? 'Transient / Reimbursable';
-            addLikely(workName, null, 'work travel window');
+            addTravelCategory(workName, null, travelWhy, prefer);
         } else {
+            const everydayLikely = [...likelyByKey.values()].filter(
+                (category) => !isVacationGroupName(category.groupName),
+            );
+            for (const category of everydayLikely) {
+                const counterpart = mapVacationCategory(category.name, input.catalog);
+                if (counterpart) {
+                    addTravelCategory(
+                        counterpart.name,
+                        counterpart.groupName,
+                        `vacation counterpart of ${category.name}`,
+                        prefer,
+                    );
+                }
+            }
             for (const category of input.catalog) {
                 if (isVacationGroupName(category.groupName) && !isTripsSavingsName(category.name)) {
-                    addLikely(category.name, category.groupName, 'vacation travel window');
+                    addTravelCategory(category.name, category.groupName, travelWhy, prefer);
                 }
             }
         }
@@ -171,6 +204,15 @@ export function buildNearbyCategories(input: {
             likelyGroups.has(category.groupName.toLowerCase()) &&
             !likelyKeys.has(categoryKey(category.name, category.groupName)),
     );
+    const siblingKeys = new Set(siblings.map((category) => categoryKey(category.name, category.groupName)));
+    for (const category of travelExtras) {
+        const key = categoryKey(category.name, category.groupName);
+        if (likelyKeys.has(key) || siblingKeys.has(key)) {
+            continue;
+        }
+        siblings.push(category);
+        siblingKeys.add(key);
+    }
 
     const nearby = [...likely, ...siblings];
     const pickList = appendUnique(nearby, input.catalog);
@@ -190,17 +232,4 @@ function appendUnique(base: readonly AssignableCategory[], extra: readonly Assig
         result.push(category);
     }
     return result;
-}
-
-function lettersKey(value: string): string {
-    return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
-}
-
-function isVacationGroupName(groupName: string): boolean {
-    return lettersKey(groupName) === 'vacation';
-}
-
-function isTripsSavingsName(categoryName: string): boolean {
-    const key = lettersKey(categoryName);
-    return key === 'tripsvacations' || key === 'tripsandvacations';
 }

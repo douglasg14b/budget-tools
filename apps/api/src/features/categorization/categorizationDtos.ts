@@ -12,6 +12,7 @@ export type CategorizationMethod =
     | 'PeriodicSeriesLookup'
     | 'Consensus'
     | 'LlmCategorization'
+    | 'TravelWindow'
     | 'Excluded'
     | 'ManualReview'
     | 'None';
@@ -49,11 +50,16 @@ export type CategorizationFlagsDto = {
     isTravelWindow: boolean;
 };
 
+export type TravelLocationMatch = 'match' | 'mismatch' | 'unknown' | 'unspecified';
+
 export type TravelWindowHitDto = {
     id: string;
     name: string;
     kind: 'vacation' | 'work';
     targetCategory: string | null;
+    location: string | null;
+    locationMatch: TravelLocationMatch;
+    merchantCity: string | null;
 };
 
 export type PeriodicCadence = 'Weekly' | 'Biweekly' | 'Monthly' | 'Quarterly' | 'Yearly';
@@ -167,6 +173,10 @@ export type CategorizationQueueDto = {
     scoredCount: number;
     /** True when pending transactions exist that have not been scored yet. */
     hasMore: boolean;
+    /** True when newer pending rows exist before this response window. */
+    hasMoreNewer: boolean;
+    /** True when older pending rows exist after this response window. */
+    hasMoreOlder: boolean;
     items: CategorizationQueueItemDto[];
 };
 
@@ -176,6 +186,12 @@ export type CategorizationQueueQuery = {
     refresh?: boolean;
     /** Score the next never-scored batch without discarding the current working set. */
     expand?: boolean;
+    /** Center a scored window on this pending transaction id. */
+    around?: string;
+    /** Return the next older batch after this pending transaction id. */
+    olderThan?: string;
+    /** Return the next newer batch before this pending transaction id. */
+    newerThan?: string;
 };
 
 export type LlmSuggestRequestDto = {
@@ -191,6 +207,8 @@ export type LlmSuggestOverlayDto = {
     confidence: number;
     notes: string | null;
     payeeSuggestion: PayeeSuggestionDto | null;
+    /** Ranked LLM categories: primary first, then an optional everyday/trip counterpart. */
+    options: CategoryOptionDto[];
 };
 
 export type PredictJsonEnvelope = {

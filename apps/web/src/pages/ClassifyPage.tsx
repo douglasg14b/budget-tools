@@ -1,14 +1,16 @@
 import { getCategoriesOptions } from '@budget-tools/web-sdk';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { BackendErrorNotice } from '../components/BackendErrorNotice';
 import { ClassifyTable } from '../components/review/classify/ClassifyTable';
 import { ClassifyWorkspace } from '../components/review/classify/ClassifyWorkspace';
+import { pinFocusedQueueItem } from '../components/review/classify/mergeClassifyQueue';
 import { filterQueueItems, QueueLoadState } from '../components/review/QueueLoadState';
 import { parseQueueSearchParams, serializeQueueSearchParams } from '../components/review/queueSearchParams';
-import { useCategorizationQueue } from '../components/review/useCategorizationQueue';
+import { sortQueueItemsByDateDesc } from '../components/review/sortQueueItems';
+import { useClassifyQueue } from '../components/review/useClassifyQueue';
 import classes from './ClassifyPage.module.css';
 
 type ClassifyPageProps = {
@@ -18,7 +20,30 @@ type ClassifyPageProps = {
 export function ClassifyPage({ layout }: ClassifyPageProps) {
     const [searchParams, setSearchParams] = useSearchParams();
     const search = parseQueueSearchParams(searchParams);
-    const { expandError, expandQueue, isExpanding, queueQuery } = useCategorizationQueue();
+    const {
+        expandError,
+        expandNewer,
+        expandOlder,
+        hasMoreNewer,
+        hasMoreOlder,
+        isExpandingNewer,
+        isExpandingOlder,
+        queueQuery,
+    } = useClassifyQueue(search.transactionId);
+
+    const writeTransactionId = useCallback(
+        (transactionId: string | undefined) => {
+            setSearchParams(
+                (previous) => {
+                    const current = parseQueueSearchParams(previous);
+                    const next = serializeQueueSearchParams({ ...current, transactionId });
+                    return next.toString() === previous.toString() ? previous : next;
+                },
+                { replace: true },
+            );
+        },
+        [setSearchParams],
+    );
 
     const categoriesQuery = useQuery({
         ...getCategoriesOptions(),
@@ -27,7 +52,11 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
     });
 
     const items = queueQuery.data?.items ?? [];
-    const visibleItems = useMemo(() => filterQueueItems(items, search), [items, search]);
+    const visibleItems = useMemo(
+        () =>
+            pinFocusedQueueItem(sortQueueItemsByDateDesc(filterQueueItems(items, search)), items, search.transactionId),
+        [items, search],
+    );
 
     return (
         <div className={classes.page}>
@@ -39,8 +68,8 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
             <QueueLoadState
                 error={queueQuery.isError ? queueQuery.error : undefined}
                 filtersActive={search.tiers !== undefined || Boolean(search.accountId)}
-                hasMore={queueQuery.data?.hasMore === true}
-                isExpanding={isExpanding}
+                hasMore={hasMoreOlder}
+                isExpanding={isExpandingOlder}
                 isPending={queueQuery.isPending}
                 pendingCount={queueQuery.data?.pendingCount}
                 visibleCount={visibleItems.length}
@@ -49,23 +78,33 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
                         replace: true,
                     });
                 }}
-                onNeedMore={expandQueue}
+                onNeedMore={expandOlder}
             >
                 {layout === 'table' ? (
                     <ClassifyTable
                         categoryGroups={categoriesQuery.data?.groups ?? []}
-                        hasMore={queueQuery.data?.hasMore === true}
-                        isExpanding={isExpanding}
+                        hasMoreNewer={hasMoreNewer}
+                        hasMoreOlder={hasMoreOlder}
+                        isExpandingNewer={isExpandingNewer}
+                        isExpandingOlder={isExpandingOlder}
                         items={visibleItems}
-                        onNeedMore={expandQueue}
+                        requestedId={search.transactionId}
+                        onCurrentIdChange={writeTransactionId}
+                        onNeedNewer={expandNewer}
+                        onNeedOlder={expandOlder}
                     />
                 ) : (
                     <ClassifyWorkspace
                         categoryGroups={categoriesQuery.data?.groups ?? []}
-                        hasMore={queueQuery.data?.hasMore === true}
-                        isExpanding={isExpanding}
+                        hasMoreNewer={hasMoreNewer}
+                        hasMoreOlder={hasMoreOlder}
+                        isExpandingNewer={isExpandingNewer}
+                        isExpandingOlder={isExpandingOlder}
                         items={visibleItems}
-                        onNeedMore={expandQueue}
+                        requestedId={search.transactionId}
+                        onCurrentIdChange={writeTransactionId}
+                        onNeedNewer={expandNewer}
+                        onNeedOlder={expandOlder}
                     />
                 )}
             </QueueLoadState>

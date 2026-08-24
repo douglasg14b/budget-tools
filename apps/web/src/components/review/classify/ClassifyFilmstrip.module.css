@@ -29,6 +29,7 @@
 }
 
 .item {
+    overflow-anchor: auto;
     display: grid;
     grid-template-columns: 1.6rem minmax(0, 1fr) auto;
     align-items: center;
@@ -96,6 +97,10 @@
     white-space: nowrap;
     font-size: 0.75rem;
     color: var(--app-text-muted);
+}
+
+.item[data-travel]:not([data-action]) .meta {
+    color: color-mix(in srgb, var(--app-tier-auto) 70%, var(--app-text-muted));
 }
 
 .amount {
