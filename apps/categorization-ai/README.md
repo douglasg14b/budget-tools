@@ -74,6 +74,8 @@ dotnet run export
 
 ## Configuration
 
+Committed `appsettings.json` holds ML thresholds and exclusions only. Database credentials and API keys go in gitignored `appsettings.Local.json` (copy from `appsettings.Local.json.example`) or environment variables. `DB_CONNECTION_STRING` wins over the JSON connection string so the API can inject it.
+
 `appsettings.json`:
 
 | Section | Key | Description |
@@ -84,7 +86,7 @@ dotnet run export
 | `ClassificationExclusions` | `CheckPatterns` | Check-related patterns in payee/import/memo |
 | `Llm` | `Enabled`, `ApiKey`, `Model` | OpenAI-compatible API (`gpt-4.1-nano` default) |
 
-Set `OPENAI_API_KEY` environment variable or `Llm:ApiKey` in config.
+Set `OPENAI_API_KEY` or `Llm:ApiKey` in gitignored `appsettings.Local.json`.
 
 ## Project structure
 

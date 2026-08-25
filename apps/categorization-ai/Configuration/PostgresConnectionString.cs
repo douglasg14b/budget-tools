@@ -14,7 +14,7 @@ public static class PostgresConnectionString
         {
             throw new InvalidOperationException(
                 "Database connection string not found. " +
-                "Set DB_CONNECTION_STRING or ConnectionStrings:BudgetTools in appsettings.json.");
+                "Set DB_CONNECTION_STRING or ConnectionStrings:BudgetTools in gitignored appsettings.Local.json.");
         }
 
         return IsPostgresUri(candidate) ? FromPostgresUri(candidate) : candidate;

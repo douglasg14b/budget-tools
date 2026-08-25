@@ -139,4 +139,5 @@ cleaning-output.json
 apps/categorization-ai/predict-output.json
 apps/categorization-ai/predict-stderr.txt
 apps/categorization-ai/transactions.json
+apps/categorization-ai/appsettings.Local.json
 apps/categorization-ai/.idea/

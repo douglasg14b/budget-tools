@@ -1,0 +1,5 @@
+{
+    "ConnectionStrings": {
+        "BudgetTools": "Host=localhost;Port=5432;Database=budget_tools;Username=budget_tools_user;Password="
+    }
+}

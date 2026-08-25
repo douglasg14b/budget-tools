@@ -40,7 +40,9 @@ public static class PipelineRunner
     private static async Task<int> RunLoggedAsync(string[] args, string mode)
     {
         IConfiguration config = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: true)
+            .AddJsonFile("appsettings.Local.json", optional: true)
             .AddEnvironmentVariables()
             .Build();
 
@@ -779,7 +781,7 @@ public static class PipelineRunner
               dotnet run predict --llm           Include LLM for ambiguous/novel transactions
               dotnet run export                  Export training CSV from database
 
-            LLM config: Llm:Enabled + Llm:ApiKey in appsettings.json or OPENAI_API_KEY env var
+            LLM config: Llm:Enabled + Llm:ApiKey in appsettings.Local.json or OPENAI_API_KEY env var
             """);
         return 1;
     }
