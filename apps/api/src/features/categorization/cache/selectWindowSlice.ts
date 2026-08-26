@@ -90,13 +90,21 @@ export function selectWindowSlice(input: SelectWindowSliceInput): SelectWindowSl
  */
 export function selectWindowScoring(input: SelectWindowScoringInput): SelectWindowScoringResult {
     const slice = selectWindowSlice(input);
-    const kept = collectValidKept(input);
+    const kept = collectValidCacheEntries(input);
     const keptIds = new Set(kept.map((entry) => entry.proposal.transactionId));
     const idsToScore = slice.ids.filter((transactionId) => !keptIds.has(transactionId));
     return { ...slice, kept, idsToScore };
 }
 
-function collectValidKept(input: SelectWindowScoringInput): CachedProposalEntry[] {
+/**
+ * Cache entries that still match a pending transaction fingerprint.
+ */
+export function collectValidCacheEntries(input: {
+    readonly pendingIds: readonly string[];
+    readonly fingerprints: ReadonlyMap<string, string>;
+    readonly cacheEntries: ReadonlyMap<string, CachedProposalEntry>;
+    readonly cacheUsable: boolean;
+}): CachedProposalEntry[] {
     const kept: CachedProposalEntry[] = [];
     if (!input.cacheUsable) {
         return kept;

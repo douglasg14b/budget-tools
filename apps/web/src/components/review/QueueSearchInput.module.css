@@ -1,0 +1,22 @@
+.input {
+    width: 22rem;
+    max-width: 100%;
+}
+
+.input :global(.mantine-TextInput-input) {
+    background: var(--app-bg-surface);
+    border-color: var(--app-border-strong);
+    color: var(--app-text-primary);
+}
+
+.input :global(.mantine-TextInput-input)::placeholder {
+    color: var(--app-text-muted);
+}
+
+.input :global(.mantine-TextInput-label) {
+    color: var(--app-text-muted);
+    font-size: 0.875rem;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}

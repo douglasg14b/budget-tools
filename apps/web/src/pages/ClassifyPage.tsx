@@ -1,4 +1,5 @@
 import { getCategoriesOptions } from '@budget-tools/web-sdk';
+import { useDebouncedValue } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -8,7 +9,12 @@ import { ClassifyTable } from '../components/review/classify/ClassifyTable';
 import { ClassifyWorkspace } from '../components/review/classify/ClassifyWorkspace';
 import { pinFocusedQueueItem } from '../components/review/classify/mergeClassifyQueue';
 import { filterQueueItems, QueueLoadState } from '../components/review/QueueLoadState';
-import { parseQueueSearchParams, serializeQueueSearchParams } from '../components/review/queueSearchParams';
+import { QueueSearchInput } from '../components/review/QueueSearchInput';
+import {
+    parseQueueSearchParams,
+    queueFiltersActive,
+    serializeQueueSearchParams,
+} from '../components/review/queueSearchParams';
 import { sortQueueItemsByDateDesc } from '../components/review/sortQueueItems';
 import { useClassifyQueue } from '../components/review/useClassifyQueue';
 import classes from './ClassifyPage.module.css';
@@ -20,6 +26,8 @@ type ClassifyPageProps = {
 export function ClassifyPage({ layout }: ClassifyPageProps) {
     const [searchParams, setSearchParams] = useSearchParams();
     const search = parseQueueSearchParams(searchParams);
+    const [debouncedQ] = useDebouncedValue(search.q ?? '', 250);
+    const querySettled = (search.q ?? '') === debouncedQ;
     const {
         expandError,
         expandNewer,
@@ -29,7 +37,7 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
         isExpandingNewer,
         isExpandingOlder,
         queueQuery,
-    } = useClassifyQueue(search.transactionId);
+    } = useClassifyQueue(search.transactionId, debouncedQ || undefined);
 
     const writeTransactionId = useCallback(
         (transactionId: string | undefined) => {
@@ -61,24 +69,42 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
     return (
         <div className={classes.page}>
             <header className={classes.header}>
-                <h1 className={classes.title}>{layout === 'table' ? 'Table' : 'Classify'}</h1>
-                <p className={classes.note}>Session only — nothing is written to YNAB yet.</p>
+                <div className={classes.headerCopy}>
+                    <h1 className={classes.title}>{layout === 'table' ? 'Table' : 'Classify'}</h1>
+                    <p className={classes.note}>Session only — nothing is written to YNAB yet.</p>
+                </div>
+                <QueueSearchInput
+                    value={search.q}
+                    onChange={(q) => {
+                        setSearchParams(serializeQueueSearchParams({ ...search, q }), { replace: true });
+                    }}
+                />
             </header>
             {expandError ? <BackendErrorNotice error={expandError} /> : null}
             <QueueLoadState
                 error={queueQuery.isError ? queueQuery.error : undefined}
-                filtersActive={search.tiers !== undefined || Boolean(search.accountId)}
+                expandingCopy="Loading more pending transactions…"
+                filtersActive={queueFiltersActive(search)}
                 hasMore={hasMoreOlder}
                 isExpanding={isExpandingOlder}
                 isPending={queueQuery.isPending}
+                loadingCopy="Loading pending transactions…"
                 pendingCount={queueQuery.data?.pendingCount}
                 visibleCount={visibleItems.length}
                 onClearFilters={() => {
-                    setSearchParams(serializeQueueSearchParams({ ...search, tiers: undefined, accountId: undefined }), {
-                        replace: true,
-                    });
+                    setSearchParams(
+                        serializeQueueSearchParams({
+                            ...search,
+                            tiers: undefined,
+                            accountId: undefined,
+                            q: undefined,
+                        }),
+                        {
+                            replace: true,
+                        },
+                    );
                 }}
-                onNeedMore={expandOlder}
+                onNeedMore={querySettled ? expandOlder : undefined}
             >
                 {layout === 'table' ? (
                     <ClassifyTable
@@ -90,8 +116,8 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
                         items={visibleItems}
                         requestedId={search.transactionId}
                         onCurrentIdChange={writeTransactionId}
-                        onNeedNewer={expandNewer}
-                        onNeedOlder={expandOlder}
+                        onNeedNewer={querySettled ? expandNewer : ignoreNeedMore}
+                        onNeedOlder={querySettled ? expandOlder : ignoreNeedMore}
                     />
                 ) : (
                     <ClassifyWorkspace
@@ -103,11 +129,15 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
                         items={visibleItems}
                         requestedId={search.transactionId}
                         onCurrentIdChange={writeTransactionId}
-                        onNeedNewer={expandNewer}
-                        onNeedOlder={expandOlder}
+                        onNeedNewer={querySettled ? expandNewer : ignoreNeedMore}
+                        onNeedOlder={querySettled ? expandOlder : ignoreNeedMore}
                     />
                 )}
             </QueueLoadState>
         </div>
     );
+}
+
+function ignoreNeedMore(): void {
+    return;
 }

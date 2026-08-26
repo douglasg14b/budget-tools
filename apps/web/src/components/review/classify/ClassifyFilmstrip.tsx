@@ -9,6 +9,7 @@ import { QueuePrefetchSentinel } from '../QueuePrefetchSentinel';
 import classes from './ClassifyFilmstrip.module.css';
 import { isCertainProposal } from './isCertainProposal';
 import type { SessionDecision, SessionDecisions } from './sessionDecisions';
+import { isSplitDecision } from './sessionDecisions';
 
 type ClassifyFilmstripProps = {
     currentId: string | undefined;
@@ -61,6 +62,7 @@ export function ClassifyFilmstrip({
                     <QueuePrefetchSentinel
                         enabled={hasMoreNewer}
                         isLoading={isExpandingNewer}
+                        loadingHint="Loading more…"
                         requireScroll
                         root={listEl}
                         onNeedMore={onNeedNewer}
@@ -70,6 +72,7 @@ export function ClassifyFilmstrip({
                     const decision = session.byId[item.transaction.id];
                     const isCurrent = item.transaction.id === currentId;
                     const payee = item.transaction.payeeName || item.transaction.importPayeeName || '—';
+                    const proposal = item.proposal;
                     return (
                         <li key={item.transaction.id}>
                             <button
@@ -78,8 +81,8 @@ export function ClassifyFilmstrip({
                                 className={classes.item}
                                 data-current={isCurrent || undefined}
                                 data-action={decision?.action}
-                                data-certain={isCertainProposal(item.proposal) || undefined}
-                                data-travel={item.proposal.flags.isTravelWindow || undefined}
+                                data-certain={isCertainProposal(proposal) || undefined}
+                                data-travel={proposal?.flags.isTravelWindow || undefined}
                                 onClick={() => {
                                     onSelect(item.transaction.id);
                                 }}
@@ -89,14 +92,14 @@ export function ClassifyFilmstrip({
                                     <span className={classes.payee}>{payee}</span>
                                     <span className={classes.meta}>
                                         {formatTransactionDate(item.transaction.date)}
-                                        {item.proposal.periodicMatch
-                                            ? ` · ${humanizeEnum(item.proposal.periodicMatch.cadence)}`
+                                        {proposal?.periodicMatch
+                                            ? ` · ${humanizeEnum(proposal.periodicMatch.cadence)}`
                                             : null}
-                                        {item.proposal.flags.isTravelWindow
-                                            ? ` · ${travelWindowChipLabel(item.proposal.travelWindow)}`
+                                        {proposal?.flags.isTravelWindow
+                                            ? ` · ${travelWindowChipLabel(proposal.travelWindow)}`
                                             : null}
                                         {decision ? ` · ${decisionVerb(decision)}` : null}
-                                        {!decision && isCertainProposal(item.proposal) ? ' · Certain' : null}
+                                        {!decision && isCertainProposal(proposal) ? ' · Certain' : null}
                                     </span>
                                 </span>
                                 <span
@@ -113,6 +116,7 @@ export function ClassifyFilmstrip({
                     <QueuePrefetchSentinel
                         enabled={hasMoreOlder}
                         isLoading={isExpandingOlder}
+                        loadingHint="Loading more…"
                         requireScroll
                         root={listEl}
                         onNeedMore={onNeedOlder}
@@ -124,6 +128,9 @@ export function ClassifyFilmstrip({
 }
 
 function decisionVerb(decision: SessionDecision): string {
+    if (isSplitDecision(decision)) {
+        return 'Split';
+    }
     switch (decision.action) {
         case 'approved':
             return 'Accepted';

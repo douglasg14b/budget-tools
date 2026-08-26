@@ -53,7 +53,7 @@ export function ClassifyProgress({
                 </p>
             ) : null}
             {isExpanding ? (
-                <p className={classes.completeCopy}>Scoring the next batch…</p>
+                <p className={classes.completeCopy}>Loading more…</p>
             ) : tally.remaining === 0 && !hasMore ? (
                 <p className={classes.completeCopy}>{completeHint}</p>
             ) : null}

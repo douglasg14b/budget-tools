@@ -37,6 +37,14 @@ export const CATEGORIZATION_QUEUE_CACHE_DIR = resolveFromCwd(
 );
 
 /**
+ * When set, ML scoring uses the warm categorization-ai HTTP scorer instead of spawning predict-json.
+ */
+export function getCategorizationScorerUrl(): string | undefined {
+    const value = env.get('CATEGORIZATION_SCORER_URL').default('').asString().trim();
+    return value || undefined;
+}
+
+/**
  * Postgres connection string. Read lazily so OpenAPI generation can load the process without a database.
  */
 export function getDbConnectionString(): string {
@@ -44,11 +52,25 @@ export function getDbConnectionString(): string {
 }
 
 /**
- * API-owned SQLite file for app config (travel windows, bias). Not the Budget Tools Postgres schema.
+ * API-owned SQLite file for app config (travel windows, Amazon order cache). Not the Budget Tools Postgres schema.
  */
 export function getSqliteDbPath(): string {
     return resolveFromCwd(env.get('SQLITE_DB_PATH').default('apps/api/data/app.sqlite').asString());
 }
+
+/**
+ * Path to the Amazon order-history MCP `dist/index.js`.
+ * Optional so OpenAPI generation can load without it. Sync fails loud (503) when unset.
+ * Produce the clone with `pnpm setup:amazon-mcp`.
+ */
+export function getAmazonOrdersMcpEntry(): string | undefined {
+    const value = env.get('AMAZON_ORDERS_MCP_ENTRY').default('').asString().trim();
+    return value ? resolveFromCwd(value) : undefined;
+}
+
+export const AMAZON_ORDERS_REGION = env.get('AMAZON_ORDERS_REGION').default('us').asString();
+
+export const AMAZON_ORDERS_SYNC_TIMEOUT_MS = env.get('AMAZON_ORDERS_SYNC_TIMEOUT_MS').default('600000').asIntPositive();
 
 function resolveFromCwd(value: string): string {
     return isAbsolute(value) ? value : resolve(process.cwd(), value);

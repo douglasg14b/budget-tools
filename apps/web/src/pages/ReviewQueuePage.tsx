@@ -9,11 +9,13 @@ import { QueueFilters } from '../components/review/QueueFilters';
 import { QueueItemCard } from '../components/review/QueueItemCard';
 import { filterQueueItems, QueueLoadState } from '../components/review/QueueLoadState';
 import { QueuePrefetchSentinel } from '../components/review/QueuePrefetchSentinel';
+import { QueueSearchInput } from '../components/review/QueueSearchInput';
 import { QueueSummaryBar } from '../components/review/QueueSummaryBar';
 import { QueueToolbar } from '../components/review/QueueToolbar';
 import type { QueueSearchState } from '../components/review/queueSearchParams';
 import {
     parseQueueSearchParams,
+    queueFiltersActive,
     serializeQueueSearchParams,
     toggleTierFilter,
 } from '../components/review/queueSearchParams';
@@ -57,27 +59,35 @@ export function ReviewQueuePage() {
                             updateSearch({ tiers: toggleTierFilter(search.tiers, tier) });
                         }}
                     />
-                    <QueueFilters
-                        accounts={accounts}
-                        accountId={search.accountId}
-                        onAccountIdChange={(accountId) => {
-                            updateSearch({ accountId });
-                        }}
-                    />
+                    <div className={classes.filters}>
+                        <QueueSearchInput
+                            value={search.q}
+                            onChange={(q) => {
+                                updateSearch({ q });
+                            }}
+                        />
+                        <QueueFilters
+                            accounts={accounts}
+                            accountId={search.accountId}
+                            onAccountIdChange={(accountId) => {
+                                updateSearch({ accountId });
+                            }}
+                        />
+                    </div>
                 </div>
             ) : null}
             {refreshError ? <BackendErrorNotice error={refreshError} /> : null}
             {expandError ? <BackendErrorNotice error={expandError} /> : null}
             <QueueLoadState
                 error={queueQuery.isError ? queueQuery.error : undefined}
-                filtersActive={search.tiers !== undefined || Boolean(search.accountId)}
+                filtersActive={queueFiltersActive(search)}
                 hasMore={queueQuery.data?.hasMore === true}
                 isExpanding={isExpanding}
                 isPending={queueQuery.isPending}
                 pendingCount={queueQuery.data?.pendingCount}
                 visibleCount={visibleItems.length}
                 onClearFilters={() => {
-                    updateSearch({ tiers: undefined, accountId: undefined });
+                    updateSearch({ tiers: undefined, accountId: undefined, q: undefined });
                 }}
                 onNeedMore={expandQueue}
             >

@@ -11,6 +11,7 @@ export type QueueSearchState = {
     tiers: ApprovalTier[] | undefined;
     accountId: string | undefined;
     transactionId: string | undefined;
+    q: string | undefined;
 };
 
 const APPROVAL_TIER_SET: ReadonlySet<string> = new Set(APPROVAL_TIERS);
@@ -25,9 +26,11 @@ function isApprovalTier(value: string): value is ApprovalTier {
 export function parseQueueSearchParams(searchParams: URLSearchParams): QueueSearchState {
     const accountId = searchParams.get('accountId')?.trim() || undefined;
     const transactionId = searchParams.get('transactionId')?.trim() || undefined;
+    const qRaw = searchParams.get('q');
+    const q = qRaw?.trim() ? qRaw : undefined;
     const tierRaw = searchParams.get('tier');
     if (!tierRaw?.trim()) {
-        return { tiers: undefined, accountId, transactionId };
+        return { tiers: undefined, accountId, transactionId, q };
     }
 
     const selected = new Set<ApprovalTier>();
@@ -43,6 +46,7 @@ export function parseQueueSearchParams(searchParams: URLSearchParams): QueueSear
         tiers: tiers.length > 0 ? tiers : undefined,
         accountId,
         transactionId,
+        q,
     };
 }
 
@@ -59,6 +63,9 @@ export function serializeQueueSearchParams(state: QueueSearchState): URLSearchPa
     }
     if (state.transactionId) {
         params.set('transactionId', state.transactionId);
+    }
+    if (state.q) {
+        params.set('q', state.q);
     }
     return params;
 }
@@ -81,4 +88,8 @@ export function toggleTierFilter(
 
     const next = APPROVAL_TIERS.filter((tier) => tier === clicked || current.includes(tier));
     return next.length === APPROVAL_TIERS.length ? undefined : next;
+}
+
+export function queueFiltersActive(search: Pick<QueueSearchState, 'accountId' | 'q' | 'tiers'>): boolean {
+    return search.tiers !== undefined || Boolean(search.accountId) || Boolean(search.q);
 }

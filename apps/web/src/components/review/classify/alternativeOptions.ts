@@ -5,7 +5,10 @@ export const ALTERNATIVE_SHORTCUT_COUNT = 3;
 /**
  * Ranked options that are not the primary suggestion, for the 1–3 shortcuts.
  */
-export function alternativeOptions(proposal: CategorizationProposalDto): CategoryOptionDto[] {
+export function alternativeOptions(proposal: CategorizationProposalDto | null): CategoryOptionDto[] {
+    if (!proposal) {
+        return [];
+    }
     return proposal.options
         .filter((option) => {
             if (proposal.suggestedCategoryId && option.categoryId) {

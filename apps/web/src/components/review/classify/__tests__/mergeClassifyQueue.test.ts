@@ -1,7 +1,7 @@
 import type { CategorizationQueueDto, CategorizationQueueItemDto } from '@budget-tools/web-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { mergeClassifyQueue, pinFocusedQueueItem } from '../mergeClassifyQueue';
+import { mergeClassifyQueue, mergePredictedItems, pinFocusedQueueItem } from '../mergeClassifyQueue';
 
 describe('mergeClassifyQueue', () => {
     const first = queue(['a', 'b'], { hasMoreNewer: true, hasMoreOlder: true });
@@ -43,6 +43,17 @@ describe('pinFocusedQueueItem', () => {
 
     it('appends the focused item when filters would hide it', () => {
         expect(pinFocusedQueueItem([items[0]], items, 'b').map(id)).toEqual(['a', 'b']);
+    });
+});
+
+describe('mergePredictedItems', () => {
+    it('fills proposals onto matching queue items and leaves others unchanged', () => {
+        const pending = queue(['a', 'b'], { hasMoreNewer: false, hasMoreOlder: true });
+        pending.items[1] = { ...pending.items[1], proposal: null };
+        const scoredB = item('b');
+        const merged = mergePredictedItems(pending, [scoredB]);
+        expect(merged.items[0]?.proposal?.transactionId).toBe('a');
+        expect(merged.items[1]?.proposal).toEqual(scoredB.proposal);
     });
 });
 

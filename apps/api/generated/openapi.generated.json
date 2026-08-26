@@ -737,7 +737,13 @@
 						"description": "Prior charges in this periodic series, newest first (ids from `proposal.periodicMatch`)."
 					},
 					"proposal": {
-						"$ref": "#/components/schemas/CategorizationProposalDto"
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/CategorizationProposalDto"
+							}
+						],
+						"nullable": true,
+						"description": "Local ML proposal when the transaction has been scored; otherwise null."
 					},
 					"transaction": {
 						"$ref": "#/components/schemas/TransactionDetailDto"
@@ -870,6 +876,284 @@
 				],
 				"type": "object"
 			},
+			"AmazonMatchKindDto": {
+				"type": "string",
+				"enum": [
+					"payment",
+					"batched-orders",
+					"partial-order",
+					"unmatched"
+				]
+			},
+			"AmazonMatchedPaymentDto": {
+				"properties": {
+					"isRefund": {
+						"type": "boolean"
+					},
+					"vendor": {
+						"type": "string",
+						"nullable": true
+					},
+					"cardLast4": {
+						"type": "string",
+						"nullable": true
+					},
+					"currency": {
+						"type": "string"
+					},
+					"amount": {
+						"type": "number",
+						"format": "double"
+					},
+					"paymentDate": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"isRefund",
+					"vendor",
+					"cardLast4",
+					"currency",
+					"amount",
+					"paymentDate",
+					"id"
+				],
+				"type": "object"
+			},
+			"AmazonMatchedOrderDto": {
+				"properties": {
+					"promotion": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
+					"shipping": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
+					"tax": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
+					"total": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
+					"orderDate": {
+						"type": "string",
+						"nullable": true
+					},
+					"orderId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"promotion",
+					"shipping",
+					"tax",
+					"total",
+					"orderDate",
+					"orderId"
+				],
+				"type": "object"
+			},
+			"AmazonSplitItemDto": {
+				"properties": {
+					"categoryGroup": {
+						"type": "string",
+						"nullable": true
+					},
+					"categoryName": {
+						"type": "string",
+						"nullable": true
+					},
+					"categoryId": {
+						"type": "string",
+						"nullable": true
+					},
+					"amount": {
+						"type": "number",
+						"format": "double"
+					},
+					"quantity": {
+						"type": "number",
+						"format": "double"
+					},
+					"asin": {
+						"type": "string",
+						"nullable": true
+					},
+					"title": {
+						"type": "string"
+					},
+					"orderId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"categoryGroup",
+					"categoryName",
+					"categoryId",
+					"amount",
+					"quantity",
+					"asin",
+					"title",
+					"orderId"
+				],
+				"type": "object"
+			},
+			"AmazonSplitLineDto": {
+				"properties": {
+					"memo": {
+						"type": "string",
+						"nullable": true
+					},
+					"categoryGroup": {
+						"type": "string"
+					},
+					"categoryName": {
+						"type": "string"
+					},
+					"categoryId": {
+						"type": "string"
+					},
+					"amount": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"memo",
+					"categoryGroup",
+					"categoryName",
+					"categoryId",
+					"amount"
+				],
+				"type": "object"
+			},
+			"AmazonSplitOverlayDto": {
+				"properties": {
+					"notes": {
+						"type": "string",
+						"nullable": true
+					},
+					"rationale": {
+						"type": "string",
+						"nullable": true
+					},
+					"collapsed": {
+						"type": "boolean"
+					},
+					"lines": {
+						"items": {
+							"$ref": "#/components/schemas/AmazonSplitLineDto"
+						},
+						"type": "array"
+					},
+					"items": {
+						"items": {
+							"$ref": "#/components/schemas/AmazonSplitItemDto"
+						},
+						"type": "array"
+					},
+					"orderIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"orders": {
+						"items": {
+							"$ref": "#/components/schemas/AmazonMatchedOrderDto"
+						},
+						"type": "array"
+					},
+					"payment": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/AmazonMatchedPaymentDto"
+							}
+						],
+						"nullable": true
+					},
+					"match": {
+						"$ref": "#/components/schemas/AmazonMatchKindDto"
+					},
+					"dataStatus": {
+						"type": "string",
+						"enum": [
+							"ready",
+							"not-synced"
+						]
+					},
+					"transactionId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"notes",
+					"rationale",
+					"collapsed",
+					"lines",
+					"items",
+					"orderIds",
+					"orders",
+					"payment",
+					"match",
+					"dataStatus",
+					"transactionId"
+				],
+				"type": "object"
+			},
+			"AmazonSuggestRequestDto": {
+				"properties": {
+					"transactionId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"transactionId"
+				],
+				"type": "object"
+			},
+			"CategorizationPredictDto": {
+				"properties": {
+					"items": {
+						"items": {
+							"$ref": "#/components/schemas/CategorizationQueueItemDto"
+						},
+						"type": "array"
+					},
+					"generatedAt": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"items",
+					"generatedAt"
+				],
+				"type": "object"
+			},
+			"CategorizationPredictRequestDto": {
+				"properties": {
+					"transactionIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"transactionIds"
+				],
+				"type": "object"
+			},
 			"CategoryDto": {
 				"properties": {
 					"note": {
@@ -931,6 +1215,140 @@
 				},
 				"required": [
 					"groups"
+				],
+				"type": "object"
+			},
+			"AmazonOrdersDateRangeDto": {
+				"properties": {
+					"end": {
+						"type": "string"
+					},
+					"start": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"end",
+					"start"
+				],
+				"type": "object"
+			},
+			"AmazonOrdersStatusDto": {
+				"properties": {
+					"items": {
+						"type": "number",
+						"format": "double"
+					},
+					"orders": {
+						"type": "number",
+						"format": "double"
+					},
+					"payments": {
+						"type": "number",
+						"format": "double"
+					},
+					"coveredRanges": {
+						"items": {
+							"$ref": "#/components/schemas/AmazonOrdersDateRangeDto"
+						},
+						"type": "array"
+					},
+					"lastAuthenticated": {
+						"type": "boolean"
+					},
+					"lastAuthCheck": {
+						"type": "string",
+						"nullable": true
+					},
+					"mcpConfigured": {
+						"type": "boolean"
+					},
+					"region": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"items",
+					"orders",
+					"payments",
+					"coveredRanges",
+					"lastAuthenticated",
+					"lastAuthCheck",
+					"mcpConfigured",
+					"region"
+				],
+				"type": "object"
+			},
+			"AmazonOrdersSyncDto": {
+				"properties": {
+					"coveredRanges": {
+						"items": {
+							"$ref": "#/components/schemas/AmazonOrdersDateRangeDto"
+						},
+						"type": "array"
+					},
+					"items": {
+						"type": "number",
+						"format": "double"
+					},
+					"orders": {
+						"type": "number",
+						"format": "double"
+					},
+					"payments": {
+						"type": "number",
+						"format": "double"
+					},
+					"fetchedOrderIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"scrapedPaymentGaps": {
+						"items": {
+							"$ref": "#/components/schemas/AmazonOrdersDateRangeDto"
+						},
+						"type": "array"
+					},
+					"to": {
+						"type": "string"
+					},
+					"from": {
+						"type": "string"
+					},
+					"region": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"coveredRanges",
+					"items",
+					"orders",
+					"payments",
+					"fetchedOrderIds",
+					"scrapedPaymentGaps",
+					"to",
+					"from",
+					"region"
+				],
+				"type": "object"
+			},
+			"AmazonOrdersSyncRequestDto": {
+				"properties": {
+					"region": {
+						"type": "string"
+					},
+					"to": {
+						"type": "string"
+					},
+					"from": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"to",
+					"from"
 				],
 				"type": "object"
 			}
@@ -1183,7 +1601,7 @@
 						}
 					}
 				},
-				"description": "Pending review queue with locally scored AI proposals joined to transaction details.",
+				"description": "Pending review queue joined to cached local ML proposals.\nWindow queries (`around` / `olderThan` / `newerThan`) list pending rows without scoring.",
 				"tags": [
 					"categorization"
 				],
@@ -1208,6 +1626,15 @@
 						}
 					},
 					{
+						"description": "Case-insensitive substring filter over payee, import names, memo, category, account, date, and amount",
+						"in": "query",
+						"name": "q",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
 						"description": "Discard cached scores and rescore the newest batch",
 						"in": "query",
 						"name": "refresh",
@@ -1226,7 +1653,7 @@
 						}
 					},
 					{
-						"description": "Center a scored window on this pending transaction id",
+						"description": "Center a pending window on this transaction id",
 						"in": "query",
 						"name": "around",
 						"required": false,
@@ -1235,7 +1662,7 @@
 						}
 					},
 					{
-						"description": "Next older batch after this pending transaction id",
+						"description": "Next older pending batch after this transaction id",
 						"in": "query",
 						"name": "olderThan",
 						"required": false,
@@ -1244,7 +1671,7 @@
 						}
 					},
 					{
-						"description": "Next newer batch before this pending transaction id",
+						"description": "Next newer pending batch before this transaction id",
 						"in": "query",
 						"name": "newerThan",
 						"required": false,
@@ -1289,6 +1716,74 @@
 				}
 			}
 		},
+		"/categorization/amazon-suggest": {
+			"post": {
+				"operationId": "PostAmazonSuggest",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AmazonSplitOverlayDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Amazon-only split overlay for one scored Amazon queue transaction.",
+				"summary": "postAmazonSuggest",
+				"tags": [
+					"categorization"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/AmazonSuggestRequestDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/categorization/predict": {
+			"post": {
+				"operationId": "PostPredict",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/CategorizationPredictDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Score pending transactions with the local ML models and cache the proposals.",
+				"summary": "postPredict",
+				"tags": [
+					"categorization"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/CategorizationPredictRequestDto"
+							}
+						}
+					}
+				}
+			}
+		},
 		"/categories": {
 			"get": {
 				"operationId": "GetCategories",
@@ -1309,6 +1804,64 @@
 				],
 				"security": [],
 				"parameters": []
+			}
+		},
+		"/amazon-orders/status": {
+			"get": {
+				"operationId": "GetAmazonOrdersStatus",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AmazonOrdersStatusDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Auth and durable cache status. Does not start Playwright.",
+				"summary": "getAmazonOrdersStatus",
+				"tags": [
+					"amazon-orders"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/amazon-orders/sync": {
+			"post": {
+				"operationId": "PostAmazonOrdersSync",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AmazonOrdersSyncDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Scrape Amazon payment/order gaps into SQLite. Starts the MCP subprocess if needed.",
+				"summary": "postAmazonOrdersSync",
+				"tags": [
+					"amazon-orders"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/AmazonOrdersSyncRequestDto"
+							}
+						}
+					}
+				}
 			}
 		}
 	},

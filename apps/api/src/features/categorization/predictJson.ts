@@ -2,8 +2,9 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { getCategorizationScorerUrl } from '../../environment';
 import type { PredictJsonEnvelope } from './categorizationDtos';
-import { PredictJsonError, parsePredictJsonStdout } from './parsePredictJson';
+import { PredictJsonError, parsePredictJsonEnvelope, parsePredictJsonStdout } from './parsePredictJson';
 
 export { PredictJsonError } from './parsePredictJson';
 
@@ -20,7 +21,7 @@ export type RunPredictJsonInput = {
 };
 
 /**
- * Spawns `dotnet run -- predict-json` and returns the parsed proposal envelope.
+ * Scores transactions via the warm HTTP scorer when configured, otherwise spawns predict-json.
  */
 export async function runPredictJson(input: RunPredictJsonInput): Promise<PredictJsonEnvelope> {
     if (input.transactionIds.length === 0) {
@@ -29,6 +30,71 @@ export async function runPredictJson(input: RunPredictJsonInput): Promise<Predic
 
     assertCategorizationModelsExist(input.modelsDir);
 
+    const scorerUrl = getCategorizationScorerUrl();
+    if (scorerUrl) {
+        return postToWarmScorer(scorerUrl, input);
+    }
+
+    return spawnPredictJson(input);
+}
+
+export function assertCategorizationModelsExist(modelsDir: string): void {
+    for (const fileName of MODEL_FILES) {
+        const modelPath = join(modelsDir, fileName);
+        if (!existsSync(modelPath)) {
+            throw new PredictJsonError(
+                `Missing model file at ${modelPath}. Run \`dotnet run -- train\` in categorization-ai before requesting the queue.`,
+            );
+        }
+    }
+}
+
+async function postToWarmScorer(baseUrl: string, input: RunPredictJsonInput): Promise<PredictJsonEnvelope> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), input.timeoutMs);
+
+    try {
+        const response = await fetch(`${baseUrl.replace(/\/$/, '')}/predict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                transactionIds: input.transactionIds,
+                llm: input.llm,
+            }),
+            signal: controller.signal,
+        });
+
+        const bodyText = await response.text();
+        if (!response.ok) {
+            const detail = bodyText.trim();
+            throw new PredictJsonError(
+                `warm scorer POST /predict failed (${response.status})${detail ? `: ${detail}` : ''}`,
+            );
+        }
+
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(bodyText);
+        } catch (error) {
+            throw new PredictJsonError('warm scorer response was not valid JSON', { cause: error });
+        }
+
+        return parsePredictJsonEnvelope(parsed);
+    } catch (error) {
+        if (error instanceof PredictJsonError) {
+            throw error;
+        }
+        if (error instanceof Error && error.name === 'AbortError') {
+            throw new PredictJsonError(`warm scorer timed out after ${input.timeoutMs}ms`);
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        throw new PredictJsonError(`warm scorer request failed: ${message}`, { cause: error });
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function spawnPredictJson(input: RunPredictJsonInput): Promise<PredictJsonEnvelope> {
     const projectPath = join(input.workingDir, 'YnabCategoryAi.csproj');
     if (!existsSync(projectPath)) {
         throw new PredictJsonError(`categorization-ai project not found at ${projectPath}`);
@@ -52,17 +118,6 @@ export async function runPredictJson(input: RunPredictJsonInput): Promise<Predic
 
     const stdout = await spawnDotnet(args, input);
     return parsePredictJsonStdout(stdout);
-}
-
-export function assertCategorizationModelsExist(modelsDir: string): void {
-    for (const fileName of MODEL_FILES) {
-        const modelPath = join(modelsDir, fileName);
-        if (!existsSync(modelPath)) {
-            throw new PredictJsonError(
-                `Missing model file at ${modelPath}. Run \`dotnet run -- train\` in categorization-ai before requesting the queue.`,
-            );
-        }
-    }
 }
 
 function spawnDotnet(args: string[], input: RunPredictJsonInput): Promise<string> {

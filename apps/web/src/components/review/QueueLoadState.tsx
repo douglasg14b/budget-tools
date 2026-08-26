@@ -6,14 +6,17 @@ import { useEffect } from 'react';
 import { BackendErrorNotice } from '../BackendErrorNotice';
 import classes from './QueueLoadState.module.css';
 import type { QueueSearchState } from './queueSearchParams';
+import { transactionMatchesQuery } from './transactionMatchesQuery';
 
 type QueueLoadStateProps = {
     children: ReactNode;
     error: unknown;
+    expandingCopy?: string;
     filtersActive?: boolean;
     hasMore?: boolean;
     isExpanding?: boolean;
     isPending: boolean;
+    loadingCopy?: string;
     onClearFilters?: () => void;
     onNeedMore?: () => void;
     pendingCount: number | undefined;
@@ -26,10 +29,12 @@ type QueueLoadStateProps = {
 export function QueueLoadState({
     children,
     error,
+    expandingCopy = 'Scoring more pending transactions to match these filters…',
     filtersActive = false,
     hasMore = false,
     isExpanding = false,
     isPending,
+    loadingCopy = 'Scoring a batch of pending transactions…',
     onClearFilters,
     onNeedMore,
     pendingCount,
@@ -46,7 +51,7 @@ export function QueueLoadState({
         return (
             <div className={classes.statusWell}>
                 <Loader type="dots" size="md" color="gray" />
-                <p className={classes.statusCopy}>Scoring a batch of pending transactions…</p>
+                <p className={classes.statusCopy}>{loadingCopy}</p>
             </div>
         );
     }
@@ -70,9 +75,7 @@ export function QueueLoadState({
                 <div className={classes.statusWell}>
                     <Loader type="dots" size="md" color="gray" />
                     <p className={classes.statusCopy}>
-                        {isExpanding
-                            ? 'Scoring more pending transactions to match these filters…'
-                            : 'Looking for matching pending transactions…'}
+                        {isExpanding ? expandingCopy : 'Looking for matching pending transactions…'}
                     </p>
                 </div>
             );
@@ -102,13 +105,16 @@ export function QueueLoadState({
 
 export function filterQueueItems(
     items: readonly CategorizationQueueItemDto[],
-    search: Pick<QueueSearchState, 'accountId' | 'tiers'>,
+    search: Pick<QueueSearchState, 'accountId' | 'tiers'> & { q?: string | undefined },
 ): CategorizationQueueItemDto[] {
     return items.filter((item) => {
-        if (search.tiers && !search.tiers.includes(item.proposal.tier)) {
+        if (search.tiers && (!item.proposal || !search.tiers.includes(item.proposal.tier))) {
             return false;
         }
         if (search.accountId && item.transaction.accountId !== search.accountId) {
+            return false;
+        }
+        if (!transactionMatchesQuery(item.transaction, search.q)) {
             return false;
         }
         return true;

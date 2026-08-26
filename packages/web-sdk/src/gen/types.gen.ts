@@ -187,7 +187,10 @@ export type CategorizationQueueItemDto = {
      * Prior charges in this periodic series, newest first (ids from `proposal.periodicMatch`).
      */
     relatedTransactions: Array<TransactionDetailDto>;
-    proposal: CategorizationProposalDto;
+    /**
+     * Local ML proposal when the transaction has been scored; otherwise null.
+     */
+    proposal: CategorizationProposalDto | null;
     transaction: TransactionDetailDto;
 };
 
@@ -234,6 +237,73 @@ export type LlmSuggestRequestDto = {
     transactionId: string;
 };
 
+export type AmazonMatchKindDto = 'payment' | 'batched-orders' | 'partial-order' | 'unmatched';
+
+export type AmazonMatchedPaymentDto = {
+    isRefund: boolean;
+    vendor: string | null;
+    cardLast4: string | null;
+    currency: string;
+    amount: number;
+    paymentDate: string;
+    id: string;
+};
+
+export type AmazonMatchedOrderDto = {
+    promotion: number | null;
+    shipping: number | null;
+    tax: number | null;
+    total: number | null;
+    orderDate: string | null;
+    orderId: string;
+};
+
+export type AmazonSplitItemDto = {
+    categoryGroup: string | null;
+    categoryName: string | null;
+    categoryId: string | null;
+    amount: number;
+    quantity: number;
+    asin: string | null;
+    title: string;
+    orderId: string;
+};
+
+export type AmazonSplitLineDto = {
+    memo: string | null;
+    categoryGroup: string;
+    categoryName: string;
+    categoryId: string;
+    amount: number;
+};
+
+export type AmazonSplitOverlayDto = {
+    notes: string | null;
+    rationale: string | null;
+    collapsed: boolean;
+    lines: Array<AmazonSplitLineDto>;
+    items: Array<AmazonSplitItemDto>;
+    orderIds: Array<string>;
+    orders: Array<AmazonMatchedOrderDto>;
+    payment: AmazonMatchedPaymentDto | null;
+    match: AmazonMatchKindDto;
+    dataStatus: 'ready' | 'not-synced';
+    transactionId: string;
+};
+
+export type AmazonSuggestRequestDto = {
+    transactionId: string;
+};
+
+export type CategorizationPredictDto = {
+    items: Array<CategorizationQueueItemDto>;
+    generatedAt: string;
+};
+
+export type CategorizationPredictRequestDto = {
+    transactionIds: Array<string>;
+};
+
 export type CategoryDto = {
     note: string | null;
     hidden: boolean;
@@ -250,6 +320,40 @@ export type CategoryGroupDto = {
 
 export type CategoriesDto = {
     groups: Array<CategoryGroupDto>;
+};
+
+export type AmazonOrdersDateRangeDto = {
+    end: string;
+    start: string;
+};
+
+export type AmazonOrdersStatusDto = {
+    items: number;
+    orders: number;
+    payments: number;
+    coveredRanges: Array<AmazonOrdersDateRangeDto>;
+    lastAuthenticated: boolean;
+    lastAuthCheck: string | null;
+    mcpConfigured: boolean;
+    region: string;
+};
+
+export type AmazonOrdersSyncDto = {
+    coveredRanges: Array<AmazonOrdersDateRangeDto>;
+    items: number;
+    orders: number;
+    payments: number;
+    fetchedOrderIds: Array<string>;
+    scrapedPaymentGaps: Array<AmazonOrdersDateRangeDto>;
+    to: string;
+    from: string;
+    region: string;
+};
+
+export type AmazonOrdersSyncRequestDto = {
+    region?: string;
+    to: string;
+    from: string;
 };
 
 export type ListTravelWindowsData = {
@@ -411,6 +515,10 @@ export type GetCategorizationQueueData = {
          */
         accountId?: string;
         /**
+         * Case-insensitive substring filter over payee, import names, memo, category, account, date, and amount
+         */
+        q?: string;
+        /**
          * Discard cached scores and rescore the newest batch
          */
         refresh?: boolean;
@@ -419,15 +527,15 @@ export type GetCategorizationQueueData = {
          */
         expand?: boolean;
         /**
-         * Center a scored window on this pending transaction id
+         * Center a pending window on this transaction id
          */
         around?: string;
         /**
-         * Next older batch after this pending transaction id
+         * Next older pending batch after this transaction id
          */
         olderThan?: string;
         /**
-         * Next newer batch before this pending transaction id
+         * Next newer pending batch before this transaction id
          */
         newerThan?: string;
     };
@@ -459,6 +567,38 @@ export type PostLlmSuggestResponses = {
 
 export type PostLlmSuggestResponse = PostLlmSuggestResponses[keyof PostLlmSuggestResponses];
 
+export type PostAmazonSuggestData = {
+    body: AmazonSuggestRequestDto;
+    path?: never;
+    query?: never;
+    url: '/categorization/amazon-suggest';
+};
+
+export type PostAmazonSuggestResponses = {
+    /**
+     * Ok
+     */
+    200: AmazonSplitOverlayDto;
+};
+
+export type PostAmazonSuggestResponse = PostAmazonSuggestResponses[keyof PostAmazonSuggestResponses];
+
+export type PostPredictData = {
+    body: CategorizationPredictRequestDto;
+    path?: never;
+    query?: never;
+    url: '/categorization/predict';
+};
+
+export type PostPredictResponses = {
+    /**
+     * Ok
+     */
+    200: CategorizationPredictDto;
+};
+
+export type PostPredictResponse = PostPredictResponses[keyof PostPredictResponses];
+
 export type GetCategoriesData = {
     body?: never;
     path?: never;
@@ -474,3 +614,35 @@ export type GetCategoriesResponses = {
 };
 
 export type GetCategoriesResponse = GetCategoriesResponses[keyof GetCategoriesResponses];
+
+export type GetAmazonOrdersStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/amazon-orders/status';
+};
+
+export type GetAmazonOrdersStatusResponses = {
+    /**
+     * Ok
+     */
+    200: AmazonOrdersStatusDto;
+};
+
+export type GetAmazonOrdersStatusResponse = GetAmazonOrdersStatusResponses[keyof GetAmazonOrdersStatusResponses];
+
+export type PostAmazonOrdersSyncData = {
+    body: AmazonOrdersSyncRequestDto;
+    path?: never;
+    query?: never;
+    url: '/amazon-orders/sync';
+};
+
+export type PostAmazonOrdersSyncResponses = {
+    /**
+     * Ok
+     */
+    200: AmazonOrdersSyncDto;
+};
+
+export type PostAmazonOrdersSyncResponse = PostAmazonOrdersSyncResponses[keyof PostAmazonOrdersSyncResponses];

@@ -8,6 +8,8 @@ describe('isCertainProposal', () => {
         expect(isCertainProposal(proposal({ confidence: 0.995, suggestedCategory: 'Groceries' }))).toBe(true);
         expect(isCertainProposal(proposal({ confidence: 0.994, suggestedCategory: 'Groceries' }))).toBe(false);
         expect(isCertainProposal(proposal({ confidence: 1, suggestedCategory: null }))).toBe(false);
+        expect(isCertainProposal(null)).toBe(false);
+        expect(isCertainProposal(undefined)).toBe(false);
     });
 });
 

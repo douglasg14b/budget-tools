@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListTravelWindowsData, ListTravelWindowsResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostLlmSuggestData, PostLlmSuggestResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
+import type { CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListTravelWindowsData, ListTravelWindowsResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostPredictData, PostPredictResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -104,7 +104,8 @@ export class Health {
 
 export class Categorization {
     /**
-     * Pending review queue with locally scored AI proposals joined to transaction details.
+     * Pending review queue joined to cached local ML proposals.
+     * Window queries (`around` / `olderThan` / `newerThan`) list pending rows without scoring.
      */
     public static request<ThrowOnError extends boolean = false>(options?: Options<GetCategorizationQueueData, ThrowOnError>): RequestResult<GetCategorizationQueueResponses, unknown, ThrowOnError> {
         return (options?.client ?? client).get<GetCategorizationQueueResponses, unknown, ThrowOnError>({ url: '/categorization/queue', ...options });
@@ -125,10 +126,69 @@ export class Categorization {
             }
         });
     }
+    
+    /**
+     * postAmazonSuggest
+     *
+     * Amazon-only split overlay for one scored Amazon queue transaction.
+     */
+    public static request3<ThrowOnError extends boolean = false>(options: Options<PostAmazonSuggestData, ThrowOnError>): RequestResult<PostAmazonSuggestResponses, unknown, ThrowOnError> {
+        return (options.client ?? client).post<PostAmazonSuggestResponses, unknown, ThrowOnError>({
+            url: '/categorization/amazon-suggest',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    /**
+     * postPredict
+     *
+     * Score pending transactions with the local ML models and cache the proposals.
+     */
+    public static request4<ThrowOnError extends boolean = false>(options: Options<PostPredictData, ThrowOnError>): RequestResult<PostPredictResponses, unknown, ThrowOnError> {
+        return (options.client ?? client).post<PostPredictResponses, unknown, ThrowOnError>({
+            url: '/categorization/predict',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
 }
 
 export class Categories {
     public static request<ThrowOnError extends boolean = false>(options?: Options<GetCategoriesData, ThrowOnError>): RequestResult<GetCategoriesResponses, unknown, ThrowOnError> {
         return (options?.client ?? client).get<GetCategoriesResponses, unknown, ThrowOnError>({ url: '/categories', ...options });
+    }
+}
+
+export class AmazonOrders {
+    /**
+     * getAmazonOrdersStatus
+     *
+     * Auth and durable cache status. Does not start Playwright.
+     */
+    public static request<ThrowOnError extends boolean = false>(options?: Options<GetAmazonOrdersStatusData, ThrowOnError>): RequestResult<GetAmazonOrdersStatusResponses, unknown, ThrowOnError> {
+        return (options?.client ?? client).get<GetAmazonOrdersStatusResponses, unknown, ThrowOnError>({ url: '/amazon-orders/status', ...options });
+    }
+    
+    /**
+     * postAmazonOrdersSync
+     *
+     * Scrape Amazon payment/order gaps into SQLite. Starts the MCP subprocess if needed.
+     */
+    public static request2<ThrowOnError extends boolean = false>(options: Options<PostAmazonOrdersSyncData, ThrowOnError>): RequestResult<PostAmazonOrdersSyncResponses, unknown, ThrowOnError> {
+        return (options.client ?? client).post<PostAmazonOrdersSyncResponses, unknown, ThrowOnError>({
+            url: '/amazon-orders/sync',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
     }
 }

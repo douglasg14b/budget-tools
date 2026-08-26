@@ -8,7 +8,8 @@ import { applyLlmOverlay, needsLlmSuggest, overlayQueryKey } from './applyLlmOve
 type UseLlmOverlayInput = {
     readonly current: CategorizationQueueItemDto | undefined;
     readonly currentDecided: boolean;
-    readonly next: CategorizationQueueItemDto | undefined;
+    readonly prefetchPrevious: CategorizationQueueItemDto | undefined;
+    readonly prefetchNext: CategorizationQueueItemDto | undefined;
 };
 
 type UseLlmOverlayResult = {
@@ -18,11 +19,15 @@ type UseLlmOverlayResult = {
 };
 
 /**
- * Fetches a JIT LLM overlay for the focused classify card, and prefetches the next remaining uncertain item.
+ * Fetches a JIT LLM overlay for the focused classify card, and prefetches uncertain neighbors.
  */
-export function useLlmOverlay({ current, currentDecided, next }: UseLlmOverlayInput): UseLlmOverlayResult {
+export function useLlmOverlay({
+    current,
+    currentDecided,
+    prefetchPrevious,
+    prefetchNext,
+}: UseLlmOverlayInput): UseLlmOverlayResult {
     const currentEnabled = Boolean(current && needsLlmSuggest(current, currentDecided));
-    const nextEnabled = Boolean(next && needsLlmSuggest(next, false));
 
     const currentQuery = useQuery({
         queryKey: ['categorization', 'llm-suggest', ...(current ? overlayQueryKey(current) : ['none'])],
@@ -34,15 +39,8 @@ export function useLlmOverlay({ current, currentDecided, next }: UseLlmOverlayIn
         retry: retryLlmSuggest,
     });
 
-    useQuery({
-        queryKey: ['categorization', 'llm-suggest', ...(next ? overlayQueryKey(next) : ['prefetch-none'])],
-        queryFn: ({ signal }) => fetchOverlay(next?.transaction.id ?? '', signal),
-        enabled: nextEnabled,
-        staleTime: Number.POSITIVE_INFINITY,
-        gcTime: Number.POSITIVE_INFINITY,
-        refetchOnWindowFocus: false,
-        retry: retryLlmSuggest,
-    });
+    usePrefetchOverlay(prefetchPrevious, 'prefetch-previous');
+    usePrefetchOverlay(prefetchNext, 'prefetch-next');
 
     const overlay = currentQuery.data;
     const item = current && overlay ? applyLlmOverlay(current, overlay) : current;
@@ -52,6 +50,18 @@ export function useLlmOverlay({ current, currentDecided, next }: UseLlmOverlayIn
         isPending: currentEnabled && currentQuery.isFetching,
         item,
     };
+}
+
+function usePrefetchOverlay(item: CategorizationQueueItemDto | undefined, scope: string): void {
+    useQuery({
+        queryKey: ['categorization', 'llm-suggest', scope, ...(item ? overlayQueryKey(item) : ['none'])],
+        queryFn: ({ signal }) => fetchOverlay(item?.transaction.id ?? '', signal),
+        enabled: Boolean(item && needsLlmSuggest(item, false)),
+        staleTime: Number.POSITIVE_INFINITY,
+        gcTime: Number.POSITIVE_INFINITY,
+        refetchOnWindowFocus: false,
+        retry: retryLlmSuggest,
+    });
 }
 
 async function fetchOverlay(transactionId: string, signal?: AbortSignal): Promise<LlmSuggestOverlayDto> {

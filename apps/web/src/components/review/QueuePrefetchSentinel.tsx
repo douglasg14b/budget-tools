@@ -5,6 +5,8 @@ import classes from './QueuePrefetchSentinel.module.css';
 type QueuePrefetchSentinelProps = {
     enabled: boolean;
     isLoading: boolean;
+    /** Shown while a prefetch request is in flight. */
+    loadingHint?: string;
     onNeedMore: () => void;
     /**
      * Skip the first layout intersection so a short list cannot drain the
@@ -21,6 +23,7 @@ type QueuePrefetchSentinelProps = {
 export function QueuePrefetchSentinel({
     enabled,
     isLoading,
+    loadingHint = 'Scoring the next batch…',
     onNeedMore,
     requireScroll = false,
     root,
@@ -74,7 +77,7 @@ export function QueuePrefetchSentinel({
         <div ref={nodeRef} className={classes.sentinel}>
             {isLoading ? (
                 <p className={classes.hint} aria-live="polite">
-                    Scoring the next batch…
+                    {loadingHint}
                 </p>
             ) : null}
         </div>

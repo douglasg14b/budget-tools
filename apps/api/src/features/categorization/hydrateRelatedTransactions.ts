@@ -10,7 +10,7 @@ export function collectRelatedTransactionIds(items: readonly QueueItemWithoutRel
     const seen = new Set<string>();
     const ids: string[] = [];
     for (const item of items) {
-        for (const relatedId of item.proposal.periodicMatch?.relatedTransactionIds ?? []) {
+        for (const relatedId of item.proposal?.periodicMatch?.relatedTransactionIds ?? []) {
             if (seen.has(relatedId)) {
                 continue;
             }
@@ -30,7 +30,7 @@ export function attachRelatedTransactions(
 ): CategorizationQueueItemDto[] {
     return items.map((item) => ({
         ...item,
-        relatedTransactions: (item.proposal.periodicMatch?.relatedTransactionIds ?? []).flatMap((relatedId) => {
+        relatedTransactions: (item.proposal?.periodicMatch?.relatedTransactionIds ?? []).flatMap((relatedId) => {
             const related = relatedById.get(relatedId);
             return related ? [related] : [];
         }),

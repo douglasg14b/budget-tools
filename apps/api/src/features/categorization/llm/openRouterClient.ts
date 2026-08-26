@@ -12,6 +12,18 @@ export type OpenRouterChatInput = {
     readonly signal?: AbortSignal;
 };
 
+export type OpenRouterJsonInput = {
+    readonly apiKey: string;
+    readonly baseUrl: string;
+    readonly model: string;
+    readonly system: string;
+    readonly user: string;
+    readonly timeoutMs: number;
+    readonly schemaName: string;
+    readonly schema: Record<string, unknown>;
+    readonly signal?: AbortSignal;
+};
+
 export type OpenRouterPrediction = {
     readonly categoryName: string | null;
     readonly categoryGroupName: string | null;
@@ -69,6 +81,29 @@ type ChatCompletionResponse = {
  * Calls OpenRouter chat completions with constrained JSON and thinking disabled.
  */
 export async function completeLlmPrediction(input: OpenRouterChatInput): Promise<OpenRouterPrediction> {
+    const content = await completeOpenRouterJson({
+        apiKey: input.apiKey,
+        baseUrl: input.baseUrl,
+        model: input.model,
+        system: input.system,
+        user: input.user,
+        timeoutMs: input.timeoutMs,
+        signal: input.signal,
+        schemaName: 'category_prediction',
+        schema: predictionSchema(Boolean(input.requireAlternate)),
+    });
+    const prediction = parsePrediction(content);
+    logLlmSuggest('openrouter completion', {
+        model: input.model,
+        parsed: prediction,
+    });
+    return prediction;
+}
+
+/**
+ * Shared OpenRouter JSON-schema completion. Returns the raw content string.
+ */
+export async function completeOpenRouterJson(input: OpenRouterJsonInput): Promise<string> {
     const endpoint = `${input.baseUrl.replace(/\/$/, '')}/chat/completions`;
     const controller = new AbortController();
     let timedOut = false;
@@ -99,9 +134,9 @@ export async function completeLlmPrediction(input: OpenRouterChatInput): Promise
                 response_format: {
                     type: 'json_schema',
                     json_schema: {
-                        name: 'category_prediction',
+                        name: input.schemaName,
                         strict: true,
-                        schema: predictionSchema(Boolean(input.requireAlternate)),
+                        schema: input.schema,
                     },
                 },
                 messages: [
@@ -122,7 +157,6 @@ export async function completeLlmPrediction(input: OpenRouterChatInput): Promise
             throw new LlmSuggestError(503, 'OpenRouter returned an empty completion');
         }
 
-        const prediction = parsePrediction(content);
         const usage = parseOpenRouterUsage(payload.usage);
         logLlmSuggest('inference cost', {
             completionTokens: usage?.completionTokens ?? null,
@@ -134,11 +168,7 @@ export async function completeLlmPrediction(input: OpenRouterChatInput): Promise
             totalTokens: usage?.totalTokens ?? null,
             cachedTokens: usage?.cachedTokens ?? null,
         });
-        logLlmSuggest('openrouter completion', {
-            model: payload.model ?? input.model,
-            parsed: prediction,
-        });
-        return prediction;
+        return content;
     } catch (error) {
         if (error instanceof LlmSuggestError) {
             throw error;

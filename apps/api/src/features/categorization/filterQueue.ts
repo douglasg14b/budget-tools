@@ -1,5 +1,6 @@
 import type { ApprovalTier, CategorizationQueueItemDto } from './categorizationDtos';
 import { isApprovalTier } from './parsePredictJson';
+import { transactionMatchesQuery } from './transactionMatchesQuery';
 
 export class QueryValidationError extends Error {
     constructor(message: string) {
@@ -18,6 +19,7 @@ const TIER_ORDER: Record<ApprovalTier, number> = {
 export type QueueFilter = {
     tiers?: ApprovalTier[];
     accountId?: string;
+    q?: string;
 };
 
 /**
@@ -51,17 +53,22 @@ export function filterAndSortQueueItems(
     filter: QueueFilter,
 ): CategorizationQueueItemDto[] {
     const filtered = items.filter((item) => {
-        if (filter.tiers && !filter.tiers.includes(item.proposal.tier)) {
-            return false;
+        if (filter.tiers) {
+            if (!item.proposal || !filter.tiers.includes(item.proposal.tier)) {
+                return false;
+            }
         }
         if (filter.accountId && item.transaction.accountId !== filter.accountId) {
+            return false;
+        }
+        if (!transactionMatchesQuery(item.transaction, filter.q)) {
             return false;
         }
         return true;
     });
 
     return [...filtered].sort((left, right) => {
-        const tierDelta = TIER_ORDER[left.proposal.tier] - TIER_ORDER[right.proposal.tier];
+        const tierDelta = tierSortOrder(left) - tierSortOrder(right);
         if (tierDelta !== 0) {
             return tierDelta;
         }
@@ -70,4 +77,11 @@ export function filterAndSortQueueItems(
         }
         return left.transaction.date < right.transaction.date ? 1 : -1;
     });
+}
+
+function tierSortOrder(item: CategorizationQueueItemDto): number {
+    if (!item.proposal) {
+        return TIER_ORDER.Blocked + 1;
+    }
+    return TIER_ORDER[item.proposal.tier];
 }

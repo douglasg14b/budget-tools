@@ -57,21 +57,48 @@ export function resolveAssignableCategory(
     categoryGroupName?: string | null,
 ): AssignableCategory | null {
     const parsed = parseModelCategory(categoryName, categoryGroupName);
-    if (!parsed.name) {
+    const direct = matchCatalog(catalog, parsed.name, parsed.groupName);
+    if (direct) {
+        return direct;
+    }
+
+    const slashed = splitKnownGroupPrefix(catalog, categoryName);
+    if (slashed) {
+        return matchCatalog(catalog, slashed.name, slashed.groupName);
+    }
+
+    return null;
+}
+
+function matchCatalog(
+    catalog: readonly AssignableCategory[],
+    name: string,
+    groupName: string | null,
+): AssignableCategory | null {
+    if (!name) {
         return null;
     }
-    const byName = catalog.filter((category) => normalizeLabel(category.name) === parsed.name);
+    const foldedName = foldLabel(name);
+    const byName = catalog.filter((category) => foldLabel(category.name) === foldedName);
     if (byName.length === 0) {
         return null;
     }
-    if (parsed.groupName) {
-        return byName.find((category) => normalizeLabel(category.groupName) === parsed.groupName) ?? byName[0] ?? null;
+    if (groupName) {
+        const foldedGroup = foldLabel(groupName);
+        return byName.find((category) => foldLabel(category.groupName) === foldedGroup) ?? byName[0] ?? null;
     }
     return byName[0] ?? null;
 }
 
-function normalizeLabel(value: string): string {
-    return value.trim().replace(/\s+/g, ' ').toLowerCase();
+/** Strip emoji/variation selectors so "🛒 Household Supplies" matches the pick-list name. */
+function foldLabel(value: string): string {
+    return value
+        .trim()
+        .replace(/\p{Extended_Pictographic}/gu, '')
+        .replace(/[\uFE0F\u200D]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
 }
 
 function parseModelCategory(
@@ -82,16 +109,37 @@ function parseModelCategory(
     const fallbackGroup = categoryGroupName?.trim() || null;
     const pipeParts = rawName.split('|').map((part) => part.trim());
     if (pipeParts.length === 2 && pipeParts[0] && pipeParts[1]) {
-        return { name: normalizeLabel(pipeParts[0]), groupName: normalizeLabel(pipeParts[1]) };
+        return { name: pipeParts[0], groupName: pipeParts[1] };
     }
     const colonParts = rawName.split(':').map((part) => part.trim());
     if (colonParts.length === 2 && colonParts[0] && colonParts[1]) {
-        return { name: normalizeLabel(colonParts[1]), groupName: normalizeLabel(colonParts[0]) };
+        return { name: colonParts[1], groupName: colonParts[0] };
     }
     return {
-        name: normalizeLabel(rawName),
-        groupName: fallbackGroup ? normalizeLabel(fallbackGroup) : null,
+        name: rawName,
+        groupName: fallbackGroup,
     };
+}
+
+function splitKnownGroupPrefix(
+    catalog: readonly AssignableCategory[],
+    raw: string,
+): { name: string; groupName: string } | null {
+    const separator = ' / ';
+    const index = raw.indexOf(separator);
+    if (index <= 0) {
+        return null;
+    }
+    const groupName = raw.slice(0, index).trim();
+    const name = raw.slice(index + separator.length).trim();
+    if (!groupName || !name) {
+        return null;
+    }
+    const groups = new Set(catalog.map((category) => foldLabel(category.groupName)));
+    if (!groups.has(foldLabel(groupName))) {
+        return null;
+    }
+    return { name, groupName };
 }
 
 /**
@@ -111,7 +159,7 @@ export function buildNearbyCategories(input: {
     function addLikely(name: string, groupName: string | null, why: string): void {
         const resolved =
             (groupName ? byKey.get(categoryKey(name, groupName)) : undefined) ??
-            input.catalog.find((category) => normalizeLabel(category.name) === normalizeLabel(name));
+            input.catalog.find((category) => foldLabel(category.name) === foldLabel(name));
         if (!resolved) {
             return;
         }
@@ -133,7 +181,7 @@ export function buildNearbyCategories(input: {
         }
         const resolved =
             (groupName ? byKey.get(categoryKey(name, groupName)) : undefined) ??
-            input.catalog.find((category) => normalizeLabel(category.name) === normalizeLabel(name));
+            input.catalog.find((category) => foldLabel(category.name) === foldLabel(name));
         if (!resolved) {
             return;
         }

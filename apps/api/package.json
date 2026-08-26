@@ -7,6 +7,7 @@
     "predev": "pnpm tsoa",
     "dev": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx watch apps/api/src/server.ts",
     "migrate": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx apps/api/src/data-persistence/runMigrations.ts",
+    "clear:amazon-cache": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx apps/api/src/features/amazonOrders/clearAmazonOrderCache.ts",
     "prebuild": "pnpm tsoa",
     "build": "tsc -p tsconfig.json --noEmit",
     "postbuild": "pnpm --filter @budget-tools/web-sdk build",
@@ -17,6 +18,7 @@
   },
   "dependencies": {
     "@budget-tools/db": "workspace:^",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@tsoa/runtime": "7.0.0-alpha.0",
     "better-sqlite3": "^13.0.3",
     "env-var": "^7.5.0",

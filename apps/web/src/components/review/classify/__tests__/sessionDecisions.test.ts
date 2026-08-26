@@ -5,7 +5,9 @@ import {
     applyDecision,
     approveSuggestion,
     decideCategory,
+    decideSplit,
     emptySession,
+    isSplitDecision,
     nextRemainingId,
     nextRowId,
     previousRemainingId,
@@ -53,8 +55,8 @@ describe('sessionDecisions', () => {
 
     it('treats a pick of the suggested category as approved', () => {
         expect(
-            decideCategory(first, { categoryGroup: 'Needs', categoryId: 'cat-1', categoryName: 'Groceries' }).action,
-        ).toBe('approved');
+            decideCategory(first, { categoryGroup: 'Needs', categoryId: 'cat-1', categoryName: 'Groceries' }),
+        ).toMatchObject({ kind: 'category', action: 'approved' });
         expect(
             decideCategory(first, { categoryGroup: 'Wants', categoryId: 'cat-9', categoryName: 'Dining' }).action,
         ).toBe('changed');
@@ -77,6 +79,48 @@ describe('sessionDecisions', () => {
 
     it('does not approve when there is no suggestion', () => {
         expect(approveSuggestion(third)).toBeUndefined();
+    });
+
+    it('stores mixed split lines and collapses a same-category split', () => {
+        const mixed = decideSplit(first, [
+            {
+                amount: -400,
+                categoryId: 'cat-1',
+                categoryName: 'Groceries',
+                categoryGroup: 'Needs',
+                memo: 'Milk',
+            },
+            {
+                amount: -600,
+                categoryId: 'cat-2',
+                categoryName: 'Household',
+                categoryGroup: 'Needs',
+                memo: 'Soap',
+            },
+        ]);
+        expect(isSplitDecision(mixed)).toBe(true);
+        if (mixed.kind !== 'split') {
+            throw new Error('expected split decision');
+        }
+        expect(mixed.lines).toHaveLength(2);
+
+        const collapsed = decideSplit(first, [
+            {
+                amount: -400,
+                categoryId: 'cat-1',
+                categoryName: 'Groceries',
+                categoryGroup: 'Needs',
+                memo: 'Milk',
+            },
+            {
+                amount: -600,
+                categoryId: 'cat-1',
+                categoryName: 'Groceries',
+                categoryGroup: 'Needs',
+                memo: 'Eggs',
+            },
+        ]);
+        expect(collapsed).toMatchObject({ kind: 'category', categoryId: 'cat-1', action: 'approved' });
     });
 
     it('keeps an in-list currentId when the URL id is stale', () => {

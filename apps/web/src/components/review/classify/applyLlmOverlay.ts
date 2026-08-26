@@ -1,15 +1,26 @@
 import type { CategorizationQueueItemDto, CategoryOptionDto, LlmSuggestOverlayDto } from '@budget-tools/web-sdk';
 
+import { isAmazonTransaction } from './isAmazonTransaction';
 import { isCertainProposal } from './isCertainProposal';
 
 /**
  * True when the classify card should request a just-in-time LLM overlay.
  */
 export function needsLlmSuggest(item: CategorizationQueueItemDto, decided: boolean): boolean {
-    if (decided) {
+    if (decided || !item.proposal) {
+        return false;
+    }
+    if (isAmazonTransaction(item.transaction)) {
         return false;
     }
     return !isCertainProposal(item.proposal);
+}
+
+export function needsAmazonSuggest(item: CategorizationQueueItemDto, _decided = false): boolean {
+    if (!item.proposal) {
+        return false;
+    }
+    return isAmazonTransaction(item.transaction);
 }
 
 /**
@@ -25,13 +36,90 @@ export function nextUncertainRemaining(
 }
 
 /**
+ * Previous remaining uncertain item before the focused card, used to prefetch one overlay.
+ */
+export function previousUncertainRemaining(
+    remaining: readonly CategorizationQueueItemDto[],
+    currentId: string | undefined,
+): CategorizationQueueItemDto | undefined {
+    const start = remaining.findIndex((item) => item.transaction.id === currentId);
+    if (start <= 0) {
+        return undefined;
+    }
+
+    for (let index = start - 1; index >= 0; index--) {
+        const item = remaining[index];
+        if (needsLlmSuggest(item, false)) {
+            return item;
+        }
+    }
+
+    return undefined;
+}
+
+export type LlmPrefetchNeighbors = {
+    readonly previous: CategorizationQueueItemDto | undefined;
+    readonly next: CategorizationQueueItemDto | undefined;
+};
+
+/** Uncertain neighbors above and below the focus for JIT LLM prefetch. */
+export function selectLlmPrefetchNeighbors(
+    remaining: readonly CategorizationQueueItemDto[],
+    currentId: string | undefined,
+): LlmPrefetchNeighbors {
+    return {
+        previous: previousUncertainRemaining(remaining, currentId),
+        next: nextUncertainRemaining(remaining, currentId),
+    };
+}
+
+export function nextAmazonRemaining(
+    remaining: readonly CategorizationQueueItemDto[],
+    currentId: string | undefined,
+): CategorizationQueueItemDto | undefined {
+    const start = remaining.findIndex((item) => item.transaction.id === currentId);
+    const after = start >= 0 ? remaining.slice(start + 1) : remaining;
+    return after.find((item) => needsAmazonSuggest(item, false));
+}
+
+export function previousAmazonRemaining(
+    remaining: readonly CategorizationQueueItemDto[],
+    currentId: string | undefined,
+): CategorizationQueueItemDto | undefined {
+    const start = remaining.findIndex((item) => item.transaction.id === currentId);
+    if (start <= 0) {
+        return undefined;
+    }
+
+    for (let index = start - 1; index >= 0; index--) {
+        const item = remaining[index];
+        if (needsAmazonSuggest(item, false)) {
+            return item;
+        }
+    }
+
+    return undefined;
+}
+
+/** Amazon neighbors above and below the focus for JIT Amazon-split prefetch. */
+export function selectAmazonPrefetchNeighbors(
+    remaining: readonly CategorizationQueueItemDto[],
+    currentId: string | undefined,
+): LlmPrefetchNeighbors {
+    return {
+        previous: previousAmazonRemaining(remaining, currentId),
+        next: nextAmazonRemaining(remaining, currentId),
+    };
+}
+
+/**
  * Merges an LLM overlay onto a locally scored queue item without dropping local signals.
  */
 export function applyLlmOverlay(
     item: CategorizationQueueItemDto,
     overlay: LlmSuggestOverlayDto,
 ): CategorizationQueueItemDto {
-    if (isCertainProposal(item.proposal)) {
+    if (!item.proposal || isCertainProposal(item.proposal)) {
         return item;
     }
 

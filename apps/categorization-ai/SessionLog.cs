@@ -34,7 +34,14 @@ public static class SessionLog
 
         if (File.Exists(path))
         {
-            File.Delete(path);
+            try
+            {
+                File.Delete(path);
+            }
+            catch (IOException)
+            {
+                // Another process (e.g. serve mode) may hold the log open; append instead.
+            }
         }
 
         var formatter = new MessageTemplateTextFormatter(OutputTemplate);

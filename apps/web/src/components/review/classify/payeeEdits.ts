@@ -38,12 +38,12 @@ export function dismissPayeeRename(edits: PayeeEdits, transactionId: string): Pa
 }
 
 export function visiblePayeeRename(
-    proposal: CategorizationProposalDto,
+    proposal: CategorizationProposalDto | null,
     transactionId: string,
     displayedPayee: string,
     edits: PayeeEdits,
 ): PayeeSuggestionDto | null {
-    if (edits.dismissed[transactionId]) {
+    if (!proposal || edits.dismissed[transactionId]) {
         return null;
     }
 

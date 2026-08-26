@@ -1,0 +1,545 @@
+diff --git a/src/amazon/extractors/items.ts b/src/amazon/extractors/items.ts
+index a41e821..4accb1e 100644
+--- a/src/amazon/extractors/items.ts
++++ b/src/amazon/extractors/items.ts
+@@ -175,80 +175,19 @@ async function extractItemsStrategy4(page: Page, header: OrderHeader, currency:
+ 
+   for (const container of containers) {
+     try {
+-      // Get title from itemTitle component
+-      const titleLink = container.locator('[data-component="itemTitle"] a').first();
+-      const titleLinkCount = await titleLink.count().catch(() => 0);
+-      
+-      if (titleLinkCount === 0) {
+-        debug(`Strategy4: Skipping item - no title link`);
+-        continue;
+-      }
+-      
+-      const name = await titleLink.textContent({ timeout: 300 }).catch(() => '');
+-      if (!name?.trim()) {
+-        debug(`Strategy4: Skipping item - no name`);
++      const titleLinks = await container.locator('[data-component="itemTitle"] a').all();
++      if (titleLinks.length === 0) {
++        debug(`Strategy4: Skipping container - no title links`);
+         continue;
+       }
+-      
+-      const href = await titleLink.getAttribute('href', { timeout: 300 }).catch(() => '');
+-      const asin = href ? extractAsinFromUrl(href) : undefined;
+-
+-      // Get price from unitPrice component (use .a-offscreen for clean text)
+-      let price = parseMoney('', currency);
+-      const priceEl = container.locator('[data-component="unitPrice"] .a-offscreen').first();
+-      const priceCount = await priceEl.count().catch(() => 0);
+-      if (priceCount > 0) {
+-        const priceText = await priceEl.textContent({ timeout: 300 }).catch(() => '');
+-        if (priceText) {
+-          price = parseMoney(priceText, currency);
+-        }
+-      } else {
+-        // Fallback: try any span in unitPrice
+-        const priceElem = container.locator('[data-component="unitPrice"] span:not(:has(span))').first();
+-        const priceText = await priceElem.textContent({ timeout: 300 }).catch(() => '');
+-        price = parseMoney(priceText || '', currency);
+-      }
+-
+-      // Get quantity - check multiple locations (matching invoice logic)
+-      let quantity = 1;
+-      
+-      // Location 1: quantity badge on image (e.g., ".od-item-view-qty span")
+-      const qtyBadge = container.locator('[data-component="itemImage"] .od-item-view-qty span, .od-item-view-qty span').first();
+-      const qtyBadgeCount = await qtyBadge.count().catch(() => 0);
+-      if (qtyBadgeCount > 0) {
+-        const qtyText = await qtyBadge.textContent({ timeout: 300 }).catch(() => '');
+-        const qtyMatch = qtyText?.match(/(\d+)/);
+-        if (qtyMatch) {
+-          quantity = parseInt(qtyMatch[1], 10);
+-        }
+-      }
+-      
+-      // Location 2: [data-component="quantity"] (fallback)
+-      if (quantity === 1) {
+-        const qtyEl = container.locator('[data-component="quantity"]').first();
+-        const qtyCount = await qtyEl.count().catch(() => 0);
+-        if (qtyCount > 0) {
+-          const qtyText = await qtyEl.textContent({ timeout: 300 }).catch(() => '');
+-          const qtyMatch = qtyText?.match(/(\d+)/);
+-          if (qtyMatch) {
+-            quantity = parseInt(qtyMatch[1], 10);
+-          }
+-        }
+-      }
+ 
+-      // Get condition from itemCondition component
+-      let condition: string | undefined;
+-      const conditionEl = container.locator('[data-component="itemCondition"]').first();
+-      const conditionCount = await conditionEl.count().catch(() => 0);
+-      if (conditionCount > 0) {
+-        const conditionText = await conditionEl.textContent({ timeout: 300 }).catch(() => '');
+-        const conditionMatch = conditionText?.match(/Condition:\s*(.+)/i);
+-        if (conditionMatch) {
+-          condition = conditionMatch[1].trim();
+-        }
+-      }
++      const priceElements = await container.locator('[data-component="unitPrice"] .a-offscreen').all();
++      const qtyElements = await container
++        .locator('[data-component="itemImage"] .od-item-view-qty span, .od-item-view-qty span')
++        .all();
++      const conditionElements = await container.locator('[data-component="itemCondition"]').all();
++      const freqElements = await container.locator('[data-component="deliveryFrequency"]').all();
+ 
+-      // Get seller - check both link and span (Amazon uses span without link)
+       let seller: SellerInfo | undefined;
+       const sellerLink = container.locator('[data-component="orderedMerchant"] a').first();
+       const sellerLinkCount = await sellerLink.count().catch(() => 0);
+@@ -258,7 +197,6 @@ async function extractItemsStrategy4(page: Page, header: OrderHeader, currency:
+           seller = { name: sellerText.trim(), soldBy: sellerText.trim() };
+         }
+       } else {
+-        // Fallback: check for span with "Sold by:" text
+         const sellerSpan = container.locator('[data-component="orderedMerchant"] span').first();
+         const sellerSpanCount = await sellerSpan.count().catch(() => 0);
+         if (sellerSpanCount > 0) {
+@@ -269,47 +207,91 @@ async function extractItemsStrategy4(page: Page, header: OrderHeader, currency:
+           }
+         }
+       }
+-      
+-      // Fallback: extract from container text
+       if (!seller) {
+         const containerText = await container.textContent({ timeout: 300 }).catch(() => '');
+         seller = extractSellerFromText(containerText || '');
+       }
+-      
+-      // Fallback for condition from container text
+-      if (!condition) {
+-        const containerText = await container.textContent({ timeout: 300 }).catch(() => '');
+-        condition = extractConditionFromText(containerText || '');
+-      }
+ 
+-      // Get Subscribe & Save delivery frequency
+-      let subscriptionFrequency: string | undefined;
+-      const freqEl = container.locator('[data-component="deliveryFrequency"]').first();
+-      const freqCount = await freqEl.count().catch(() => 0);
+-      if (freqCount > 0) {
+-        const freqText = await freqEl.textContent({ timeout: 300 }).catch(() => '');
+-        const freqMatch = freqText?.match(/Auto-delivered:\s*(.+)/i);
+-        if (freqMatch) {
+-          subscriptionFrequency = freqMatch[1].trim();
++      for (let i = 0; i < titleLinks.length; i++) {
++        const titleLink = titleLinks[i];
++        const name = await titleLink.textContent({ timeout: 300 }).catch(() => '');
++        if (!name?.trim()) {
++          debug(`Strategy4: Skipping item ${i} - no name`);
++          continue;
+         }
+-      }
+ 
+-      debug(`Strategy4: Found item: ${asin} - ${name.slice(0, 40)} - ${price.formatted} x${quantity}${seller ? ` - Seller: ${seller.name}` : ''}${condition ? ` - Condition: ${condition}` : ''}${subscriptionFrequency ? ` - Sub: ${subscriptionFrequency}` : ''}`);
++        const href = await titleLink.getAttribute('href', { timeout: 300 }).catch(() => '');
++        const asin = href ? extractAsinFromUrl(href) : undefined;
+ 
+-      items.push({
+-        id: asin || name.trim().slice(0, 50),
+-        asin,
+-        name: name.trim(),
+-        quantity,
+-        unitPrice: price,
+-        totalPrice: { ...price, amount: price.amount * quantity },
+-        url: href ? (href.startsWith('http') ? href : `https://www.${getRegionByCode(header.region)?.domain}${href}`) : '',
+-        orderHeader: header,
+-        seller,
+-        condition,
+-        subscriptionFrequency,
+-        platformData: {},
+-      });
++        let price = parseMoney('', currency);
++        if (priceElements.length > i) {
++          const priceText = await priceElements[i].textContent({ timeout: 300 }).catch(() => '');
++          if (priceText) {
++            price = parseMoney(priceText, currency);
++          }
++        } else if (priceElements.length > 0) {
++          const priceText = await priceElements[0].textContent({ timeout: 300 }).catch(() => '');
++          price = parseMoney(priceText || '', currency);
++        }
++
++        let quantity = 1;
++        if (qtyElements.length > i) {
++          const qtyText = await qtyElements[i].textContent({ timeout: 300 }).catch(() => '');
++          const qtyMatch = qtyText?.match(/(\d+)/);
++          if (qtyMatch) {
++            quantity = parseInt(qtyMatch[1], 10);
++          }
++        } else if (quantity === 1) {
++          const qtyEl = container.locator('[data-component="quantity"]').first();
++          const qtyCount = await qtyEl.count().catch(() => 0);
++          if (qtyCount > 0) {
++            const qtyText = await qtyEl.textContent({ timeout: 300 }).catch(() => '');
++            const qtyMatch = qtyText?.match(/(\d+)/);
++            if (qtyMatch) {
++              quantity = parseInt(qtyMatch[1], 10);
++            }
++          }
++        }
++
++        let condition: string | undefined;
++        if (conditionElements.length > i) {
++          const conditionText = await conditionElements[i].textContent({ timeout: 300 }).catch(() => '');
++          const conditionMatch = conditionText?.match(/Condition:\s*(.+)/i);
++          if (conditionMatch) {
++            condition = conditionMatch[1].trim();
++          }
++        }
++        if (!condition) {
++          const containerText = await container.textContent({ timeout: 300 }).catch(() => '');
++          condition = extractConditionFromText(containerText || '');
++        }
++
++        let subscriptionFrequency: string | undefined;
++        if (freqElements.length > i) {
++          const freqText = await freqElements[i].textContent({ timeout: 300 }).catch(() => '');
++          const freqMatch = freqText?.match(/Auto-delivered:\s*(.+)/i);
++          if (freqMatch) {
++            subscriptionFrequency = freqMatch[1].trim();
++          }
++        }
++
++        debug(`Strategy4: Found item: ${asin} - ${name.slice(0, 40)} - ${price.formatted} x${quantity}${seller ? ` - Seller: ${seller.name}` : ''}${condition ? ` - Condition: ${condition}` : ''}${subscriptionFrequency ? ` - Sub: ${subscriptionFrequency}` : ''}`);
++
++        items.push({
++          id: asin || name.trim().slice(0, 50),
++          asin,
++          name: name.trim(),
++          quantity,
++          unitPrice: price,
++          totalPrice: { ...price, amount: price.amount * quantity },
++          url: href ? (href.startsWith('http') ? href : `https://www.${getRegionByCode(header.region)?.domain}${href}`) : '',
++          orderHeader: header,
++          seller,
++          condition,
++          subscriptionFrequency,
++          platformData: {},
++        });
++      }
+     } catch (e) {
+       debug(`Strategy4: Error extracting item: ${e}`);
+       continue;
+diff --git a/src/index.ts b/src/index.ts
+index 6b288be..213de74 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -812,7 +812,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
+                     ? {
+                         id: order.id,
+                         date: order.date?.toISOString(),
+-                        total: order.total,
++                        total: order.grandTotal ?? order.total,
+                         shipping: order.shipping,
+                         tax: order.tax,
+                         recipient: order.recipient,
+diff --git a/src/tools/fetch-orders.ts b/src/tools/fetch-orders.ts
+index 5d79222..76d2e4b 100644
+--- a/src/tools/fetch-orders.ts
++++ b/src/tools/fetch-orders.ts
+@@ -201,107 +201,47 @@ export async function fetchOrders(
+         }
+       }
+ 
+-      // Try to extract items - first try data-component, then fall back to extractFromInvoice
+-      const itemContainers = await page
+-        .locator('[data-component="purchasedItems"]')
+-        .all();
++      // Always use the invoice extractor. Amazon often wraps every line item in one
++      // purchasedItems node; taking .first() on itemTitle dropped the rest and skipped totals.
++      const invoiceData = await extractFromInvoice(page, header);
++
+       console.error(
+-        `[fetch-orders] Found ${itemContainers.length} purchasedItems containers on invoice page`,
++        `[fetch-orders] Invoice data: subtotal=${invoiceData.subtotal?.formatted}, total=${invoiceData.total?.formatted}, vat=${invoiceData.vat?.formatted}, shipping=${invoiceData.shipping?.formatted}, items=${invoiceData.items?.length ?? 0}`,
+       );
+-
+-      // Invoice pages often don't have data-component, try the full invoice extractor
+-      if (itemContainers.length === 0) {
+-        console.error(
+-          `[fetch-orders] No data-component items found, using extractFromInvoice`,
+-        );
+-        const invoiceData = await extractFromInvoice(page, header);
+-
+-        // Copy over invoice data (amounts, recipient, payments) regardless of items
+-        console.error(
+-          `[fetch-orders] Invoice data: subtotal=${invoiceData.subtotal?.formatted}, total=${invoiceData.total?.formatted}, vat=${invoiceData.vat?.formatted}, shipping=${invoiceData.shipping?.formatted}`,
+-        );
+-        if (invoiceData.subtotal) enrichedOrder.subtotal = invoiceData.subtotal;
+-        if (invoiceData.total) enrichedOrder.grandTotal = invoiceData.total;
+-        if (invoiceData.shipping) enrichedOrder.shipping = invoiceData.shipping;
+-        if (invoiceData.tax) enrichedOrder.tax = invoiceData.tax;
+-        if (invoiceData.vat) enrichedOrder.vat = invoiceData.vat;
+-        if (invoiceData.gift) enrichedOrder.promotion = invoiceData.gift;
+-        if (invoiceData.recipientName) {
+-          enrichedOrder.recipient = invoiceData.recipientName;
+-          if (invoiceData.shippingAddress) {
+-            // Prepend recipient name as line1 if address doesn't start with it
+-            const addressWithName = [
+-              invoiceData.recipientName,
+-              ...invoiceData.shippingAddress,
+-            ];
+-            enrichedOrder.shippingAddress =
+-              parseInvoiceAddressLines(addressWithName);
+-          }
+-        }
+-        if (invoiceData.payments && invoiceData.payments.length > 0) {
+-          enrichedOrder.payments = invoiceData.payments;
+-          // Also set paymentMethod from first payment
+-          const firstPayment = invoiceData.payments[0];
+-          enrichedOrder.paymentMethod = {
+-            type: firstPayment.method,
+-            lastFour: firstPayment.lastFour,
+-          };
+-        }
+-
+-        // Convert invoice items to full Item type if found
+-        if (invoiceData.items && invoiceData.items.length > 0) {
+-          // Create enriched header with all order data for items
+-          const enrichedHeader: OrderHeader = {
+-            ...header,
+-            recipient:
+-              typeof enrichedOrder.recipient === "string"
+-                ? enrichedOrder.recipient
+-                : undefined,
+-            subtotal: enrichedOrder.subtotal,
+-            shipping: enrichedOrder.shipping,
+-            tax: enrichedOrder.tax,
+-            vat: enrichedOrder.vat,
+-            promotion: enrichedOrder.promotion,
+-            grandTotal: enrichedOrder.grandTotal,
+-            shippingAddress: enrichedOrder.shippingAddress,
+-            paymentMethod: enrichedOrder.paymentMethod,
+-          };
+-
+-          const items = invoiceData.items.map((ii) => ({
+-            id: ii.asin || ii.name.slice(0, 50),
+-            asin: ii.asin,
+-            name: ii.name,
+-            quantity: ii.quantity,
+-            unitPrice: ii.unitPrice,
+-            totalPrice: {
+-              ...ii.unitPrice,
+-              amount: ii.unitPrice.amount * ii.quantity,
+-              formatted: `${currencySymbol}${(ii.unitPrice.amount * ii.quantity).toFixed(2)}`,
+-            },
+-            url: ii.asin ? `https://www.${domain}/dp/${ii.asin}` : "",
+-            orderHeader: enrichedHeader,
+-            condition: ii.condition,
+-            seller: ii.seller ? { name: ii.seller } : undefined,
+-            subscriptionFrequency: ii.subscriptionFrequency,
+-            platformData: { source: "invoice" },
+-          }));
+-
+-          console.error(
+-            `[fetch-orders] extractFromInvoice found ${items.length} items`,
+-          );
+-          enrichedOrder.items = items;
+-          result.items = items;
++      if (invoiceData.subtotal) enrichedOrder.subtotal = invoiceData.subtotal;
++      if (invoiceData.total) {
++        enrichedOrder.grandTotal = invoiceData.total;
++        enrichedOrder.total = invoiceData.total;
++      }
++      if (invoiceData.shipping) enrichedOrder.shipping = invoiceData.shipping;
++      if (invoiceData.tax) enrichedOrder.tax = invoiceData.tax;
++      if (invoiceData.vat) enrichedOrder.vat = invoiceData.vat;
++      if (invoiceData.gift) enrichedOrder.promotion = invoiceData.gift;
++      if (invoiceData.recipientName) {
++        enrichedOrder.recipient = invoiceData.recipientName;
++        if (invoiceData.shippingAddress) {
++          const addressWithName = [
++            invoiceData.recipientName,
++            ...invoiceData.shippingAddress,
++          ];
++          enrichedOrder.shippingAddress =
++            parseInvoiceAddressLines(addressWithName);
+         }
+       }
++      if (invoiceData.payments && invoiceData.payments.length > 0) {
++        enrichedOrder.payments = invoiceData.payments;
++        const firstPayment = invoiceData.payments[0];
++        enrichedOrder.paymentMethod = {
++          type: firstPayment.method,
++          lastFour: firstPayment.lastFour,
++        };
++      }
+ 
+-      // Only use inline extraction if we found data-component containers (detail page)
+-      // Otherwise extractFromInvoice already handled it above
+-      if (itemContainers.length > 0) {
+-        // Create enriched header with all order data for items
++      if (invoiceData.items && invoiceData.items.length > 0) {
+         const enrichedHeader: OrderHeader = {
+           ...header,
+           recipient:
+-            typeof enrichedOrder.recipient === "string"
++            typeof enrichedOrder.recipient === 'string'
+               ? enrichedOrder.recipient
+               : undefined,
+           subtotal: enrichedOrder.subtotal,
+@@ -310,137 +250,35 @@ export async function fetchOrders(
+           vat: enrichedOrder.vat,
+           promotion: enrichedOrder.promotion,
+           grandTotal: enrichedOrder.grandTotal,
++          total: enrichedOrder.total,
+           shippingAddress: enrichedOrder.shippingAddress,
+           paymentMethod: enrichedOrder.paymentMethod,
+         };
+ 
+-        const extractedItems: Item[] = [];
+-        for (const container of itemContainers) {
+-          try {
+-            // Title + ASIN
+-            const titleLink = container
+-              .locator('[data-component="itemTitle"] a')
+-              .first();
+-            const titleCount = await titleLink.count().catch(() => 0);
+-            if (titleCount === 0) continue;
+-
+-            const name = await titleLink
+-              .textContent({ timeout: 500 })
+-              .catch(() => "");
+-            if (!name?.trim()) continue;
+-
+-            const href = await titleLink
+-              .getAttribute("href", { timeout: 500 })
+-              .catch(() => "");
+-            const asinMatch = href?.match(/\/dp\/([A-Z0-9]+)/i);
+-            const asin = asinMatch ? asinMatch[1] : undefined;
+-
+-            // Price
+-            const priceEl = container
+-              .locator('[data-component="unitPrice"] .a-offscreen')
+-              .first();
+-            const priceText = await priceEl
+-              .textContent({ timeout: 500 })
+-              .catch(() => "");
+-            const priceMatch = priceText?.match(/[£$€]?([\d,.]+)/);
+-            const priceAmount = priceMatch
+-              ? parseFloat(priceMatch[1].replace(",", ""))
+-              : 0;
+-
+-            // Quantity (check badge first, then quantity component)
+-            let quantity = 1;
+-            const qtyBadge = container
+-              .locator(".od-item-view-qty span")
+-              .first();
+-            const qtyBadgeCount = await qtyBadge.count().catch(() => 0);
+-            if (qtyBadgeCount > 0) {
+-              const qtyText = await qtyBadge
+-                .textContent({ timeout: 500 })
+-                .catch(() => "");
+-              const qtyMatch = qtyText?.match(/(\d+)/);
+-              if (qtyMatch) quantity = parseInt(qtyMatch[1], 10);
+-            }
+-
+-            // Seller
+-            let seller: string | undefined;
+-            const sellerEl = container
+-              .locator('[data-component="orderedMerchant"]')
+-              .first();
+-            const sellerCount = await sellerEl.count().catch(() => 0);
+-            if (sellerCount > 0) {
+-              const sellerText = await sellerEl
+-                .textContent({ timeout: 500 })
+-                .catch(() => "");
+-              const sellerMatch = sellerText?.match(/Sold by:\s*(.+)/i);
+-              if (sellerMatch) seller = sellerMatch[1].trim();
+-            }
+-
+-            // Condition
+-            let condition: string | undefined;
+-            const condEl = container
+-              .locator('[data-component="itemCondition"]')
+-              .first();
+-            const condCount = await condEl.count().catch(() => 0);
+-            if (condCount > 0) {
+-              const condText = await condEl
+-                .textContent({ timeout: 500 })
+-                .catch(() => "");
+-              const condMatch = condText?.match(/Condition:\s*(.+)/i);
+-              if (condMatch) condition = condMatch[1].trim();
+-            }
+-
+-            // Subscription frequency
+-            let subscriptionFrequency: string | undefined;
+-            const freqEl = container
+-              .locator('[data-component="deliveryFrequency"]')
+-              .first();
+-            const freqCount = await freqEl.count().catch(() => 0);
+-            if (freqCount > 0) {
+-              const freqText = await freqEl
+-                .textContent({ timeout: 500 })
+-                .catch(() => "");
+-              const freqMatch = freqText?.match(/Auto-delivered:\s*(.+)/i);
+-              if (freqMatch) subscriptionFrequency = freqMatch[1].trim();
+-            }
+-
+-            extractedItems.push({
+-              id: asin || name.trim().slice(0, 50),
+-              asin,
+-              name: name.trim(),
+-              quantity,
+-              unitPrice: {
+-                amount: priceAmount,
+-                currency,
+-                currencySymbol,
+-                formatted: `${currencySymbol}${priceAmount.toFixed(2)}`,
+-              },
+-              totalPrice: {
+-                amount: priceAmount * quantity,
+-                currency,
+-                currencySymbol,
+-                formatted: `${currencySymbol}${(priceAmount * quantity).toFixed(2)}`,
+-              },
+-              url: asin ? `https://www.${domain}/dp/${asin}` : "",
+-              orderHeader: enrichedHeader,
+-              condition,
+-              seller: seller ? { name: seller } : undefined,
+-              subscriptionFrequency,
+-              platformData: { source: "invoice" },
+-            });
+-          } catch {
+-            continue;
+-          }
+-        }
++        const items = invoiceData.items.map((ii) => ({
++          id: ii.asin || ii.name.slice(0, 50),
++          asin: ii.asin,
++          name: ii.name,
++          quantity: ii.quantity,
++          unitPrice: ii.unitPrice,
++          totalPrice: {
++            ...ii.unitPrice,
++            amount: ii.unitPrice.amount * ii.quantity,
++            formatted: `${currencySymbol}${(ii.unitPrice.amount * ii.quantity).toFixed(2)}`,
++          },
++          url: ii.asin ? `https://www.${domain}/dp/${ii.asin}` : "",
++          orderHeader: enrichedHeader,
++          condition: ii.condition,
++          seller: ii.seller ? { name: ii.seller } : undefined,
++          subscriptionFrequency: ii.subscriptionFrequency,
++          platformData: { source: 'invoice' },
++        }));
+ 
+         console.error(
+-          `[fetch-orders] Extracted ${extractedItems.length} items from data-component`,
++          `[fetch-orders] extractFromInvoice found ${items.length} items`,
+         );
+-
+-        // Store items
+-        if (extractedItems.length > 0) {
+-          enrichedOrder.items = extractedItems;
+-          result.items = extractedItems;
+-        }
++        enrichedOrder.items = items;
++        result.items = items;
+       }
+ 
+       // If no items found from invoice, try the detail page

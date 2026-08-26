@@ -97,6 +97,19 @@
     color: var(--app-text-secondary);
 }
 
+.splitToggle {
+    align-self: flex-start;
+    margin: -0.35rem 0 0;
+    color: var(--app-text-secondary);
+    font-size: 0.8125rem;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+
+.splitToggle:hover {
+    color: var(--app-text-primary);
+}
+
 .verdict {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -171,6 +184,17 @@
     font-size: 0.875rem;
     line-height: 1.35;
     color: var(--app-text-secondary);
+}
+
+.amazonDetails {
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--app-border);
+}
+
+.scoringLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
 }
 
 .decision {

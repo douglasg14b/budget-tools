@@ -16,6 +16,10 @@ describe('alternativeOptions', () => {
         expect(alternativeOptions(proposal).map((item) => item.category)).toEqual(['Dining', 'Gas', 'Parking']);
     });
 
+    it('returns an empty list when there is no proposal yet', () => {
+        expect(alternativeOptions(null)).toEqual([]);
+    });
+
     it('matches the suggestion by name when ids are missing', () => {
         const proposal = proposalWithOptions(
             [

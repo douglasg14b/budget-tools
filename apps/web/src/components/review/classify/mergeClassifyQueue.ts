@@ -53,3 +53,21 @@ export function pinFocusedQueueItem(
 
     return [...visibleItems, focused];
 }
+
+/**
+ * Replaces queued items with freshly scored proposals for the same transaction ids.
+ */
+export function mergePredictedItems(
+    queue: CategorizationQueueDto,
+    predicted: readonly CategorizationQueueItemDto[],
+): CategorizationQueueDto {
+    if (predicted.length === 0) {
+        return queue;
+    }
+
+    const byId = new Map(predicted.map((item) => [item.transaction.id, item]));
+    return {
+        ...queue,
+        items: queue.items.map((item) => byId.get(item.transaction.id) ?? item),
+    };
+}

@@ -159,7 +159,8 @@ export type TransactionDetailDto = {
 
 export type CategorizationQueueItemDto = {
     transaction: TransactionDetailDto;
-    proposal: CategorizationProposalDto;
+    /** Local ML proposal when the transaction has been scored; otherwise null. */
+    proposal: CategorizationProposalDto | null;
     /** Prior charges in this periodic series, newest first (ids from `proposal.periodicMatch`). */
     relatedTransactions: TransactionDetailDto[];
 };
@@ -183,15 +184,26 @@ export type CategorizationQueueDto = {
 export type CategorizationQueueQuery = {
     tier?: string;
     accountId?: string;
+    /** Case-insensitive substring filter over payee, import names, memo, category, account, date, and amount. */
+    q?: string;
     refresh?: boolean;
     /** Score the next never-scored batch without discarding the current working set. */
     expand?: boolean;
-    /** Center a scored window on this pending transaction id. */
+    /** Center a pending window on this transaction id. */
     around?: string;
-    /** Return the next older batch after this pending transaction id. */
+    /** Return the next older pending batch after this transaction id. */
     olderThan?: string;
-    /** Return the next newer batch before this pending transaction id. */
+    /** Return the next newer pending batch before this transaction id. */
     newerThan?: string;
+};
+
+export type CategorizationPredictRequestDto = {
+    transactionIds: string[];
+};
+
+export type CategorizationPredictDto = {
+    generatedAt: string;
+    items: CategorizationQueueItemDto[];
 };
 
 export type LlmSuggestRequestDto = {

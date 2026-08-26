@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CategorizationQueueItemDto } from '../categorizationDtos';
+import type { ApprovalTier, CategorizationQueueItemDto } from '../categorizationDtos';
 import { filterAndSortQueueItems, parseTierFilter, QueryValidationError } from '../filterQueue';
 
 function item(overrides: {
     id: string;
-    tier: CategorizationQueueItemDto['proposal']['tier'];
+    tier: ApprovalTier;
     date: string;
     accountId?: string;
+    scored?: boolean;
 }): CategorizationQueueItemDto {
     return {
         transaction: {
@@ -27,36 +28,39 @@ function item(overrides: {
             importPayeeName: null,
             importPayeeNameOriginal: null,
         },
-        proposal: {
-            transactionId: overrides.id,
-            tier: overrides.tier,
-            flags: {
-                isAmbiguous: false,
-                isNovelImport: false,
-                isExcluded: false,
-                requiresManualReview: false,
-                isPeriodic: false,
-                isPeriodicConflict: false,
-                isTravelWindow: false,
-            },
-            suggestedCategory: 'Groceries',
-            suggestedCategoryGroup: 'Needs',
-            suggestedCategoryId: 'cat-1',
-            confidence: 0.9,
-            method: 'Consensus',
-            routeReason: 'None',
-            gapReason: 'None',
-            signals: [],
-            agreeingSignals: [],
-            options: [],
-            confidenceInterval: { top: 0.9, second: null, third: null, spread: 0 },
-            featureText: '',
-            resolvedPayee: null,
-            payeeSuggestion: null,
-            notes: null,
-            periodicMatch: null,
-            travelWindow: null,
-        },
+        proposal:
+            overrides.scored === false
+                ? null
+                : {
+                      transactionId: overrides.id,
+                      tier: overrides.tier,
+                      flags: {
+                          isAmbiguous: false,
+                          isNovelImport: false,
+                          isExcluded: false,
+                          requiresManualReview: false,
+                          isPeriodic: false,
+                          isPeriodicConflict: false,
+                          isTravelWindow: false,
+                      },
+                      suggestedCategory: 'Groceries',
+                      suggestedCategoryGroup: 'Needs',
+                      suggestedCategoryId: 'cat-1',
+                      confidence: 0.9,
+                      method: 'Consensus',
+                      routeReason: 'None',
+                      gapReason: 'None',
+                      signals: [],
+                      agreeingSignals: [],
+                      options: [],
+                      confidenceInterval: { top: 0.9, second: null, third: null, spread: 0 },
+                      featureText: '',
+                      resolvedPayee: null,
+                      payeeSuggestion: null,
+                      notes: null,
+                      periodicMatch: null,
+                      travelWindow: null,
+                  },
         relatedTransactions: [],
     };
 }
@@ -104,5 +108,36 @@ describe('filterAndSortQueueItems', () => {
     it('filters by accountId', () => {
         const filtered = filterAndSortQueueItems(items, { accountId: 'acct-2' });
         expect(filtered.map((entry) => entry.transaction.id)).toEqual(['blocked']);
+    });
+
+    it('filters by text query', () => {
+        const withPayee = [
+            ...items,
+            {
+                ...item({ id: 'starbucks', tier: 'Review', date: '2024-08-01' }),
+                transaction: {
+                    ...item({ id: 'starbucks', tier: 'Review', date: '2024-08-01' }).transaction,
+                    payeeName: 'Starbucks',
+                },
+            },
+        ];
+        expect(filterAndSortQueueItems(withPayee, { q: 'starbucks' }).map((entry) => entry.transaction.id)).toEqual([
+            'starbucks',
+        ]);
+    });
+
+    it('omits unscored items when filtering by tier and sorts them last otherwise', () => {
+        const withUnscored = [
+            ...items,
+            item({ id: 'unscored-new', tier: 'Review', date: '2024-07-01', scored: false }),
+        ];
+        expect(
+            filterAndSortQueueItems(withUnscored, { tiers: ['Review'] }).map((entry) => entry.transaction.id),
+        ).toEqual(['review-old']);
+        expect(
+            filterAndSortQueueItems(withUnscored, {})
+                .map((entry) => entry.transaction.id)
+                .at(-1),
+        ).toBe('unscored-new');
     });
 });

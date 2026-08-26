@@ -23,7 +23,9 @@ import type { CategorySelectGroup } from './flattenCategoryChoices';
 import { formatCategoryLabel } from './formatCategoryLabel';
 import { isCertainProposal } from './isCertainProposal';
 import type { SessionDecision } from './sessionDecisions';
+import { decisionCategoryId, decisionCategoryName, isSplitDecision } from './sessionDecisions';
 import { useClassifySession } from './useClassifySession';
+import { usePredictWindow } from './usePredictWindow';
 
 type ClassifyTableProps = {
     categoryGroups: readonly CategoryGroupDto[];
@@ -56,6 +58,7 @@ export function ClassifyTable({
         onCurrentIdChange,
         requestedId,
     });
+    const predict = usePredictWindow({ currentId: classify.current?.transaction.id, items });
     const currentRef = useRef<HTMLTableRowElement>(null);
     const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
     const previousFirstId = useRef<string | undefined>(undefined);
@@ -103,6 +106,7 @@ export function ClassifyTable({
                 <QueuePrefetchSentinel
                     enabled={hasMoreNewer}
                     isLoading={isExpandingNewer}
+                    loadingHint="Loading more…"
                     requireScroll
                     root={scroller}
                     onNeedMore={onNeedNewer}
@@ -134,6 +138,8 @@ export function ClassifyTable({
                                     item={item}
                                     payee={classify.payeeName(item)}
                                     rename={classify.payeeRename(item)}
+                                    scoring={predict.isPending && !item.proposal}
+                                    scoreError={isCurrent && !item.proposal ? predict.errorMessage : null}
                                     onCommitPayee={(name) => {
                                         classify.commitPayee(item.transaction.id, name);
                                     }}
@@ -151,6 +157,7 @@ export function ClassifyTable({
                 <QueuePrefetchSentinel
                     enabled={hasMoreOlder}
                     isLoading={isExpandingOlder}
+                    loadingHint="Loading more…"
                     requireScroll
                     root={scroller}
                     onNeedMore={onNeedOlder}
@@ -177,6 +184,8 @@ type TableRowProps = {
     onSelect: (transactionId: string) => void;
     payee: string;
     rename: PayeeSuggestionDto | null;
+    scoreError: string | null;
+    scoring: boolean;
 };
 
 function TableRow({
@@ -193,9 +202,14 @@ function TableRow({
     onSelect,
     payee,
     rename,
+    scoreError,
+    scoring,
 }: TableRowProps) {
     const { transaction, proposal } = item;
-    const suggestion = formatCategoryLabel(proposal.suggestedCategory, proposal.suggestedCategoryGroup);
+    const suggestion = formatCategoryLabel(
+        proposal?.suggestedCategory ?? null,
+        proposal?.suggestedCategoryGroup ?? null,
+    );
     const certain = isCertainProposal(proposal);
     const alternatives = alternativeOptions(proposal);
 
@@ -205,7 +219,7 @@ function TableRow({
             className={classes.row}
             data-action={decision?.action}
             data-current={isCurrent || undefined}
-            data-travel={proposal.flags.isTravelWindow || undefined}
+            data-travel={proposal?.flags.isTravelWindow || undefined}
             onClick={() => {
                 onSelect(transaction.id);
             }}
@@ -221,7 +235,7 @@ function TableRow({
                     onDismissRename={onDismissRename}
                 />
                 {transaction.memo ? <span className={classes.memo}>{transaction.memo}</span> : null}
-                {proposal.travelWindow ? (
+                {proposal?.travelWindow ? (
                     <span className={classes.travelChip}>
                         <TravelWindowChip travelWindow={proposal.travelWindow} />
                     </span>
@@ -230,16 +244,18 @@ function TableRow({
             <td className={classes.amount} data-inflow={transaction.amount >= 0 || undefined}>
                 {formatYnabAmount(transaction.amount)}
             </td>
-            <td className={suggestion ? classes.suggestion : classes.suggestionMuted}>{suggestion ?? '—'}</td>
+            <td className={suggestion ? classes.suggestion : classes.suggestionMuted}>
+                {scoring ? 'Scoring…' : scoreError && !proposal ? scoreError : (suggestion ?? '—')}
+            </td>
             <td className={classes.conf} data-certain={certain || undefined}>
-                {formatConfidence(proposal.confidence)}
+                {proposal ? formatConfidence(proposal.confidence) : ''}
             </td>
             <td className={classes.alts}>
                 {alternatives.map((option, optionIndex) => {
                     const label = option.category;
                     const selected =
-                        decision?.categoryId === option.categoryId ||
-                        (decision?.categoryName === option.category && !option.categoryId);
+                        decisionCategoryId(decision) === option.categoryId ||
+                        (decisionCategoryName(decision) === option.category && !option.categoryId);
                     if (!isCurrent) {
                         return (
                             <span
@@ -294,6 +310,9 @@ function TableRow({
 }
 
 function statusLabel(decision: SessionDecision | undefined): string {
+    if (isSplitDecision(decision)) {
+        return `Split (${decision.lines.length})`;
+    }
     switch (decision?.action) {
         case 'approved':
             return 'Accepted';

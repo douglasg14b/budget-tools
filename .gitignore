@@ -141,3 +141,6 @@ apps/categorization-ai/predict-stderr.txt
 apps/categorization-ai/transactions.json
 apps/categorization-ai/appsettings.Local.json
 apps/categorization-ai/.idea/
+
+# Local Amazon order-history MCP clone (`pnpm setup:amazon-mcp`)
+third_party/amazon-order-history-csv-download-mcp/

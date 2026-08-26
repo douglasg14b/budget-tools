@@ -6,6 +6,9 @@ export const CERTAIN_EXPLANATION = 'The model is at 100% confidence and has a ca
 /**
  * True when the model reports whole-number 100% confidence and a category to apply.
  */
-export function isCertainProposal(proposal: CategorizationProposalDto): boolean {
+export function isCertainProposal(proposal: CategorizationProposalDto | null | undefined): boolean {
+    if (!proposal) {
+        return false;
+    }
     return Math.round(proposal.confidence * 100) === 100 && Boolean(proposal.suggestedCategory);
 }

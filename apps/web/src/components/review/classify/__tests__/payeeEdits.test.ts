@@ -32,6 +32,7 @@ describe('payeeEdits', () => {
         expect(
             visiblePayeeRename(proposal, transaction.id, 'Frgn Trans Fee-proton Ag* Proton Ag Ge', emptyPayeeEdits()),
         ).toBeNull();
+        expect(visiblePayeeRename(null, transaction.id, 'Proton Ag', emptyPayeeEdits())).toBeNull();
     });
 });
 

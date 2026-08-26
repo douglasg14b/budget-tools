@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseQueueSearchParams, serializeQueueSearchParams, toggleTierFilter } from '../queueSearchParams';
+import {
+    parseQueueSearchParams,
+    queueFiltersActive,
+    serializeQueueSearchParams,
+    toggleTierFilter,
+} from '../queueSearchParams';
 
 describe('parseQueueSearchParams', () => {
     it('defaults to all tiers and no account', () => {
@@ -8,6 +13,7 @@ describe('parseQueueSearchParams', () => {
             tiers: undefined,
             accountId: undefined,
             transactionId: undefined,
+            q: undefined,
         });
     });
 
@@ -28,6 +34,7 @@ describe('parseQueueSearchParams', () => {
             tiers: undefined,
             accountId: 'acct-1',
             transactionId: undefined,
+            q: undefined,
         });
     });
 
@@ -36,6 +43,7 @@ describe('parseQueueSearchParams', () => {
             tiers: undefined,
             accountId: undefined,
             transactionId: 'tx-9',
+            q: undefined,
         });
     });
 
@@ -44,18 +52,34 @@ describe('parseQueueSearchParams', () => {
             tiers: undefined,
             accountId: undefined,
             transactionId: undefined,
+            q: undefined,
+        });
+    });
+
+    it('parses q', () => {
+        expect(parseQueueSearchParams(new URLSearchParams('q=starbucks'))).toEqual({
+            tiers: undefined,
+            accountId: undefined,
+            transactionId: undefined,
+            q: 'starbucks',
         });
     });
 });
 
 describe('serializeQueueSearchParams', () => {
     it('round-trips a filtered state', () => {
-        const state = { tiers: ['Blocked'] as const, accountId: 'acct-1', transactionId: undefined };
+        const state = {
+            tiers: ['Blocked'] as const,
+            accountId: 'acct-1',
+            transactionId: undefined,
+            q: undefined,
+        };
         const serialized = serializeQueueSearchParams({ ...state, tiers: [...state.tiers] });
         expect(parseQueueSearchParams(serialized)).toEqual({
             tiers: ['Blocked'],
             accountId: 'acct-1',
             transactionId: undefined,
+            q: undefined,
         });
     });
 
@@ -64,11 +88,13 @@ describe('serializeQueueSearchParams', () => {
             tiers: ['Review'],
             accountId: 'acct-1',
             transactionId: 'tx-9',
+            q: 'starbucks',
         });
         expect(parseQueueSearchParams(serialized)).toEqual({
             tiers: ['Review'],
             accountId: 'acct-1',
             transactionId: 'tx-9',
+            q: 'starbucks',
         });
     });
 
@@ -77,6 +103,7 @@ describe('serializeQueueSearchParams', () => {
             tiers: undefined,
             accountId: undefined,
             transactionId: undefined,
+            q: undefined,
         });
         expect(serialized.toString()).toBe('');
     });
@@ -97,5 +124,12 @@ describe('toggleTierFilter', () => {
 
     it('returns undefined when all four tiers would be selected', () => {
         expect(toggleTierFilter(['AutoApply', 'Suggested', 'Review'], 'Blocked')).toBeUndefined();
+    });
+});
+
+describe('queueFiltersActive', () => {
+    it('is true when a text query is set', () => {
+        expect(queueFiltersActive({ tiers: undefined, accountId: undefined, q: 'store' })).toBe(true);
+        expect(queueFiltersActive({ tiers: undefined, accountId: undefined, q: undefined })).toBe(false);
     });
 });

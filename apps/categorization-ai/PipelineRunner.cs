@@ -780,6 +780,7 @@ public static class PipelineRunner
               dotnet run feedback-stats          Summarize recorded approval/denial feedback
               dotnet run predict --llm           Include LLM for ambiguous/novel transactions
               dotnet run export                  Export training CSV from database
+              dotnet run serve [--force]         Warm HTTP scorer (POST /predict, GET /health)
 
             LLM config: Llm:Enabled + Llm:ApiKey in appsettings.Local.json or OPENAI_API_KEY env var
             """);

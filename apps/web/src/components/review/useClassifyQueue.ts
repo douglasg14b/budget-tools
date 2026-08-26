@@ -11,23 +11,34 @@ const NEWEST_WINDOW_SENTINEL = '__window__';
 
 type ExpandDirection = 'older' | 'newer';
 
+type WindowCursor = {
+    around?: string;
+    olderThan?: string;
+    newerThan?: string;
+};
+
 /**
  * Windowed classify queue. Uses a stable query key so j/k does not refetch,
  * and never writes the review-list queue cache.
  */
-export function useClassifyQueue(transactionId: string | undefined) {
+export function useClassifyQueue(transactionId: string | undefined, q?: string) {
     const queryClient = useQueryClient();
     const [isExpandingOlder, setIsExpandingOlder] = useState(false);
     const [isExpandingNewer, setIsExpandingNewer] = useState(false);
     const [expandError, setExpandError] = useState<unknown>();
     const expandLock = useRef(false);
     const aroundId = transactionId || NEWEST_WINDOW_SENTINEL;
+    const queryText = q?.trim() || undefined;
+    const previousQueryText = useRef(queryText);
+    const aroundKeyRef = useRef('');
+    const transactionIdRef = useRef(transactionId);
+    transactionIdRef.current = transactionId;
 
     const queueQuery = useQuery({
         queryKey: CLASSIFY_QUEUE_QUERY_KEY,
         queryFn: async () => {
             const result = await queryClient.fetchQuery({
-                ...getCategorizationQueueOptions({ query: { around: aroundId } }),
+                ...getCategorizationQueueOptions(windowRequest({ around: aroundId }, queryText)),
                 staleTime: 0,
             });
             return result;
@@ -45,7 +56,7 @@ export function useClassifyQueue(transactionId: string | undefined) {
             setExpandError(undefined);
             try {
                 const data = await queryClient.fetchQuery({
-                    ...getCategorizationQueueOptions({ query: { around: nextId } }),
+                    ...getCategorizationQueueOptions(windowRequest({ around: nextId }, queryText)),
                     staleTime: 0,
                 });
                 queryClient.setQueryData(CLASSIFY_QUEUE_QUERY_KEY, data);
@@ -55,8 +66,17 @@ export function useClassifyQueue(transactionId: string | undefined) {
                 expandLock.current = false;
             }
         },
-        [queryClient],
+        [queryClient, queryText],
     );
+
+    useEffect(() => {
+        if (previousQueryText.current === queryText) {
+            return;
+        }
+        previousQueryText.current = queryText;
+        aroundKeyRef.current = '';
+        void jumpAround(transactionIdRef.current || NEWEST_WINDOW_SENTINEL);
+    }, [jumpAround, queryText]);
 
     useEffect(() => {
         if (!transactionId || queueQuery.isPending || expandLock.current) {
@@ -69,8 +89,13 @@ export function useClassifyQueue(transactionId: string | undefined) {
         if (items.some((item) => item.transaction.id === transactionId)) {
             return;
         }
+        const aroundKey = `${queryText ?? ''}\0${transactionId}`;
+        if (aroundKeyRef.current === aroundKey) {
+            return;
+        }
+        aroundKeyRef.current = aroundKey;
         void jumpAround(transactionId);
-    }, [jumpAround, queueQuery.data?.items, queueQuery.isPending, transactionId]);
+    }, [jumpAround, queryText, queueQuery.data?.items, queueQuery.isPending, transactionId]);
 
     async function expand(direction: ExpandDirection): Promise<void> {
         if (expandLock.current) {
@@ -100,10 +125,9 @@ export function useClassifyQueue(transactionId: string | undefined) {
         }
         setExpandError(undefined);
         try {
+            const cursor: WindowCursor = direction === 'older' ? { olderThan: cursorId } : { newerThan: cursorId };
             const data = await queryClient.fetchQuery({
-                ...getCategorizationQueueOptions({
-                    query: direction === 'older' ? { olderThan: cursorId } : { newerThan: cursorId },
-                }),
+                ...getCategorizationQueueOptions(windowRequest(cursor, queryText)),
                 staleTime: 0,
             });
             const merged = mergeClassifyQueue(current, data, direction);
@@ -131,4 +155,8 @@ export function useClassifyQueue(transactionId: string | undefined) {
         isExpandingOlder,
         queueQuery,
     };
+}
+
+function windowRequest(cursor: WindowCursor, q: string | undefined): { query: WindowCursor & { q?: string } } {
+    return { query: q ? { ...cursor, q } : cursor };
 }

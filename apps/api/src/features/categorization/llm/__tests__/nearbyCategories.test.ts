@@ -256,6 +256,42 @@ describe('resolveAssignableCategory', () => {
         const resolved = resolveAssignableCategory(catalog, 'Needs: Groceries', null);
         expect(resolved).toEqual({ id: 'groceries', name: 'Groceries', groupName: 'Needs' });
     });
+
+    it('parses Group / emoji Category when the left side is a known group', () => {
+        const household = assignableCategories([
+            {
+                id: 'living',
+                name: 'Living Expenses',
+                hidden: false,
+                categories: [{ id: 'supplies', name: '🛒 Household Supplies', hidden: false, note: null }],
+            },
+            {
+                id: 'medical',
+                name: 'Medical',
+                hidden: false,
+                categories: [{ id: 'med-supplies', name: '🩹 Medical - Supplies', hidden: false, note: null }],
+            },
+        ]);
+        expect(resolveAssignableCategory(household, 'Living Expenses / 🛒 Household Supplies', null)?.id).toBe(
+            'supplies',
+        );
+        expect(resolveAssignableCategory(household, 'Household Supplies', 'Living Expenses')?.id).toBe('supplies');
+        expect(resolveAssignableCategory(household, 'Medical / 🩹 Medical - Supplies', 'Medical')?.id).toBe(
+            'med-supplies',
+        );
+    });
+
+    it('does not split a category whose name itself contains a slash', () => {
+        const fun = assignableCategories([
+            {
+                id: 'fun',
+                name: 'Fun',
+                hidden: false,
+                categories: [{ id: 'outing', name: 'Outing / Theater', hidden: false, note: null }],
+            },
+        ]);
+        expect(resolveAssignableCategory(fun, 'Outing / Theater', 'Fun')?.id).toBe('outing');
+    });
 });
 
 function example(categoryName: string, categoryGroup: string): RankedSimilarTransaction {

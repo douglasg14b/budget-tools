@@ -110,11 +110,18 @@ export function parsePredictJsonStdout(stdout: string): PredictJsonEnvelope {
         throw new PredictJsonError('predict-json stdout was not valid JSON', { cause: error });
     }
 
-    if (!parsed || typeof parsed !== 'object') {
+    return parsePredictJsonEnvelope(parsed);
+}
+
+/**
+ * Parses and validates a predict-json envelope from a JSON value (HTTP scorer response).
+ */
+export function parsePredictJsonEnvelope(value: unknown): PredictJsonEnvelope {
+    if (!value || typeof value !== 'object') {
         throw new PredictJsonError('predict-json envelope must be an object');
     }
 
-    const envelope = parsed as Record<string, unknown>;
+    const envelope = value as Record<string, unknown>;
     return {
         summary: parseSummary(envelope.summary),
         proposals: parseProposals(envelope.proposals),

@@ -5,7 +5,15 @@ import type {
 } from '@budget-tools/web-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { applyLlmOverlay, needsLlmSuggest, nextUncertainRemaining } from '../applyLlmOverlay';
+import {
+    applyLlmOverlay,
+    needsAmazonSuggest,
+    needsLlmSuggest,
+    nextUncertainRemaining,
+    previousUncertainRemaining,
+    selectAmazonPrefetchNeighbors,
+    selectLlmPrefetchNeighbors,
+} from '../applyLlmOverlay';
 
 describe('needsLlmSuggest', () => {
     it('skips decided items and locally certain proposals', () => {
@@ -13,6 +21,15 @@ describe('needsLlmSuggest', () => {
         expect(needsLlmSuggest(item({ confidence: 1, suggestedCategory: 'Groceries' }), false)).toBe(false);
         expect(needsLlmSuggest(item({ confidence: 0.4, suggestedCategory: 'Groceries' }), false)).toBe(true);
         expect(needsLlmSuggest(item({ confidence: 1, suggestedCategory: null }), false)).toBe(true);
+        expect(needsLlmSuggest(unscored('u'), false)).toBe(false);
+    });
+
+    it('skips Amazon payees so they use the Amazon split overlay', () => {
+        const amazon = amazonItem('amz');
+        expect(needsLlmSuggest(amazon, false)).toBe(false);
+        expect(needsAmazonSuggest(amazon, false)).toBe(true);
+        expect(needsAmazonSuggest(amazon, true)).toBe(true);
+        expect(needsAmazonSuggest(item({ confidence: 0.4, suggestedCategory: 'Groceries' }), false)).toBe(false);
     });
 });
 
@@ -23,6 +40,49 @@ describe('nextUncertainRemaining', () => {
         const next = item({ id: 'c', confidence: 0.2, suggestedCategory: null });
         expect(nextUncertainRemaining([current, certain, next], 'a')?.transaction.id).toBe('c');
         expect(nextUncertainRemaining([current, certain, next], 'c')).toBeUndefined();
+    });
+
+    it('skips Amazon payees so they do not hit generic llm-suggest', () => {
+        const current = item({ id: 'a', confidence: 0.4, suggestedCategory: 'Groceries' });
+        const amazon = amazonItem('amz');
+        const next = item({ id: 'c', confidence: 0.2, suggestedCategory: null });
+        expect(nextUncertainRemaining([current, amazon, next], 'a')?.transaction.id).toBe('c');
+    });
+});
+
+describe('previousUncertainRemaining', () => {
+    it('prefetches the previous remaining uncertain item only', () => {
+        const previous = item({ id: 'a', confidence: 0.2, suggestedCategory: null });
+        const certain = item({ id: 'b', confidence: 1, suggestedCategory: 'Dining' });
+        const current = item({ id: 'c', confidence: 0.4, suggestedCategory: 'Groceries' });
+        expect(previousUncertainRemaining([previous, certain, current], 'c')?.transaction.id).toBe('a');
+        expect(previousUncertainRemaining([previous, certain, current], 'a')).toBeUndefined();
+    });
+});
+
+describe('selectLlmPrefetchNeighbors', () => {
+    it('returns uncertain neighbors above and below the focus', () => {
+        const previous = item({ id: 'a', confidence: 0.2, suggestedCategory: null });
+        const certain = item({ id: 'b', confidence: 1, suggestedCategory: 'Dining' });
+        const current = item({ id: 'c', confidence: 0.4, suggestedCategory: 'Groceries' });
+        const next = item({ id: 'd', confidence: 0.3, suggestedCategory: 'Gas' });
+        expect(selectLlmPrefetchNeighbors([previous, certain, current, next], 'c')).toEqual({
+            previous,
+            next,
+        });
+    });
+});
+
+describe('selectAmazonPrefetchNeighbors', () => {
+    it('returns Amazon neighbors above and below the focus', () => {
+        const previous = amazonItem('a');
+        const grocery = item({ id: 'b', confidence: 0.4, suggestedCategory: 'Groceries' });
+        const current = amazonItem('c');
+        const next = amazonItem('d');
+        expect(selectAmazonPrefetchNeighbors([previous, grocery, current, next], 'c')).toEqual({
+            previous,
+            next,
+        });
     });
 });
 
@@ -41,9 +101,9 @@ describe('applyLlmOverlay', () => {
             method: 'CategoryModel',
         });
         const merged = applyLlmOverlay(local, overlay({ suggestedCategory: null, notes: 'unknown name' }));
-        expect(merged.proposal.suggestedCategory).toBe('Groceries');
-        expect(merged.proposal.method).toBe('CategoryModel');
-        expect(merged.proposal.notes).toBe('unknown name');
+        expect(scored(merged).suggestedCategory).toBe('Groceries');
+        expect(scored(merged).method).toBe('CategoryModel');
+        expect(scored(merged).notes).toBe('unknown name');
     });
 
     it('overlays category as LLM and never promotes to AutoApply', () => {
@@ -64,12 +124,12 @@ describe('applyLlmOverlay', () => {
                 confidence: 0.71,
             }),
         );
-        expect(merged.proposal.suggestedCategory).toBe('Dining Out');
-        expect(merged.proposal.method).toBe('LlmCategorization');
-        expect(merged.proposal.gapReason).toBe('LlmSuggestion');
-        expect(merged.proposal.tier).toBe('Suggested');
-        expect(merged.proposal.options.map((option) => option.category)).toEqual(['Dining Out', 'Groceries']);
-        expect(merged.proposal.signals).toEqual([
+        expect(scored(merged).suggestedCategory).toBe('Dining Out');
+        expect(scored(merged).method).toBe('LlmCategorization');
+        expect(scored(merged).gapReason).toBe('LlmSuggestion');
+        expect(scored(merged).tier).toBe('Suggested');
+        expect(scored(merged).options.map((option) => option.category)).toEqual(['Dining Out', 'Groceries']);
+        expect(scored(merged).signals).toEqual([
             { method: 'CategoryModel', category: 'Groceries', confidence: 0.55 },
             { method: 'LlmCategorization', category: 'Dining Out', confidence: 0.71 },
         ]);
@@ -112,8 +172,8 @@ describe('applyLlmOverlay', () => {
                 ],
             }),
         );
-        expect(merged.proposal.suggestedCategory).toBe('Vacation - Outing');
-        expect(merged.proposal.options.map((option) => option.category)).toEqual([
+        expect(scored(merged).suggestedCategory).toBe('Vacation - Outing');
+        expect(scored(merged).options.map((option) => option.category)).toEqual([
             'Vacation - Outing',
             'Outing / Theater',
             'Groceries',
@@ -132,7 +192,7 @@ describe('applyLlmOverlay', () => {
             suggestedCategory: null,
             payeeSuggestion: localRename,
         });
-        expect(applyLlmOverlay(withLocal, overlay({ payeeSuggestion: null })).proposal.payeeSuggestion).toEqual(
+        expect(scored(applyLlmOverlay(withLocal, overlay({ payeeSuggestion: null }))).payeeSuggestion).toEqual(
             localRename,
         );
 
@@ -143,9 +203,14 @@ describe('applyLlmOverlay', () => {
             confidence: 0.8,
             needsRename: true,
         };
-        expect(applyLlmOverlay(dirty, overlay({ payeeSuggestion: llmPayee })).proposal.payeeSuggestion).toEqual(
+        expect(scored(applyLlmOverlay(dirty, overlay({ payeeSuggestion: llmPayee }))).payeeSuggestion).toEqual(
             llmPayee,
         );
+    });
+
+    it('leaves an unscored item unchanged', () => {
+        const pending = unscored('tx-1');
+        expect(applyLlmOverlay(pending, overlay({ suggestedCategory: 'Dining Out' }))).toBe(pending);
     });
 });
 
@@ -236,4 +301,29 @@ function item(overrides: {
         },
         relatedTransactions: [],
     };
+}
+
+function amazonItem(id: string): CategorizationQueueItemDto {
+    const scored = item({ id, confidence: 0, suggestedCategory: null });
+    return {
+        ...scored,
+        transaction: {
+            ...scored.transaction,
+            payeeName: 'Amazon',
+            importPayeeNameOriginal: 'AMZN MKTP',
+        },
+    };
+}
+
+function unscored(id: string): CategorizationQueueItemDto {
+    const scoredItem = item({ id, confidence: 0, suggestedCategory: null });
+    return { ...scoredItem, proposal: null };
+}
+
+function scored(entry: CategorizationQueueItemDto): CategorizationProposalDto {
+    expect(entry.proposal).not.toBeNull();
+    if (!entry.proposal) {
+        throw new Error('expected a scored proposal');
+    }
+    return entry.proposal;
 }

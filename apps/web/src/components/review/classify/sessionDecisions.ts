@@ -1,14 +1,26 @@
 import type { CategorizationQueueItemDto } from '@budget-tools/web-sdk';
+import type { SplitLine } from './splitLines';
+import { collapsedSplitCategory } from './splitLines';
 
 export type DecisionAction = 'approved' | 'rejected' | 'changed';
 
-export type SessionDecision = {
+export type CategorySessionDecision = {
+    readonly kind: 'category';
     readonly action: DecisionAction;
     readonly categoryGroup: string | null;
     readonly categoryId: string | null;
     readonly categoryName: string | null;
     readonly transactionId: string;
 };
+
+export type SplitSessionDecision = {
+    readonly kind: 'split';
+    readonly action: DecisionAction;
+    readonly transactionId: string;
+    readonly lines: readonly SplitLine[];
+};
+
+export type SessionDecision = CategorySessionDecision | SplitSessionDecision;
 
 export type SessionDecisions = {
     readonly byId: Readonly<Record<string, SessionDecision>>;
@@ -199,11 +211,12 @@ export function tallySession(items: readonly CategorizationQueueItemDto[], sessi
 
 export function approveSuggestion(item: CategorizationQueueItemDto): SessionDecision | undefined {
     const { proposal, transaction } = item;
-    if (!proposal.suggestedCategory) {
+    if (!proposal?.suggestedCategory) {
         return undefined;
     }
 
     return {
+        kind: 'category',
         action: 'approved',
         categoryGroup: proposal.suggestedCategoryGroup,
         categoryId: proposal.suggestedCategoryId,
@@ -214,6 +227,7 @@ export function approveSuggestion(item: CategorizationQueueItemDto): SessionDeci
 
 export function rejectItem(item: CategorizationQueueItemDto): SessionDecision {
     return {
+        kind: 'category',
         action: 'rejected',
         categoryGroup: null,
         categoryId: null,
@@ -226,8 +240,8 @@ export function decideCategory(
     item: CategorizationQueueItemDto,
     choice: { categoryGroup: string | null; categoryId: string | null; categoryName: string },
 ): SessionDecision {
-    const suggestedId = item.proposal.suggestedCategoryId;
-    const suggestedName = item.proposal.suggestedCategory;
+    const suggestedId = item.proposal?.suggestedCategoryId;
+    const suggestedName = item.proposal?.suggestedCategory;
     const sameId = Boolean(choice.categoryId) && choice.categoryId === suggestedId;
     const sameName =
         !choice.categoryId &&
@@ -235,10 +249,41 @@ export function decideCategory(
         suggestedName.localeCompare(choice.categoryName, undefined, { sensitivity: 'accent' }) === 0;
 
     return {
+        kind: 'category',
         action: sameId || sameName ? 'approved' : 'changed',
         categoryGroup: choice.categoryGroup,
         categoryId: choice.categoryId,
         categoryName: choice.categoryName,
         transactionId: item.transaction.id,
     };
+}
+
+export function decideSplit(item: CategorizationQueueItemDto, lines: readonly SplitLine[]): SessionDecision {
+    const collapsed = collapsedSplitCategory(lines);
+    if (collapsed) {
+        return decideCategory(item, {
+            categoryGroup: collapsed.categoryGroup,
+            categoryId: collapsed.categoryId,
+            categoryName: collapsed.categoryName,
+        });
+    }
+
+    return {
+        kind: 'split',
+        action: 'changed',
+        transactionId: item.transaction.id,
+        lines,
+    };
+}
+
+export function isSplitDecision(decision: SessionDecision | undefined): decision is SplitSessionDecision {
+    return decision?.kind === 'split';
+}
+
+export function decisionCategoryId(decision: SessionDecision | undefined): string | null {
+    return decision?.kind === 'category' ? decision.categoryId : null;
+}
+
+export function decisionCategoryName(decision: SessionDecision | undefined): string | null {
+    return decision?.kind === 'category' ? decision.categoryName : null;
 }

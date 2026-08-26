@@ -1,4 +1,4 @@
-import type { CategorizationQueueItemDto } from '@budget-tools/web-sdk';
+import type { ApprovalTier, CategorizationQueueItemDto } from '@budget-tools/web-sdk';
 import { describe, expect, it } from 'vitest';
 
 import { sortQueueItemsByDateDesc } from '../sortQueueItems';
@@ -23,11 +23,7 @@ describe('sortQueueItemsByDateDesc', () => {
     });
 });
 
-function item(overrides: {
-    id: string;
-    date: string;
-    tier: CategorizationQueueItemDto['proposal']['tier'];
-}): CategorizationQueueItemDto {
+function item(overrides: { id: string; date: string; tier: ApprovalTier }): CategorizationQueueItemDto {
     return {
         transaction: {
             id: overrides.id,

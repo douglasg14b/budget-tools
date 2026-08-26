@@ -25,7 +25,9 @@ import {
     applyDecision,
     approveSuggestion,
     decideCategory,
+    decideSplit,
     emptySession,
+    isSplitDecision,
     nextRemainingId,
     nextRowId,
     previousRemainingId,
@@ -36,6 +38,8 @@ import {
     tallySession,
     undoLast,
 } from './sessionDecisions';
+import type { SplitLine } from './splitLines';
+import { seedSingleSplitLine, validateSplitLines } from './splitLines';
 
 type UseClassifySessionOptions = {
     /**
@@ -58,11 +62,13 @@ export function useClassifySession(
 ) {
     const [session, setSession] = useState(emptySession);
     const [payeeEdits, setPayeeEdits] = useState<PayeeEdits>(emptyPayeeEdits);
+    const [splitDrafts, setSplitDrafts] = useState<Readonly<Record<string, readonly SplitLine[]>>>({});
     const [currentId, setCurrentId] = useState<string | undefined>(options.requestedId ?? items[0]?.transaction.id);
 
     const choices = useMemo(() => flattenCategoryChoices(categoryGroups), [categoryGroups]);
     const selectGroups = useMemo(() => categorySelectGroups(choices), [choices]);
     const choicesById = useMemo(() => new Map(choices.map((choice) => [choice.id, choice])), [choices]);
+    const assignableIds = useMemo(() => new Set(choices.map((choice) => choice.id)), [choices]);
 
     const remaining = remainingItems(items, session);
     const certainRemaining = remaining.filter((item) => isCertainProposal(item.proposal));
@@ -95,6 +101,14 @@ export function useClassifySession(
     function commit(decision: SessionDecision): void {
         const nextSession = applyDecision(session, decision);
         setSession(nextSession);
+        setSplitDrafts((drafts) => {
+            if (!(decision.transactionId in drafts)) {
+                return drafts;
+            }
+            const next = { ...drafts };
+            delete next[decision.transactionId];
+            return next;
+        });
         setCurrentId(nextRemainingId(items, nextSession, decision.transactionId) ?? decision.transactionId);
     }
 
@@ -111,10 +125,56 @@ export function useClassifySession(
         if (!item) {
             return;
         }
+        const draft = splitDrafts[item.transaction.id];
+        if (draft) {
+            if (validateSplitLines(draft, item.transaction.amount, assignableIds)) {
+                return;
+            }
+            commit(decideSplit(item, draft));
+            return;
+        }
         const decision = approveSuggestion(item);
         if (decision) {
             commit(decision);
         }
+    }
+
+    function beginSplit(item: CategorizationQueueItemDto, lines?: readonly SplitLine[]): void {
+        const existing = session.byId[item.transaction.id];
+        const seeded =
+            lines ??
+            (isSplitDecision(existing)
+                ? existing.lines
+                : seedSingleSplitLine(item.transaction.amount, {
+                      categoryId:
+                          existing?.kind === 'category'
+                              ? (existing.categoryId ?? '')
+                              : (item.proposal?.suggestedCategoryId ?? ''),
+                      categoryName:
+                          existing?.kind === 'category'
+                              ? (existing.categoryName ?? '')
+                              : (item.proposal?.suggestedCategory ?? ''),
+                      categoryGroup:
+                          existing?.kind === 'category'
+                              ? (existing.categoryGroup ?? '')
+                              : (item.proposal?.suggestedCategoryGroup ?? ''),
+                  }));
+        setSplitDrafts((drafts) => ({ ...drafts, [item.transaction.id]: seeded }));
+    }
+
+    function setSplitLines(transactionId: string, lines: readonly SplitLine[]): void {
+        setSplitDrafts((drafts) => ({ ...drafts, [transactionId]: lines }));
+    }
+
+    function cancelSplit(transactionId: string): void {
+        setSplitDrafts((drafts) => {
+            if (!(transactionId in drafts)) {
+                return drafts;
+            }
+            const next = { ...drafts };
+            delete next[transactionId];
+            return next;
+        });
     }
 
     function rejectCurrent(): void {
@@ -242,6 +302,9 @@ export function useClassifySession(
     return {
         acceptAllCertain,
         acceptCurrent,
+        assignableIds,
+        beginSplit,
+        cancelSplit,
         certainRemaining,
         choicesById,
         commitPayee,
@@ -256,6 +319,8 @@ export function useClassifySession(
         selectGroups,
         session,
         setCurrentId,
+        setSplitLines,
+        splitDrafts,
         tally,
         undo,
     };

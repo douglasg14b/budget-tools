@@ -21,6 +21,9 @@ type QueueItemCardProps = {
 export function QueueItemCard({ item }: QueueItemCardProps) {
     const [expanded, setExpanded] = useState(false);
     const { transaction, proposal } = item;
+    if (!proposal) {
+        return null;
+    }
     const payee = transaction.payeeName || transaction.importPayeeName || '—';
     const rename = payeeRenameSuggestion(proposal);
     const suggestion = proposal.suggestedCategory

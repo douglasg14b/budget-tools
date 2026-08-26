@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { Accounts, Categories, Categorization, Health, type Options, TravelBias, TravelWindows } from '../sdk.gen';
-import type { CreateTravelWindowData, CreateTravelWindowResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListTravelWindowsData, ListTravelWindowsResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostLlmSuggestData, PostLlmSuggestResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
+import { Accounts, AmazonOrders, Categories, Categorization, Health, type Options, TravelBias, TravelWindows } from '../sdk.gen';
+import type { CreateTravelWindowData, CreateTravelWindowResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListTravelWindowsData, ListTravelWindowsResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostPredictData, PostPredictResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -181,7 +181,8 @@ export const getHealthOptions = (options?: Options<GetHealthData>) => queryOptio
 export const getCategorizationQueueQueryKey = (options?: Options<GetCategorizationQueueData>) => createQueryKey('getCategorizationQueue', options);
 
 /**
- * Pending review queue with locally scored AI proposals joined to transaction details.
+ * Pending review queue joined to cached local ML proposals.
+ * Window queries (`around` / `olderThan` / `newerThan`) list pending rows without scoring.
  */
 export const getCategorizationQueueOptions = (options?: Options<GetCategorizationQueueData>) => queryOptions<GetCategorizationQueueResponse, DefaultError, GetCategorizationQueueResponse, ReturnType<typeof getCategorizationQueueQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -215,6 +216,44 @@ export const postLlmSuggestMutation = (options?: Partial<Options<PostLlmSuggestD
     return mutationOptions;
 };
 
+/**
+ * postAmazonSuggest
+ *
+ * Amazon-only split overlay for one scored Amazon queue transaction.
+ */
+export const postAmazonSuggestMutation = (options?: Partial<Options<PostAmazonSuggestData>>): UseMutationOptions<PostAmazonSuggestResponse, DefaultError, Options<PostAmazonSuggestData>> => {
+    const mutationOptions: UseMutationOptions<PostAmazonSuggestResponse, DefaultError, Options<PostAmazonSuggestData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await Categorization.request3({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * postPredict
+ *
+ * Score pending transactions with the local ML models and cache the proposals.
+ */
+export const postPredictMutation = (options?: Partial<Options<PostPredictData>>): UseMutationOptions<PostPredictResponse, DefaultError, Options<PostPredictData>> => {
+    const mutationOptions: UseMutationOptions<PostPredictResponse, DefaultError, Options<PostPredictData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await Categorization.request4({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const getCategoriesQueryKey = (options?: Options<GetCategoriesData>) => createQueryKey('getCategories', options);
 
 export const getCategoriesOptions = (options?: Options<GetCategoriesData>) => queryOptions<GetCategoriesResponse, DefaultError, GetCategoriesResponse, ReturnType<typeof getCategoriesQueryKey>>({
@@ -229,3 +268,42 @@ export const getCategoriesOptions = (options?: Options<GetCategoriesData>) => qu
     },
     queryKey: getCategoriesQueryKey(options)
 });
+
+export const getAmazonOrdersStatusQueryKey = (options?: Options<GetAmazonOrdersStatusData>) => createQueryKey('getAmazonOrdersStatus', options);
+
+/**
+ * getAmazonOrdersStatus
+ *
+ * Auth and durable cache status. Does not start Playwright.
+ */
+export const getAmazonOrdersStatusOptions = (options?: Options<GetAmazonOrdersStatusData>) => queryOptions<GetAmazonOrdersStatusResponse, DefaultError, GetAmazonOrdersStatusResponse, ReturnType<typeof getAmazonOrdersStatusQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await AmazonOrders.request({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getAmazonOrdersStatusQueryKey(options)
+});
+
+/**
+ * postAmazonOrdersSync
+ *
+ * Scrape Amazon payment/order gaps into SQLite. Starts the MCP subprocess if needed.
+ */
+export const postAmazonOrdersSyncMutation = (options?: Partial<Options<PostAmazonOrdersSyncData>>): UseMutationOptions<PostAmazonOrdersSyncResponse, DefaultError, Options<PostAmazonOrdersSyncData>> => {
+    const mutationOptions: UseMutationOptions<PostAmazonOrdersSyncResponse, DefaultError, Options<PostAmazonOrdersSyncData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await AmazonOrders.request2({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};

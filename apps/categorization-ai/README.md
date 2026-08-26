@@ -43,6 +43,7 @@ dotnet run predict              # human-readable tier summary
 dotnet run predict-json                # JSON payload for API/UI integration
 dotnet run predict-json --limit 50     # newest 50 pending
 dotnet run predict-json --ids id,id    # specific transactions (API cache fill)
+dotnet run serve                       # warm HTTP scorer on port 4021 (POST /predict)
 dotnet run feedback-stats       # approval/denial metrics
 ```
 
@@ -75,6 +76,28 @@ dotnet run export
 ## Configuration
 
 Committed `appsettings.json` holds ML thresholds and exclusions only. Database credentials and API keys go in gitignored `appsettings.Local.json` (copy from `appsettings.Local.json.example`) or environment variables. `DB_CONNECTION_STRING` wins over the JSON connection string so the API can inject it.
+
+### Warm HTTP scorer
+
+For on-the-fly classify scoring, run the warm scorer so the API does not spawn a new process per predict window:
+
+```bash
+# Terminal 1 — loads models once, listens on :4021
+dotnet run serve
+
+# Terminal 2 — API uses HTTP scorer when CATEGORIZATION_SCORER_URL is set
+CATEGORIZATION_SCORER_URL=http://localhost:4021 pnpm --filter @budget-tools/api dev
+```
+
+Or from the repo root: `pnpm dev` starts API, web, and scorer together when `.env.local` includes `CATEGORIZATION_SCORER_URL`.
+
+Endpoints:
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/health` | Ready check + model signature |
+| `POST` | `/predict` | Body `{ "transactionIds": ["id"], "llm": false }` → same envelope as `predict-json` |
+| `POST` | `/reload` | Rebuild lookups/models after `dotnet run train` |
 
 `appsettings.json`:
 
