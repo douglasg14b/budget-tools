@@ -331,6 +331,9 @@ function unlessDialogOpen(handler: () => void): () => void {
         if (document.body.hasAttribute(CLASSIFY_DIALOG_ATTR)) {
             return;
         }
+        if (document.querySelector('[role="dialog"]')) {
+            return;
+        }
         handler();
     };
 }

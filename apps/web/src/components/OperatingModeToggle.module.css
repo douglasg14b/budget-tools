@@ -1,0 +1,172 @@
+.toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    margin: 0;
+    padding: 0.15rem;
+    border: 0;
+    min-width: 0;
+    min-inline-size: 0;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--app-bg-surface);
+    box-shadow: inset 0 0 0 1px var(--app-border);
+}
+
+.legend {
+    position: absolute;
+    overflow: hidden;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    border: 0;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+.option {
+    appearance: none;
+    margin: 0;
+    padding: 0.35rem 0.85rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--app-text-secondary);
+    font-family: var(--app-font-display);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.option:hover:not(:disabled) {
+    color: var(--app-text-primary);
+}
+
+.option:disabled {
+    cursor: wait;
+}
+
+.option[data-active] {
+    background: var(--app-bg-elevated);
+    color: var(--app-text-primary);
+    box-shadow: inset 0 0 0 1px var(--app-border-strong);
+}
+
+.option[data-live][data-active] {
+    background: color-mix(in srgb, var(--app-mode-live) 22%, var(--app-bg-elevated));
+    color: var(--app-mode-live-ink);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-mode-live) 55%, transparent);
+}
+
+.overlay {
+    background: color-mix(in srgb, var(--app-bg-root) 72%, black);
+    backdrop-filter: blur(6px);
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    background: var(--app-bg-surface);
+    box-shadow:
+        inset 0 0 0 1px var(--app-border-strong),
+        0 1.5rem 3rem color-mix(in srgb, var(--app-bg-root) 55%, transparent);
+    overflow: hidden;
+}
+
+.content::before {
+    content: "";
+    display: block;
+    flex-shrink: 0;
+    height: 0.28rem;
+    background: linear-gradient(90deg, var(--app-mode-live), color-mix(in srgb, var(--app-mode-live) 20%, transparent));
+}
+
+.header {
+    flex-shrink: 0;
+    padding: 1.15rem 1.35rem 0.35rem;
+    background: transparent;
+    border-bottom: none;
+}
+
+.title {
+    font-family: var(--app-font-display);
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--app-text-primary);
+}
+
+.close {
+    color: var(--app-text-secondary);
+}
+
+.close:hover {
+    color: var(--app-text-primary);
+    background: var(--app-bg-hover);
+}
+
+.body {
+    padding: 0.35rem 1.35rem 1.4rem;
+}
+
+.lede {
+    margin: 0 0 1.15rem;
+    font-size: 1rem;
+    color: var(--app-text-secondary);
+    line-height: 1.45;
+}
+
+.error {
+    margin: -0.5rem 0 1.15rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--app-status-error);
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.6rem;
+}
+
+.stay,
+.goLive {
+    appearance: none;
+    margin: 0;
+    padding: 0.55rem 0.95rem;
+    border: 0;
+    border-radius: 0.35rem;
+    font-family: var(--app-font-display);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.stay {
+    background: var(--app-bg-elevated);
+    color: var(--app-text-primary);
+    box-shadow: inset 0 0 0 1px var(--app-border-strong);
+}
+
+.stay:hover {
+    background: var(--app-bg-hover);
+}
+
+.goLive {
+    background: var(--app-mode-live);
+    color: var(--app-mode-live-on);
+}
+
+.goLive:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--app-mode-live) 82%, white);
+}
+
+.goLive:disabled {
+    cursor: wait;
+    opacity: 0.8;
+}

@@ -6,6 +6,7 @@ import * as createTravelTables from './migrations/2026-08-23-Create_Travel_Table
 import * as travelWindowLocationAndAccounts from './migrations/2026-08-23-Travel_Window_Location_And_Accounts';
 import * as amazonOrderTables from './migrations/2026-08-25-Amazon_Order_Tables';
 import * as amazonSplitOverlays from './migrations/2026-08-26-Amazon_Split_Overlays';
+import * as operatingMode from './migrations/2026-08-27-Operating_Mode';
 
 /**
  * Explicit migration registry. Dynamic filesystem imports break on Windows paths
@@ -17,6 +18,7 @@ export const MIGRATIONS: Record<string, Migration> = {
     '2026-08-23-Travel_Window_Location_And_Accounts': travelWindowLocationAndAccounts,
     '2026-08-25-Amazon_Order_Tables': amazonOrderTables,
     '2026-08-26-Amazon_Split_Overlays': amazonSplitOverlays,
+    '2026-08-27-Operating_Mode': operatingMode,
 };
 
 class StaticMigrationProvider implements MigrationProvider {

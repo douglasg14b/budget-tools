@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { Accounts, AmazonOrders, Categories, Categorization, Health, type Options, TravelBias, TravelWindows } from '../sdk.gen';
-import type { CreateTravelWindowData, CreateTravelWindowResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListTravelWindowsData, ListTravelWindowsResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostPredictData, PostPredictResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
+import { Accounts, AmazonOrders, Categories, Categorization, Health, OperatingMode, type Options, TravelBias, TravelWindows } from '../sdk.gen';
+import type { CreateTravelWindowData, CreateTravelWindowResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetOperatingModeData, GetOperatingModeResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListTravelWindowsData, ListTravelWindowsResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostPredictData, PostPredictResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -163,6 +163,41 @@ export const listAccountsOptions = (options?: Options<ListAccountsData>) => quer
     queryKey: listAccountsQueryKey(options)
 });
 
+export const getOperatingModeQueryKey = (options?: Options<GetOperatingModeData>) => createQueryKey('getOperatingMode', options);
+
+/**
+ * getOperatingMode
+ */
+export const getOperatingModeOptions = (options?: Options<GetOperatingModeData>) => queryOptions<GetOperatingModeResponse, DefaultError, GetOperatingModeResponse, ReturnType<typeof getOperatingModeQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await OperatingMode.request({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getOperatingModeQueryKey(options)
+});
+
+/**
+ * patchOperatingMode
+ */
+export const patchOperatingModeMutation = (options?: Partial<Options<PatchOperatingModeData>>): UseMutationOptions<PatchOperatingModeResponse, DefaultError, Options<PatchOperatingModeData>> => {
+    const mutationOptions: UseMutationOptions<PatchOperatingModeResponse, DefaultError, Options<PatchOperatingModeData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await OperatingMode.request2({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const getHealthQueryKey = (options?: Options<GetHealthData>) => createQueryKey('getHealth', options);
 
 export const getHealthOptions = (options?: Options<GetHealthData>) => queryOptions<GetHealthResponse, DefaultError, GetHealthResponse, ReturnType<typeof getHealthQueryKey>>({
@@ -292,7 +327,8 @@ export const getAmazonOrdersStatusOptions = (options?: Options<GetAmazonOrdersSt
 /**
  * postAmazonOrdersSync
  *
- * Scrape Amazon payment/order gaps into SQLite. Starts the MCP subprocess if needed.
+ * Index Amazon payments from the oldest uncategorized Amazon charge through today,
+ * then fetch invoices for order IDs in the requested classify window. Starts the MCP subprocess if needed.
  */
 export const postAmazonOrdersSyncMutation = (options?: Partial<Options<PostAmazonOrdersSyncData>>): UseMutationOptions<PostAmazonOrdersSyncResponse, DefaultError, Options<PostAmazonOrdersSyncData>> => {
     const mutationOptions: UseMutationOptions<PostAmazonOrdersSyncResponse, DefaultError, Options<PostAmazonOrdersSyncData>> = {

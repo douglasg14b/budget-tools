@@ -10,6 +10,8 @@ import { TravelBiasController } from './../features/travelWindows/travelBiasCont
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AccountsController } from './../features/travelWindows/accountsController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { OperatingModeController } from './../features/operatingMode/operatingModeController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { HealthController } from './../features/health/healthController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { CategorizationController } from './../features/categorization/categorizationController';
@@ -62,6 +64,11 @@ const models: TsoaRoute.Models = {
     "AccountsDto": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"accounts":{"dataType":"array","array":{"dataType":"refAlias","ref":"AccountDto"},"required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "OperatingModeDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"mode":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["practice"]},{"dataType":"enum","enums":["live"]}],"required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "HealthDto": {
@@ -473,6 +480,65 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'listAccounts',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsOperatingModeController_getOperatingMode: Record<string, TsoaRoute.ParameterSchema> = {
+        };
+        app.get('/api/operating-mode',
+            ...(fetchMiddlewares<RequestHandler>(OperatingModeController)),
+            ...(fetchMiddlewares<RequestHandler>(OperatingModeController.prototype.getOperatingMode)),
+
+            async function OperatingModeController_getOperatingMode(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsOperatingModeController_getOperatingMode, request, response });
+
+                const controller = new OperatingModeController();
+
+              await templateService.apiHandler({
+                methodName: 'getOperatingMode',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsOperatingModeController_patchOperatingMode: Record<string, TsoaRoute.ParameterSchema> = {
+                body: {"in":"body","name":"body","required":true,"ref":"OperatingModeDto"},
+        };
+        app.patch('/api/operating-mode',
+            ...(fetchMiddlewares<RequestHandler>(OperatingModeController)),
+            ...(fetchMiddlewares<RequestHandler>(OperatingModeController.prototype.patchOperatingMode)),
+
+            async function OperatingModeController_patchOperatingMode(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsOperatingModeController_patchOperatingMode, request, response });
+
+                const controller = new OperatingModeController();
+
+              await templateService.apiHandler({
+                methodName: 'patchOperatingMode',
                 controller,
                 response,
                 next,

@@ -47,6 +47,10 @@ export type AccountsDto = {
     accounts: Array<AccountDto>;
 };
 
+export type OperatingModeDto = {
+    mode: 'practice' | 'live';
+};
+
 export type HealthDto = {
     ok: true;
 };
@@ -485,6 +489,38 @@ export type ListAccountsResponses = {
 };
 
 export type ListAccountsResponse = ListAccountsResponses[keyof ListAccountsResponses];
+
+export type GetOperatingModeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/operating-mode';
+};
+
+export type GetOperatingModeResponses = {
+    /**
+     * Ok
+     */
+    200: OperatingModeDto;
+};
+
+export type GetOperatingModeResponse = GetOperatingModeResponses[keyof GetOperatingModeResponses];
+
+export type PatchOperatingModeData = {
+    body: OperatingModeDto;
+    path?: never;
+    query?: never;
+    url: '/operating-mode';
+};
+
+export type PatchOperatingModeResponses = {
+    /**
+     * Ok
+     */
+    200: OperatingModeDto;
+};
+
+export type PatchOperatingModeResponse = PatchOperatingModeResponses[keyof PatchOperatingModeResponses];
 
 export type GetHealthData = {
     body?: never;

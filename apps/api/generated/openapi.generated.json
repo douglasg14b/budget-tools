@@ -157,6 +157,21 @@
 				],
 				"type": "object"
 			},
+			"OperatingModeDto": {
+				"properties": {
+					"mode": {
+						"type": "string",
+						"enum": [
+							"practice",
+							"live"
+						]
+					}
+				},
+				"required": [
+					"mode"
+				],
+				"type": "object"
+			},
 			"HealthDto": {
 				"properties": {
 					"ok": {
@@ -1564,6 +1579,60 @@
 				"parameters": []
 			}
 		},
+		"/operating-mode": {
+			"get": {
+				"operationId": "GetOperatingMode",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/OperatingModeDto"
+								}
+							}
+						}
+					}
+				},
+				"summary": "getOperatingMode",
+				"tags": [
+					"operating-mode"
+				],
+				"security": [],
+				"parameters": []
+			},
+			"patch": {
+				"operationId": "PatchOperatingMode",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/OperatingModeDto"
+								}
+							}
+						}
+					}
+				},
+				"summary": "patchOperatingMode",
+				"tags": [
+					"operating-mode"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/OperatingModeDto"
+							}
+						}
+					}
+				}
+			}
+		},
 		"/health": {
 			"get": {
 				"operationId": "GetHealth",
@@ -1845,7 +1914,7 @@
 						}
 					}
 				},
-				"description": "Scrape Amazon payment/order gaps into SQLite. Starts the MCP subprocess if needed.",
+				"description": "Index Amazon payments from the oldest uncategorized Amazon charge through today,\nthen fetch invoices for order IDs in the requested classify window. Starts the MCP subprocess if needed.",
 				"summary": "postAmazonOrdersSync",
 				"tags": [
 					"amazon-orders"

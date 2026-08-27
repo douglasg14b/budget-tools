@@ -1,4 +1,4 @@
-import { getCategoriesOptions } from '@budget-tools/web-sdk';
+import { getCategoriesOptions, getOperatingModeOptions } from '@budget-tools/web-sdk';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
@@ -17,6 +17,8 @@ import {
 } from '../components/review/queueSearchParams';
 import { sortQueueItemsByDateDesc } from '../components/review/sortQueueItems';
 import { useClassifyQueue } from '../components/review/useClassifyQueue';
+import type { OperatingMode } from '../operatingMode/operatingModeCopy';
+import { operatingModeClassifyNote } from '../operatingMode/operatingModeCopy';
 import classes from './ClassifyPage.module.css';
 
 type ClassifyPageProps = {
@@ -58,6 +60,8 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
         staleTime: Number.POSITIVE_INFINITY,
         refetchOnWindowFocus: false,
     });
+    const modeQuery = useQuery(getOperatingModeOptions());
+    const mode: OperatingMode = modeQuery.data?.mode ?? 'practice';
 
     const items = queueQuery.data?.items ?? [];
     const visibleItems = useMemo(
@@ -71,7 +75,9 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
             <header className={classes.header}>
                 <div className={classes.headerCopy}>
                     <h1 className={classes.title}>{layout === 'table' ? 'Table' : 'Classify'}</h1>
-                    <p className={classes.note}>Session only — nothing is written to YNAB yet.</p>
+                    <p className={classes.note} data-mode={mode}>
+                        {operatingModeClassifyNote(mode)}
+                    </p>
                 </div>
                 <QueueSearchInput
                     value={search.q}

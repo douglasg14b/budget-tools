@@ -12,6 +12,7 @@ import type {
     AmazonPaymentsTable,
     AmazonSyncStateTable,
 } from '../features/amazonOrders/data/amazonOrdersSchema';
+import type { OperatingModeTable } from '../features/operatingMode/data/operatingModeSchema';
 import type { TravelBiasConfigTable } from '../features/travelWindows/data/travelBiasConfigSchema';
 import type { TravelWindowAccountsTable, TravelWindowsTable } from '../features/travelWindows/data/travelWindowsSchema';
 import { migrateToLatest } from './migrate';
@@ -31,6 +32,7 @@ export type AppDatabase = {
     amazon_order_items: AmazonOrderItemsTable;
     amazon_sync_state: AmazonSyncStateTable;
     amazon_split_overlays: AmazonSplitOverlaysTable;
+    operating_mode: OperatingModeTable;
 };
 
 export type AppDatabaseClient = Kysely<AppDatabase>;

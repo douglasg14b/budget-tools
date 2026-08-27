@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListTravelWindowsData, ListTravelWindowsResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostPredictData, PostPredictResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
+import type { CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetOperatingModeData, GetOperatingModeResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListTravelWindowsData, ListTravelWindowsResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostPredictData, PostPredictResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -96,6 +96,29 @@ export class Accounts {
     }
 }
 
+export class OperatingMode {
+    /**
+     * getOperatingMode
+     */
+    public static request<ThrowOnError extends boolean = false>(options?: Options<GetOperatingModeData, ThrowOnError>): RequestResult<GetOperatingModeResponses, unknown, ThrowOnError> {
+        return (options?.client ?? client).get<GetOperatingModeResponses, unknown, ThrowOnError>({ url: '/operating-mode', ...options });
+    }
+    
+    /**
+     * patchOperatingMode
+     */
+    public static request2<ThrowOnError extends boolean = false>(options: Options<PatchOperatingModeData, ThrowOnError>): RequestResult<PatchOperatingModeResponses, unknown, ThrowOnError> {
+        return (options.client ?? client).patch<PatchOperatingModeResponses, unknown, ThrowOnError>({
+            url: '/operating-mode',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+}
+
 export class Health {
     public static request<ThrowOnError extends boolean = false>(options?: Options<GetHealthData, ThrowOnError>): RequestResult<GetHealthResponses, unknown, ThrowOnError> {
         return (options?.client ?? client).get<GetHealthResponses, unknown, ThrowOnError>({ url: '/health', ...options });
@@ -179,7 +202,8 @@ export class AmazonOrders {
     /**
      * postAmazonOrdersSync
      *
-     * Scrape Amazon payment/order gaps into SQLite. Starts the MCP subprocess if needed.
+     * Index Amazon payments from the oldest uncategorized Amazon charge through today,
+     * then fetch invoices for order IDs in the requested classify window. Starts the MCP subprocess if needed.
      */
     public static request2<ThrowOnError extends boolean = false>(options: Options<PostAmazonOrdersSyncData, ThrowOnError>): RequestResult<PostAmazonOrdersSyncResponses, unknown, ThrowOnError> {
         return (options.client ?? client).post<PostAmazonOrdersSyncResponses, unknown, ThrowOnError>({

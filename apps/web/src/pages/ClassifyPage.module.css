@@ -35,3 +35,8 @@
     font-size: 1rem;
     color: var(--app-text-muted);
 }
+
+.note[data-mode="live"] {
+    color: var(--app-mode-live-ink);
+    font-weight: 700;
+}
