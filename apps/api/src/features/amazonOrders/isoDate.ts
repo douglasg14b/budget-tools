@@ -15,6 +15,40 @@ export function addIsoDays(isoDate: string, days: number): string {
     return date.toISOString().slice(0, 10);
 }
 
+/** UTC calendar day for `now`. */
+export function utcTodayIso(now: Date = new Date()): string {
+    return now.toISOString().slice(0, 10);
+}
+
+const PAYMENT_INDEX_LOOKBACK_DAYS = 5;
+
+/**
+ * Payment scrape window: oldest uncategorized Amazon bank day (minus match lookback)
+ * through today, unioned with the classify `{from, to}`.
+ */
+export function amazonPaymentIndexRange(input: {
+    readonly requested: IsoDateRange;
+    readonly oldestUncategorizedDate: string | null;
+    readonly today: string;
+}): IsoDateRange {
+    const oldestStart =
+        input.oldestUncategorizedDate && isIsoDate(input.oldestUncategorizedDate)
+            ? addIsoDays(input.oldestUncategorizedDate, -PAYMENT_INDEX_LOOKBACK_DAYS)
+            : input.requested.start;
+    const start = oldestStart < input.requested.start ? oldestStart : input.requested.start;
+    const end = input.today > input.requested.end ? input.today : input.requested.end;
+    return { start, end };
+}
+
+/** One Your Payments walk from the oldest uncovered day through the index end. */
+export function paymentScrapeRange(gaps: readonly IsoDateRange[], indexEnd: string): IsoDateRange | null {
+    const oldestGap = gaps[0];
+    if (!oldestGap) {
+        return null;
+    }
+    return { start: oldestGap.start, end: indexEnd };
+}
+
 export function mergeIsoDateRanges(ranges: readonly IsoDateRange[]): IsoDateRange[] {
     const sorted = [...ranges]
         .filter((range) => range.start <= range.end)
@@ -36,6 +70,25 @@ export function mergeIsoDateRanges(ranges: readonly IsoDateRange[]): IsoDateRang
         merged.push(range);
     }
     return merged;
+}
+
+export function coveredRangeFromScrapedPayments(
+    requested: IsoDateRange,
+    paymentDates: readonly string[],
+    paginationComplete: boolean,
+): IsoDateRange | null {
+    if (paginationComplete) {
+        return requested;
+    }
+    const inRange = paymentDates
+        .filter((date) => isIsoDate(date) && date >= requested.start && date <= requested.end)
+        .sort((left, right) => left.localeCompare(right));
+    const oldest = inRange[0];
+    if (!oldest) {
+        return null;
+    }
+    // Newest-first walk: every day from this payment through `requested.end` was on a visited page.
+    return { start: oldest, end: requested.end };
 }
 
 export function uncoveredIsoDateRanges(covered: readonly IsoDateRange[], requested: IsoDateRange): IsoDateRange[] {

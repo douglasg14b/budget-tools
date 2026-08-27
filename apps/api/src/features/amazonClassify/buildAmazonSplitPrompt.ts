@@ -19,7 +19,8 @@ export function buildAmazonSplitPrompt(input: {
         'Never invent a category.',
         'amountMilliunits must be integers and must sum to the bank transaction amount.',
         'Amazon item milliunits below already use the same sign as the bank charge. Copy that sign.',
-        'Never emit an opposite-sign line to make the math work, and never invent items that are not listed.',
+        'Never emit an opposite-sign line to invent inflows, and never invent items that are not listed.',
+        'Item milliunits below are the charged amounts for this bank transaction, net of Subscribe & Save and other discounts.',
         'itemIndex is the 0-based index of the Amazon item this line is for, or null for tax, shipping, or promo leftovers.',
         'memo is a short YNAB memo: 3-8 words, what it is, pack count if useful. No brand, no model number, no size catalog.',
         'Good memo: "16-pack small beach balls". Bad memo: the full Amazon title.',
@@ -28,6 +29,10 @@ export function buildAmazonSplitPrompt(input: {
         'For a partial-order match, allocate only this bank amount, not the full order total.',
     ].join(' ');
 
+    if (input.items.length === 0) {
+        throw new Error('Amazon split prompt requires at least one line item');
+    }
+
     const lines: string[] = [];
     const tx = input.transaction;
     lines.push('Bank transaction:');
@@ -35,17 +40,14 @@ export function buildAmazonSplitPrompt(input: {
     lines.push(`- Amount milliunits: ${tx.amount}`);
     lines.push(`- Payee: ${tx.payeeName?.trim() || '(none)'}`);
     lines.push(`- Import original: ${tx.importPayeeNameOriginal?.trim() || '(none)'}`);
+    lines.push(`- YNAB transaction ID: ${tx.id}`);
     lines.push(`- Match: ${input.match}`);
     lines.push(`- Order IDs: ${input.orderIds.join(', ') || '(none)'}`);
     lines.push('Amazon items:');
-    if (input.items.length === 0) {
-        lines.push('- (none)');
-    } else {
-        for (const [index, item] of input.items.entries()) {
-            lines.push(
-                `- [${index}] ${item.title} | ASIN ${item.asin ?? '(none)'} | qty ${item.quantity} | milliunits ${alignAmountToBank(item.itemTotalMilliunits, tx.amount)}`,
-            );
-        }
+    for (const [index, item] of input.items.entries()) {
+        lines.push(
+            `- [${index}] ${item.title} | ASIN ${item.asin ?? '(none)'} | qty ${item.quantity} | milliunits ${alignAmountToBank(item.itemTotalMilliunits, tx.amount)}`,
+        );
     }
     if (input.orders.length > 0) {
         lines.push('Order totals:');

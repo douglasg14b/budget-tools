@@ -8,7 +8,7 @@ import { AMAZON_ORDERS_SYNC_TIMEOUT_MS, getAmazonOrdersMcpEntry } from '../../en
 import { HttpError } from '../travelWindows/HttpError';
 import type { AmazonOrdersSource } from './amazonOrdersSource';
 import type { IsoDateRange } from './isoDate';
-import type { ParsedAmazonAuth, ParsedAmazonOrder, ParsedAmazonPayment } from './parseAmazonMcp';
+import type { ParsedAmazonAuth, ParsedAmazonOrder, ParsedAmazonTransactions } from './parseAmazonMcp';
 import {
     parseAmazonAuthPayload,
     parseAmazonOrderDetailsPayload,
@@ -65,7 +65,7 @@ function createMcpSource(client: Client): AmazonOrdersSource {
             const payload = await callToolJson(client, 'check_amazon_auth_status', { region });
             return parseAmazonAuthPayload(payload);
         },
-        async getTransactions(input: { region: string; range: IsoDateRange }): Promise<ParsedAmazonPayment[]> {
+        async getTransactions(input: { region: string; range: IsoDateRange }): Promise<ParsedAmazonTransactions> {
             const payload = await callToolJson(client, 'get_amazon_transactions', {
                 region: input.region,
                 start_date: input.range.start,
@@ -85,7 +85,15 @@ function createMcpSource(client: Client): AmazonOrdersSource {
     };
 }
 
+let toolChain: Promise<unknown> = Promise.resolve();
+
 async function callToolJson(client: Client, name: string, args: Record<string, unknown>): Promise<unknown> {
+    const run = toolChain.then(() => callToolJsonUnqueued(client, name, args));
+    toolChain = run.catch(() => undefined);
+    return run;
+}
+
+async function callToolJsonUnqueued(client: Client, name: string, args: Record<string, unknown>): Promise<unknown> {
     const result = (await client.callTool({ name, arguments: args }, undefined, {
         timeout: AMAZON_ORDERS_SYNC_TIMEOUT_MS,
     })) as ToolResult;

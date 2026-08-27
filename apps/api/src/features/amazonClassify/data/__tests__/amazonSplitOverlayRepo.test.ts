@@ -40,6 +40,11 @@ describe('amazonSplitOverlayRepo', () => {
         expect(await deleteAllAmazonSplitOverlays(database)).toBe(1);
         expect(await getAmazonSplitOverlay('tx-1', 'fp-1', database)).toBeNull();
     });
+
+    it('ignores a stored overlay that has no Amazon line items', async () => {
+        await upsertAmazonSplitOverlay('tx-1', 'fp-1', { ...overlay(), items: [], lines: [] }, database);
+        expect(await getAmazonSplitOverlay('tx-1', 'fp-1', database)).toBeNull();
+    });
 });
 
 function overlay(): AmazonSplitOverlayDto {

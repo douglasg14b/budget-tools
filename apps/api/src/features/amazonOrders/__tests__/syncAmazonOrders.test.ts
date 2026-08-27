@@ -28,20 +28,47 @@ describe('syncAmazonOrders', () => {
         await rm(directory, { recursive: true, force: true });
     });
 
-    it('scrapes payment gaps once, then only missing orders', async () => {
+    it('indexes payments through today in one walk, then only missing orders', async () => {
         const source = fakeSource();
-        const first = await syncAmazonOrders({ from: '2026-02-01', to: '2026-02-10' }, source, database);
-        expect(first.scrapedPaymentGaps).toEqual([{ start: '2026-02-01', end: '2026-02-10' }]);
-        expect(source.transactionCalls).toBe(1);
+        const first = await syncAmazonOrders(
+            { from: '2026-02-01', to: '2026-02-10', today: '2026-08-26' },
+            source,
+            database,
+        );
+        expect(first.scrapedPaymentGaps).toEqual([{ start: '2026-02-01', end: '2026-08-26' }]);
+        expect(source.transactionRanges).toEqual([{ start: '2026-02-01', end: '2026-08-26' }]);
         expect(source.orderCalls).toEqual(['111-2222222-3333333']);
         expect(first.payments).toBe(1);
         expect(first.orders).toBe(1);
+        expect(first.coveredRanges).toEqual([{ start: '2026-02-01', end: '2026-08-26' }]);
 
-        const second = await syncAmazonOrders({ from: '2026-02-01', to: '2026-02-10' }, source, database);
+        const second = await syncAmazonOrders(
+            { from: '2026-03-01', to: '2026-03-07', today: '2026-08-26' },
+            source,
+            database,
+        );
         expect(second.scrapedPaymentGaps).toEqual([]);
-        expect(source.transactionCalls).toBe(1);
+        expect(source.transactionRanges).toHaveLength(1);
         expect(source.orderCalls).toEqual(['111-2222222-3333333']);
         expect(second.fetchedOrderIds).toEqual([]);
+    });
+
+    it('pages from the oldest uncategorized Amazon day through today', async () => {
+        const source = fakeSource();
+        const result = await syncAmazonOrders(
+            {
+                from: '2026-06-20',
+                to: '2026-06-26',
+                oldestUncategorizedDate: '2026-01-15',
+                today: '2026-08-26',
+            },
+            source,
+            database,
+        );
+        expect(source.transactionRanges).toEqual([{ start: '2026-01-10', end: '2026-08-26' }]);
+        expect(result.scrapedPaymentGaps).toEqual([{ start: '2026-01-10', end: '2026-08-26' }]);
+        expect(result.coveredRanges).toEqual([{ start: '2026-01-10', end: '2026-08-26' }]);
+        expect(source.orderCalls).toEqual([]);
     });
 
     it('re-fetches a stored order whose line items do not cover the total', async () => {
@@ -55,18 +82,26 @@ describe('syncAmazonOrders', () => {
             },
             database,
         );
-        const result = await syncAmazonOrders({ from: '2026-02-01', to: '2026-02-10' }, source, database);
+        const result = await syncAmazonOrders(
+            { from: '2026-02-01', to: '2026-02-10', today: '2026-08-26' },
+            source,
+            database,
+        );
         expect(source.orderCalls).toEqual(['111-2222222-3333333']);
         expect(result.fetchedOrderIds).toEqual(['111-2222222-3333333']);
     });
 
     it('re-fetches orders after the order cache is cleared', async () => {
         const source = fakeSource();
-        await syncAmazonOrders({ from: '2026-02-01', to: '2026-02-10' }, source, database);
+        await syncAmazonOrders({ from: '2026-02-01', to: '2026-02-10', today: '2026-08-26' }, source, database);
         await deleteAllAmazonOrders(database);
-        const again = await syncAmazonOrders({ from: '2026-02-01', to: '2026-02-10' }, source, database);
+        const again = await syncAmazonOrders(
+            { from: '2026-02-01', to: '2026-02-10', today: '2026-08-26' },
+            source,
+            database,
+        );
         expect(again.scrapedPaymentGaps).toEqual([]);
-        expect(source.transactionCalls).toBe(1);
+        expect(source.transactionRanges).toHaveLength(1);
         expect(source.orderCalls).toEqual(['111-2222222-3333333', '111-2222222-3333333']);
         expect(again.fetchedOrderIds).toEqual(['111-2222222-3333333']);
     });
@@ -74,18 +109,28 @@ describe('syncAmazonOrders', () => {
     it('fails loud when Amazon is not authenticated', async () => {
         const source = fakeSource({ authenticated: false });
         await expect(
-            syncAmazonOrders({ from: '2026-02-01', to: '2026-02-02' }, source, database),
+            syncAmazonOrders({ from: '2026-02-01', to: '2026-02-02', today: '2026-08-26' }, source, database),
         ).rejects.toMatchObject({ statusCode: 503, name: 'HttpError' } satisfies Partial<HttpError>);
-        expect(source.transactionCalls).toBe(0);
+        expect(source.transactionRanges).toEqual([]);
+    });
+
+    it('covers from the oldest scraped payment through today when paging did not finish', async () => {
+        const source = fakeSource({ paginationComplete: false });
+        const result = await syncAmazonOrders(
+            { from: '2026-02-01', to: '2026-02-10', today: '2026-08-26' },
+            source,
+            database,
+        );
+        expect(result.coveredRanges).toEqual([{ start: '2026-02-03', end: '2026-08-26' }]);
     });
 });
 
-function fakeSource(options?: { authenticated?: boolean }): AmazonOrdersSource & {
-    transactionCalls: number;
+function fakeSource(options?: { authenticated?: boolean; paginationComplete?: boolean }): AmazonOrdersSource & {
+    transactionRanges: { start: string; end: string }[];
     orderCalls: string[];
 } {
     const source = {
-        transactionCalls: 0,
+        transactionRanges: [] as { start: string; end: string }[],
         orderCalls: [] as string[],
         async checkAuth() {
             return {
@@ -95,9 +140,9 @@ function fakeSource(options?: { authenticated?: boolean }): AmazonOrdersSource &
                 loginUrl: options?.authenticated === false ? 'https://www.amazon.com/ap/signin' : null,
             };
         },
-        async getTransactions() {
-            source.transactionCalls += 1;
-            return [samplePayment];
+        async getTransactions(input: { range: { start: string; end: string } }) {
+            source.transactionRanges.push(input.range);
+            return { payments: [samplePayment], paginationComplete: options?.paginationComplete ?? true };
         },
         async getOrderDetails(input: { orderId: string }) {
             source.orderCalls.push(input.orderId);

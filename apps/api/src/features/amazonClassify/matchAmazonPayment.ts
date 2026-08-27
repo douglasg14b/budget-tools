@@ -1,5 +1,5 @@
 import type { AmazonOrderRecord, AmazonPaymentRecord } from '../amazonOrders/data/amazonOrdersRepo';
-import { addIsoDays } from '../amazonOrders/isoDate';
+import { addIsoDays, uncoveredIsoDateRanges } from '../amazonOrders/isoDate';
 
 export type AmazonMatchKind = 'payment' | 'batched-orders' | 'partial-order' | 'unmatched';
 
@@ -17,6 +17,18 @@ export function amazonPaymentDateWindow(bankDate: string): { earliestDate: strin
         earliestDate: addIsoDays(bankDate, -DAYS_AFTER_PAYMENT),
         latestDate: addIsoDays(bankDate, DAYS_BEFORE_PAYMENT),
     };
+}
+
+/** Coverage tracks scrape windows, not "Amazon charged us on this calendar day." */
+export function amazonWindowNeedsSync(
+    coveredRanges: readonly { readonly start: string; readonly end: string }[],
+    window: { readonly earliestDate: string; readonly latestDate: string },
+    paymentCount: number,
+): boolean {
+    if (paymentCount > 0) {
+        return false;
+    }
+    return uncoveredIsoDateRanges(coveredRanges, { start: window.earliestDate, end: window.latestDate }).length > 0;
 }
 
 export function matchAmazonPayment(input: {
@@ -44,7 +56,8 @@ export function matchAmazonPayment(input: {
     }
 
     const order = input.ordersById.get(orderIds[0] ?? '');
-    if (order?.totalMilliunits != null && Math.abs(order.totalMilliunits) !== target) {
+    const orderTotal = order?.totalMilliunits;
+    if (orderTotal != null && orderTotal !== 0 && Math.abs(orderTotal) !== target) {
         return { kind: 'partial-order', payment, orderIds };
     }
     return { kind: 'payment', payment, orderIds };

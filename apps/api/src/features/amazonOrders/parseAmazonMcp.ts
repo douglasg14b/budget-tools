@@ -72,7 +72,12 @@ export function parseAmazonAuthPayload(payload: unknown): ParsedAmazonAuth {
     };
 }
 
-export function parseAmazonTransactionsPayload(payload: unknown): ParsedAmazonPayment[] {
+export type ParsedAmazonTransactions = {
+    readonly payments: readonly ParsedAmazonPayment[];
+    readonly paginationComplete: boolean;
+};
+
+export function parseAmazonTransactionsPayload(payload: unknown): ParsedAmazonTransactions {
     const record = asRecord(payload);
     if (!record) {
         throw new Error('Amazon MCP transactions payload was not an object');
@@ -88,7 +93,7 @@ export function parseAmazonTransactionsPayload(payload: unknown): ParsedAmazonPa
             payments.push(parsed);
         }
     }
-    return payments;
+    return { payments, paginationComplete: record.paginationComplete === true };
 }
 
 export function parseAmazonOrderDetailsPayload(payload: unknown, requestedOrderId: string): ParsedAmazonOrder {
@@ -120,10 +125,10 @@ export function parseAmazonOrderDetailsPayload(payload: unknown, requestedOrderI
     return {
         orderId,
         orderDate: isoDateFromUnknown(order?.date),
-        totalMilliunits: moneyToMilliunits(order?.total ?? order?.grandTotal),
+        totalMilliunits: scrapedMoneyToMilliunits(order?.total ?? order?.grandTotal),
         shippingMilliunits: moneyToMilliunits(order?.shipping),
         taxMilliunits: moneyToMilliunits(order?.tax ?? order?.vat),
-        promotionMilliunits: moneyToMilliunits(order?.promotion),
+        promotionMilliunits: scrapedMoneyToMilliunits(order?.promotion),
         items,
         rawJson: JSON.stringify(payload),
     };
@@ -211,4 +216,17 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function optionalText(value: unknown): string | null {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+/** MCP placeholder `{ amount: 0, formatted: '' }` is a failed scrape, not a $0 order. */
+function scrapedMoneyToMilliunits(value: unknown): number | null {
+    const milliunits = moneyToMilliunits(value);
+    if (milliunits !== 0) {
+        return milliunits;
+    }
+    const record = asRecord(value);
+    if (record && !optionalText(record.formatted) && record.amount === 0) {
+        return null;
+    }
+    return milliunits;
 }

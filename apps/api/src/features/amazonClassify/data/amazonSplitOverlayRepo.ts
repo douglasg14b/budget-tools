@@ -87,5 +87,8 @@ function parseStoredOverlay(raw: string, transactionId: string): AmazonSplitOver
     if (record.transactionId !== transactionId || !Array.isArray(record.lines) || !Array.isArray(record.items)) {
         return null;
     }
+    if (record.items.length === 0) {
+        return null;
+    }
     return record;
 }

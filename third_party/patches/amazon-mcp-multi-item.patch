@@ -1,3 +1,495 @@
+diff --git a/src/amazon/extractors/invoice.ts b/src/amazon/extractors/invoice.ts
+index db55284..e4f8638 100644
+--- a/src/amazon/extractors/invoice.ts
++++ b/src/amazon/extractors/invoice.ts
+@@ -11,6 +11,7 @@ import { Page } from "playwright";
+ import { Item, extractAsinFromUrl } from "../../core/types/item";
+ import { OrderHeader, Payment } from "../../core/types/order";
+ import { Money, parseMoney } from "../../core/types/money";
++import { parseDate } from "../../core/utils/date";
+ import { getRegionByCode } from "../regions";
+ 
+ /**
+@@ -78,13 +79,18 @@ export async function extractFromInvoice(
+   const currency = regionConfig?.currency || "USD";
+ 
+   const invoiceUrl = getInvoiceUrl(header.orderId, domain);
+-  console.error(`[invoice] Navigating to invoice: ${invoiceUrl}`);
+-
+-  // Navigate to invoice page
+-  await page.goto(invoiceUrl, {
+-    waitUntil: "domcontentloaded",
+-    timeout: 15000,
+-  });
++  const alreadyOnInvoice =
++    page.url().includes(`orderID=${header.orderId}`) &&
++    page.url().includes("summary/print");
++  if (!alreadyOnInvoice) {
++    console.error(`[invoice] Navigating to invoice: ${invoiceUrl}`);
++    await page.goto(invoiceUrl, {
++      waitUntil: "domcontentloaded",
++      timeout: 15000,
++    });
++  } else {
++    console.error(`[invoice] Already on invoice: ${page.url()}`);
++  }
+ 
+   // Check where we actually landed
+   const currentUrl = page.url();
+@@ -104,12 +110,9 @@ export async function extractFromInvoice(
+     );
+   }
+ 
+-  // Quick wait for content
+-  await page
+-    .waitForSelector('[data-component="purchasedItems"], table, .a-box', {
+-      timeout: 2000,
+-    })
+-    .catch(() => {});
++  // chargeSummary can exist as an empty wrapper before the amount rows hydrate.
++  // Waiting on purchasedItems / the wrapper lets items succeed and totals stay $0.
++  await waitForInvoiceChargeSummary(page);
+ 
+   const data: InvoiceData = {
+     orderId: header.orderId,
+@@ -132,101 +135,235 @@ export async function extractFromInvoice(
+   Object.assign(data, recipient);
+   data.payments = payments.length > 0 ? payments : undefined;
+   data.items = items.length > 0 ? items : undefined;
++  if (!data.orderDate) {
++    data.orderDate = (await extractOrderDate(page)) || undefined;
++  }
+ 
+   return data;
+ }
+ 
++export const INVOICE_CHARGE_SUMMARY_ROW =
++  '[data-component="chargeSummary"] .od-line-item-row';
++
++export function chargeSummaryLinesFromHtml(html: string): InvoiceAmountLine[] {
++  const rows = html.split(/<div class="a-row od-line-item-row">/).slice(1);
++  const lines: InvoiceAmountLine[] = [];
++  for (const row of rows) {
++    const contentTag = row.search(/<div class="[^"]*od-line-item-row-content/);
++    const labelHtml = contentTag >= 0 ? row.slice(0, contentTag) : row;
++    const valueOpen = contentTag >= 0 ? row.indexOf(">", contentTag) : -1;
++    const valueHtml = valueOpen >= 0 ? row.slice(valueOpen + 1) : "";
++    const label = stripInvoiceHtml(labelHtml);
++    const value = stripInvoiceHtml(valueHtml);
++    if (label || value) {
++      lines.push({ label, value });
++    }
++  }
++  return lines;
++}
++
++function stripInvoiceHtml(html: string): string {
++  return html
++    .replace(/<[^>]+>/g, " ")
++    .replace(/&amp;/g, "&")
++    .replace(/&nbsp;/g, " ")
++    .replace(/\s+/g, " ")
++    .trim();
++}
++
++export type InvoiceAmountLine = {
++  readonly label: string;
++  readonly value: string;
++};
++
++export async function waitForInvoiceChargeSummary(page: Page): Promise<void> {
++  // The first .od-line-item-row (subtotal) can paint before Grand Total.
++  // Reading then leaves total unset and classify stores the $0 placeholder.
++  await page
++    .locator('[data-component="chargeSummary"]')
++    .getByText(/Grand Total/i)
++    .first()
++    .waitFor({ state: "visible", timeout: 10000 })
++    .catch(() =>
++      page
++        .getByText(/Grand Total/i)
++        .first()
++        .waitFor({ state: "visible", timeout: 5000 }),
++    )
++    .catch(() => {});
++}
++
+ /**
+- * Extract amounts from invoice page using data-component selectors.
++ * Map charge-summary rows and invoice body text onto totals.
++ * Amazon often puts subtotal/shipping in chargeSummary and Grand Total /
++ * Subscribe & Save only in the surrounding page text ??? do not return after
++ * the first matching subtotal row.
+  */
+-async function extractAmounts(
+-  page: Page,
++export function parseInvoiceAmountLines(
++  lines: readonly InvoiceAmountLine[],
++  pageText: string,
+   currency: string,
+-): Promise<Partial<InvoiceData>> {
++): Partial<InvoiceData> {
+   const result: Partial<InvoiceData> = {};
++  for (const line of lines) {
++    applyInvoiceAmountLabel(result, line.label, line.value, currency);
++  }
++  fillInvoiceAmountsFromPageText(result, pageText, currency);
++  return result;
++}
+ 
+-  // Strategy 1: Use data-component="chargeSummary" (modern invoice pages)
+-  try {
+-    const chargeSummary = page
+-      .locator('[data-component="chargeSummary"]')
+-      .first();
+-    const summaryCount = await chargeSummary.count().catch(() => 0);
++function applyInvoiceAmountLabel(
++  result: Partial<InvoiceData>,
++  label: string,
++  value: string,
++  currency: string,
++): void {
++  const labelLower = label.toLowerCase();
++  const cleanValue = value.trim();
++  if (!cleanValue) {
++    return;
++  }
+ 
+-    if (summaryCount > 0) {
+-      // Get all line items from the charge summary
+-      const lineItems = await chargeSummary.locator(".od-line-item-row").all();
++  if (labelLower.includes("subtotal") && !labelLower.includes("before")) {
++    result.subtotal ??= parseMoney(cleanValue, currency);
++  } else if (
++    labelLower.includes("postage") ||
++    labelLower.includes("shipping") ||
++    labelLower.includes("packing")
++  ) {
++    result.shipping ??= parseMoney(cleanValue, currency);
++  } else if (labelLower.includes("vat")) {
++    result.vat ??= parseMoney(cleanValue, currency);
++  } else if (labelLower.includes("tax") && !labelLower.includes("before")) {
++    result.tax ??= parseMoney(cleanValue, currency);
++  } else if (isPromotionLabel(labelLower)) {
++    addPromotion(result, parseMoney(cleanValue, currency));
++  } else if (
++    labelLower.includes("grand total") ||
++    labelLower.includes("order total")
++  ) {
++    result.total = parseMoney(cleanValue, currency);
++  } else if (
++    labelLower.includes("total") &&
++    !labelLower.includes("before") &&
++    !labelLower.includes("subtotal") &&
++    !result.total
++  ) {
++    result.total = parseMoney(cleanValue, currency);
++  }
++}
+ 
+-      for (const item of lineItems) {
+-        const label = await item
+-          .locator(".od-line-item-row-label")
+-          .textContent({ timeout: 200 })
+-          .catch(() => "");
+-        const value = await item
+-          .locator(".od-line-item-row-content")
+-          .textContent({ timeout: 200 })
+-          .catch(() => "");
++function isPromotionLabel(labelLower: string): boolean {
++  return (
++    labelLower.includes("promotion") ||
++    labelLower.includes("discount") ||
++    labelLower.includes("subscribe") ||
++    (labelLower.includes("savings") && !labelLower.includes("saved"))
++  );
++}
+ 
+-        const labelLower = label?.toLowerCase() || "";
+-        const cleanValue = value?.trim() || "";
+-
+-        if (labelLower.includes("subtotal") && !labelLower.includes("before")) {
+-          result.subtotal = parseMoney(cleanValue, currency);
+-        } else if (
+-          labelLower.includes("postage") ||
+-          labelLower.includes("shipping") ||
+-          labelLower.includes("packing")
+-        ) {
+-          result.shipping = parseMoney(cleanValue, currency);
+-        } else if (labelLower.includes("vat")) {
+-          result.vat = parseMoney(cleanValue, currency);
+-        } else if (
+-          labelLower.includes("tax") &&
+-          !labelLower.includes("before")
+-        ) {
+-          result.tax = parseMoney(cleanValue, currency);
+-        } else if (
+-          labelLower.includes("promotion") ||
+-          labelLower.includes("discount")
+-        ) {
+-          result.gift = parseMoney(cleanValue, currency);
+-        } else if (labelLower.includes("grand total")) {
+-          result.total = parseMoney(cleanValue, currency);
+-        } else if (
+-          labelLower.includes("total:") &&
+-          !labelLower.includes("before") &&
+-          !labelLower.includes("subtotal")
+-        ) {
+-          // "Total:" line (before Grand Total)
+-          if (!result.total) {
+-            result.total = parseMoney(cleanValue, currency);
+-          }
+-        }
+-      }
++function addPromotion(result: Partial<InvoiceData>, money: Money): void {
++  if (!result.gift) {
++    result.gift = money;
++    return;
++  }
++  result.gift = {
++    ...result.gift,
++    amount: Math.round((result.gift.amount + money.amount) * 100) / 100,
++    formatted: `${result.gift.formatted}+${money.formatted}`,
++  };
++}
+ 
+-      // If we found data from chargeSummary, return it
+-      if (result.subtotal || result.total || result.shipping) {
+-        console.error(
+-          `[invoice] Extracted from chargeSummary: subtotal=${result.subtotal?.formatted}, total=${result.total?.formatted}, shipping=${result.shipping?.formatted}, vat=${result.vat?.formatted}`,
+-        );
+-        return result;
+-      }
++/**
++ * Extract amounts from invoice page using data-component selectors.
++ */
++async function extractAmounts(
++  page: Page,
++  currency: string,
++): Promise<Partial<InvoiceData>> {
++  await waitForInvoiceChargeSummary(page);
++  const lines = await readChargeSummaryLines(page);
++  const pageText =
++    (await page.locator("body").innerText().catch(() => "")) ||
++    (await page.textContent("body").catch(() => "")) ||
++    "";
++  const result = parseInvoiceAmountLines(lines, pageText, currency);
++  console.error(
++    `[invoice] Extracted amounts: lines=${lines.length} subtotal=${result.subtotal?.formatted} total=${result.total?.formatted} shipping=${result.shipping?.formatted} promo=${result.gift?.formatted}`,
++  );
++  return result;
++}
++
++async function readChargeSummaryLines(
++  page: Page,
++): Promise<InvoiceAmountLine[]> {
++  const html =
++    (await page
++      .locator('[data-component="chargeSummary"]')
++      .innerHTML()
++      .catch(() => "")) || "";
++  const fromHtml = chargeSummaryLinesFromHtml(html);
++  if (fromHtml.length > 0) {
++    return fromHtml;
++  }
++  const rows = page.locator(INVOICE_CHARGE_SUMMARY_ROW);
++  const count = await rows.count();
++  const lines: InvoiceAmountLine[] = [];
++  for (let i = 0; i < count; i++) {
++    const row = rows.nth(i);
++    const label = (
++      (await row.locator(".od-line-item-row-label").textContent()) || ""
++    )
++      .replace(/\s+/g, " ")
++      .trim();
++    const value = (
++      (await row.locator(".od-line-item-row-content").textContent()) || ""
++    )
++      .replace(/\s+/g, " ")
++      .trim();
++    if (label || value) {
++      lines.push({ label, value });
+     }
+-  } catch (e) {
+-    console.error(`[invoice] chargeSummary extraction error: ${e}`);
+   }
++  if (lines.length > 0) {
++    return lines;
++  }
++  return page.evaluate(() => {
++    // eslint-disable-next-line @typescript-eslint/no-explicit-any
++    const doc = (globalThis as any).document;
++    const summary = doc.querySelector('[data-component="chargeSummary"]');
++    if (!summary) {
++      return [];
++    }
++    return Array.from(summary.querySelectorAll(".od-line-item-row")).map(
++      (row: any) => ({
++        label: (
++          row.querySelector(".od-line-item-row-label")?.textContent || ""
++        )
++          .replace(/\s+/g, " ")
++          .trim(),
++        value: (
++          row.querySelector(".od-line-item-row-content")?.textContent || ""
++        )
++          .replace(/\s+/g, " ")
++          .trim(),
++      }),
++    );
++  });
++}
+ 
+-  // Strategy 2: Fallback to text parsing
+-  const pageText = (await page.textContent("body").catch(() => "")) || "";
+-
+-  // Subtotal
++function fillInvoiceAmountsFromPageText(
++  result: Partial<InvoiceData>,
++  pageText: string,
++  currency: string,
++): void {
+   const subtotalMatch = pageText.match(
+     /Item(?:s)?\s*Subtotal:?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+   );
+-  if (subtotalMatch) {
++  if (subtotalMatch && !result.subtotal) {
+     result.subtotal = parseMoney(subtotalMatch[1], currency);
+   }
+ 
+-  // Shipping / Postage
+   const shippingPatterns = [
+     /Shipping\s*(?:&|and)?\s*Handling:?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+     /Postage\s*(?:&|and)?\s*Packing:?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+@@ -234,13 +371,12 @@ async function extractAmounts(
+   ];
+   for (const pattern of shippingPatterns) {
+     const match = pageText.match(pattern);
+-    if (match) {
++    if (match && !result.shipping) {
+       result.shipping = parseMoney(match[1], currency);
+       break;
+     }
+   }
+ 
+-  // Tax patterns (region-specific)
+   const taxPatterns = [
+     /Estimated\s*tax:?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+     /Tax\s*Collected:?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+@@ -248,40 +384,36 @@ async function extractAmounts(
+   ];
+   for (const pattern of taxPatterns) {
+     const match = pageText.match(pattern);
+-    if (match) {
++    if (match && !result.tax) {
+       result.tax = parseMoney(match[1], currency);
+       break;
+     }
+   }
+ 
+-  // VAT (UK/EU)
+   const vatPatterns = [
+     /Estimated\s*VAT:?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+     /VAT:?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+   ];
+   for (const pattern of vatPatterns) {
+     const match = pageText.match(pattern);
+-    if (match) {
++    if (match && !result.vat) {
+       result.vat = parseMoney(match[1], currency);
+       break;
+     }
+   }
+ 
+-  // GST (Canada/Australia)
+   const gstMatch = pageText.match(/(?:GST|HST):?\s*([$?????]?\s*[\d,]+\.?\d*)/i);
+-  if (gstMatch) {
++  if (gstMatch && !result.gst) {
+     result.gst = parseMoney(gstMatch[1], currency);
+   }
+ 
+-  // PST (Canada)
+   const pstMatch = pageText.match(
+     /(?:PST|QST|RST):?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+   );
+-  if (pstMatch) {
++  if (pstMatch && !result.pst) {
+     result.pst = parseMoney(pstMatch[1], currency);
+   }
+ 
+-  // Grand Total
+   const totalPatterns = [
+     /Grand\s*Total:?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+     /Order\s*Total:?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+@@ -295,30 +427,55 @@ async function extractAmounts(
+     }
+   }
+ 
+-  // Gift card / promotional credit / discount
+   const giftPatterns = [
+-    /Gift\s*Card:?\s*-?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+-    /Promotion\s*Applied:?\s*-?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+-    /Discount:?\s*-?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+-    /Subscribe\s*(?:&|and)?\s*Save:?\s*-?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
++    /Subscribe\s*(?:&|and)?\s*Save:?\s*(-?\s*[$?????]?\s*[\d,]+\.?\d*)/gi,
++    /Gift\s*Card:?\s*(-?\s*[$?????]?\s*[\d,]+\.?\d*)/gi,
++    /Promotion\s*Applied:?\s*(-?\s*[$?????]?\s*[\d,]+\.?\d*)/gi,
++    /Discount:?\s*(-?\s*[$?????]?\s*[\d,]+\.?\d*)/gi,
+   ];
+-  for (const pattern of giftPatterns) {
+-    const match = pageText.match(pattern);
+-    if (match) {
+-      result.gift = parseMoney(match[1], currency);
+-      break;
++  if (!result.gift) {
++    for (const pattern of giftPatterns) {
++      const matches = [...pageText.matchAll(pattern)];
++      for (const match of matches) {
++        if (match[1]) {
++          addPromotion(result, parseMoney(match[1], currency));
++        }
++      }
++      if (result.gift) {
++        break;
++      }
+     }
+   }
+ 
+-  // Refund
+   const refundMatch = pageText.match(
+     /Refund:?\s*-?\s*([$?????]?\s*[\d,]+\.?\d*)/i,
+   );
+-  if (refundMatch) {
++  if (refundMatch && !result.refund) {
+     result.refund = parseMoney(refundMatch[1], currency);
+   }
++}
+ 
+-  return result;
++async function extractOrderDate(page: Page): Promise<Date | null> {
++  const fromComponent = await page.evaluate(() => {
++    // eslint-disable-next-line @typescript-eslint/no-explicit-any
++    const doc = (globalThis as any).document;
++    const node = doc.querySelector('[data-component="orderDate"]');
++    return node ? (node.textContent || "").replace(/\s+/g, " ").trim() : "";
++  });
++  if (fromComponent) {
++    const parsed = parseDate(fromComponent);
++    if (parsed) {
++      return parsed;
++    }
++  }
++  const pageText = (await page.textContent("body").catch(() => "")) || "";
++  const match =
++    pageText.match(/Order\s*Date:?\s*([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i) ||
++    pageText.match(/Placed\s*(?:on)?:?\s*([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i);
++  if (!match?.[1]) {
++    return null;
++  }
++  return parseDate(match[1]);
+ }
+ 
+ /**
 diff --git a/src/amazon/extractors/items.ts b/src/amazon/extractors/items.ts
 index a41e821..4accb1e 100644
 --- a/src/amazon/extractors/items.ts
@@ -225,11 +717,213 @@ index a41e821..4accb1e 100644
      } catch (e) {
        debug(`Strategy4: Error extracting item: ${e}`);
        continue;
+diff --git a/src/amazon/extractors/transactions-page.ts b/src/amazon/extractors/transactions-page.ts
+index 75a03c7..45a024f 100644
+--- a/src/amazon/extractors/transactions-page.ts
++++ b/src/amazon/extractors/transactions-page.ts
+@@ -48,7 +48,7 @@ export async function extractTransactionsFromPage(
+     maxScrolls?: number;
+     onProgress?: (message: string, count: number) => void;
+   },
+-): Promise<Transaction[]> {
++): Promise<{ transactions: Transaction[]; paginationComplete: boolean }> {
+   const regionConfig = getRegionByCode(region);
+   const currency = regionConfig?.currency || "USD";
+   const url = getTransactionsPageUrl(region);
+@@ -74,6 +74,8 @@ export async function extractTransactionsFromPage(
+   let pageCount = 0;
+   let previousCount = 0;
+   let stableCount = 0;
++  let reachedRequestedStart = false;
++  let finishedPaging = false;
+ 
+   // The transactions page is paginated (Previous/Next page buttons).
+   // Walk pages until there's no enabled Next button, we pass the start date,
+@@ -114,13 +116,14 @@ export async function extractTransactionsFromPage(
+         ...allTransactions.map((t) => t.date.getTime()),
+       );
+       if (oldestDate < startDate.getTime()) {
++        reachedRequestedStart = true;
+         break;
+       }
+     }
+ 
+-    // Move to the next page if there is one
+-    const advanced = await goToNextPage(page);
+-    if (!advanced) {
++    const next = await goToNextPage(page);
++    if (!next.advanced) {
++      finishedPaging = next.reason === "no-next";
+       break;
+     }
+     pageCount++;
+@@ -150,7 +153,10 @@ export async function extractTransactionsFromPage(
+     filteredTransactions.length,
+   );
+ 
+-  return filteredTransactions;
++  return {
++    transactions: filteredTransactions,
++    paginationComplete: reachedRequestedStart || finishedPaging,
++  };
+ }
+ 
+ /**
+@@ -670,38 +676,79 @@ function parseTransactionText(
+ }
+ 
+ /**
+- * Advance to the next page of transactions.
+- * Returns true if navigation happened, false if there is no next page.
+- *
+- * The paginated page uses a form-submit button:
+- *   <input name="ppw-widgetEvent:DefaultNextPageNavigationEvent:..." type="submit">
+- * (disabled buttons have no such input / carry the disabled attribute).
+- * Falls back to scrolling for legacy infinite-scroll layouts.
++ * Advance to the next page of transactions by POSTing the Next form fields.
++ * Clicking Next in Playwright fires continueWidget and Amazon returns 401.
+  */
+-async function goToNextPage(page: Page): Promise<boolean> {
+-  const nextButton = page.locator(
+-    'input[name*="DefaultNextPageNavigationEvent"]:not([disabled])',
+-  );
++type NextPageResult = {
++  advanced: boolean;
++  reason: "advanced" | "no-next" | "failed" | "unchanged" | "scrolled";
++};
++
++async function goToNextPage(page: Page): Promise<NextPageResult> {
++  const before = await transactionFingerprint(page);
++  const form = await page.evaluate(() => {
++    // eslint-disable-next-line @typescript-eslint/no-explicit-any
++    const doc = (globalThis as any).document;
++    const next = doc.querySelector(
++      'input[name*="DefaultNextPageNavigationEvent"]:not([disabled])',
++    );
++    if (!next) {
++      return null;
++    }
++    const formEl = next.closest("form");
++    if (!formEl) {
++      return null;
++    }
++    const state = formEl.querySelector('input[name="ppw-widgetState"]');
++    const ie = formEl.querySelector('input[name="ie"]');
++    return {
++      action: formEl.getAttribute("action") || "",
++      nextName: next.getAttribute("name") || "",
++      widgetState: state ? state.value : "",
++      ie: ie ? ie.value : "UTF-8",
++    };
++  });
+ 
+-  const count = await nextButton.count().catch(() => 0);
+-  if (count > 0) {
+-    await Promise.all([
+-      page
+-        .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 30000 })
+-        .catch(() => {}),
+-      nextButton.first().click(),
+-    ]);
+-    // Wait for the new page's transactions to render
+-    await page
+-      .waitForSelector(".apx-transactions-line-item-component-container", {
+-        timeout: 10000,
+-      })
+-      .catch(() => {});
+-    await page.waitForTimeout(500);
+-    return true;
++  if (form?.nextName && form.widgetState) {
++    const url = transactionsFormUrl(form.action, page.url());
++    const origin = new URL(url).origin;
++    const referer = page.url().startsWith("http") ? page.url() : url;
++    const response = await page.request.post(url, {
++      form: {
++        "ppw-widgetState": form.widgetState,
++        ie: form.ie,
++        [form.nextName]: "",
++      },
++      headers: {
++        Referer: referer,
++        Origin: origin,
++      },
++    });
++    if (!response.ok()) {
++      console.error(
++        `[transactions-page] next-page POST failed: ${response.status()}`,
++      );
++      return { advanced: false, reason: "failed" };
++    }
++    const html = await response.text();
++    if (!html.includes("apx-transactions-line-item-component-container")) {
++      console.error(
++        "[transactions-page] next-page POST did not return transaction markup",
++      );
++      return { advanced: false, reason: "failed" };
++    }
++    await page.setContent(html, { waitUntil: "domcontentloaded" });
++    const after = await transactionFingerprint(page);
++    if (!after || after === before) {
++      console.error(
++        "[transactions-page] next-page POST did not change order IDs",
++      );
++      return { advanced: false, reason: "unchanged" };
++    }
++    console.error("[transactions-page] next-page POST advanced");
++    return { advanced: true, reason: "advanced" };
+   }
+ 
+-  // Legacy infinite-scroll layout: scroll the last item into view
+   const lastTransaction = page
+     .locator('[data-testid="transaction-link"], .transactions-line-item')
+     .last();
+@@ -710,10 +757,39 @@ async function goToNextPage(page: Page): Promise<boolean> {
+   if (exists > 0) {
+     await lastTransaction.scrollIntoViewIfNeeded().catch(() => {});
+     await page.waitForTimeout(500);
+-    return true;
++    const after = await transactionFingerprint(page);
++    if (after && after !== before) {
++      return { advanced: true, reason: "scrolled" };
++    }
++    return { advanced: false, reason: "no-next" };
+   }
+ 
+-  return false;
++  return { advanced: false, reason: "no-next" };
++}
++
++function transactionsFormUrl(action: string, pageUrl: string): string {
++  const fallback = "https://www.amazon.com/cpe/yourpayments/transactions";
++  const base = pageUrl.startsWith("http") ? pageUrl : fallback;
++  const url = new URL(action || base, base);
++  if (url.port === "443" || url.port === "80") {
++    url.port = "";
++  }
++  return url.href;
++}
++
++async function transactionFingerprint(page: Page): Promise<string> {
++  return page.evaluate(() => {
++    // eslint-disable-next-line @typescript-eslint/no-explicit-any
++    const doc = (globalThis as any).document;
++    return Array.from(
++      doc.querySelectorAll(
++        '.apx-transactions-line-item-component-container a[href*="orderID="]',
++      ),
++    )
++      .map((anchor: any) => anchor.getAttribute("href"))
++      .filter(Boolean)
++      .join("|");
++  });
+ }
+ 
+ /**
 diff --git a/src/index.ts b/src/index.ts
-index 6b288be..213de74 100644
+index 6b288be..42b0834 100644
 --- a/src/index.ts
 +++ b/src/index.ts
-@@ -812,7 +812,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
+@@ -812,9 +812,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                      ? {
                          id: order.id,
                          date: order.date?.toISOString(),
@@ -237,12 +931,70 @@ index 6b288be..213de74 100644
 +                        total: order.grandTotal ?? order.total,
                          shipping: order.shipping,
                          tax: order.tax,
++                        promotion: order.promotion,
                          recipient: order.recipient,
+                         payments: order.payments,
+                         itemCount: order.items?.length || 0,
+@@ -1185,7 +1186,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
+         const endDate = args?.end_date as string | undefined;
+         const maxScrolls = args?.max_scrolls as number | undefined;
+ 
+-        const transactions = await extractTransactionsFromPage(
++        const extracted = await extractTransactionsFromPage(
+           currentPage,
+           region,
+           {
+@@ -1211,8 +1212,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
+                     endDate,
+                     maxScrolls,
+                   },
+-                  transactionCount: transactions.length,
+-                  transactions: transactions.map((t) => ({
++                  paginationComplete: extracted.paginationComplete,
++                  transactionCount: extracted.transactions.length,
++                  transactions: extracted.transactions.map((t) => ({
+                     date: t.date.toISOString(),
+                     orderIds: t.orderIds,
+                     amount: t.amount,
 diff --git a/src/tools/fetch-orders.ts b/src/tools/fetch-orders.ts
-index 5d79222..76d2e4b 100644
+index 5d79222..ff3e677 100644
 --- a/src/tools/fetch-orders.ts
 +++ b/src/tools/fetch-orders.ts
-@@ -201,107 +201,47 @@ export async function fetchOrders(
+@@ -16,9 +16,19 @@ import {
+   hasNextPage,
+   goToNextPage,
+ } from "../amazon/extractors";
+-import { extractFromInvoice } from "../amazon/extractors/invoice";
++import {
++  extractFromInvoice,
++  waitForInvoiceChargeSummary,
++} from "../amazon/extractors/invoice";
+ import { getRegionByCode } from "../amazon/regions";
+ 
++function isScrapedMoney(value: Money | undefined): value is Money {
++  if (!value) {
++    return false;
++  }
++  return value.amount !== 0 || Boolean(value.formatted);
++}
++
+ /**
+  * Parse invoice address lines into simple line1-line7 structure.
+  */
+@@ -171,11 +181,7 @@ export async function fetchOrders(
+       const currentUrl = page.url();
+       console.error(`[fetch-orders] Current URL: ${currentUrl}`);
+ 
+-      await page
+-        .waitForSelector('[data-component="purchasedItems"], table, .a-box', {
+-          timeout: 3000,
+-        })
+-        .catch(() => {});
++      await waitForInvoiceChargeSummary(page);
+ 
+       // Check for error banners (e.g., "We're unable to load your order details")
+       const errorBanner = await page
+@@ -201,107 +207,53 @@ export async function fetchOrders(
          }
        }
  
@@ -263,7 +1015,10 @@ index 5d79222..76d2e4b 100644
 -      if (itemContainers.length === 0) {
 -        console.error(
 -          `[fetch-orders] No data-component items found, using extractFromInvoice`,
--        );
++      if (!isScrapedMoney(invoiceData.total)) {
++        result.errors.push(
++          `Invoice total missing for ${orderId} (subtotal=${invoiceData.subtotal?.formatted ?? "none"} promo=${invoiceData.gift?.formatted ?? "none"})`,
+         );
 -        const invoiceData = await extractFromInvoice(page, header);
 -
 -        // Copy over invoice data (amounts, recipient, payments) regardless of items
@@ -341,15 +1096,17 @@ index 5d79222..76d2e4b 100644
 -          );
 -          enrichedOrder.items = items;
 -          result.items = items;
++      }
++      if (invoiceData.orderDate) enrichedOrder.date = invoiceData.orderDate;
 +      if (invoiceData.subtotal) enrichedOrder.subtotal = invoiceData.subtotal;
-+      if (invoiceData.total) {
++      if (isScrapedMoney(invoiceData.total)) {
 +        enrichedOrder.grandTotal = invoiceData.total;
 +        enrichedOrder.total = invoiceData.total;
 +      }
 +      if (invoiceData.shipping) enrichedOrder.shipping = invoiceData.shipping;
 +      if (invoiceData.tax) enrichedOrder.tax = invoiceData.tax;
 +      if (invoiceData.vat) enrichedOrder.vat = invoiceData.vat;
-+      if (invoiceData.gift) enrichedOrder.promotion = invoiceData.gift;
++      if (isScrapedMoney(invoiceData.gift)) enrichedOrder.promotion = invoiceData.gift;
 +      if (invoiceData.recipientName) {
 +        enrichedOrder.recipient = invoiceData.recipientName;
 +        if (invoiceData.shippingAddress) {
@@ -383,7 +1140,7 @@ index 5d79222..76d2e4b 100644
                ? enrichedOrder.recipient
                : undefined,
            subtotal: enrichedOrder.subtotal,
-@@ -310,137 +250,35 @@ export async function fetchOrders(
+@@ -310,137 +262,35 @@ export async function fetchOrders(
            vat: enrichedOrder.vat,
            promotion: enrichedOrder.promotion,
            grandTotal: enrichedOrder.grandTotal,
@@ -420,7 +1177,7 @@ index 5d79222..76d2e4b 100644
 -            const priceText = await priceEl
 -              .textContent({ timeout: 500 })
 -              .catch(() => "");
--            const priceMatch = priceText?.match(/[£$€]?([\d,.]+)/);
+-            const priceMatch = priceText?.match(/[??$???]?([\d,.]+)/);
 -            const priceAmount = priceMatch
 -              ? parseFloat(priceMatch[1].replace(",", ""))
 -              : 0;
@@ -543,3 +1300,492 @@ index 5d79222..76d2e4b 100644
        }
  
        // If no items found from invoice, try the detail page
+@@ -743,12 +593,16 @@ export async function fetchOrders(
+             const invoiceData = await extractFromInvoice(page, header);
+ 
+             // Merge all invoice data into order (amounts, recipient, payments)
++            if (invoiceData.orderDate && !order.date) order.date = invoiceData.orderDate;
+             if (invoiceData.subtotal) order.subtotal = invoiceData.subtotal;
+             if (invoiceData.shipping) order.shipping = invoiceData.shipping;
+             if (invoiceData.tax) order.tax = invoiceData.tax;
+             if (invoiceData.vat) order.vat = invoiceData.vat;
+-            if (invoiceData.total) order.grandTotal = invoiceData.total;
+-            if (invoiceData.gift) order.promotion = invoiceData.gift;
++            if (isScrapedMoney(invoiceData.total)) {
++              order.grandTotal = invoiceData.total;
++              order.total = invoiceData.total;
++            }
++            if (isScrapedMoney(invoiceData.gift)) order.promotion = invoiceData.gift;
+             if (invoiceData.payments && invoiceData.payments.length > 0) {
+               order.payments = invoiceData.payments;
+               // Also set paymentMethod from first payment
+diff --git a/tests/unit/fixtures/gloves-charge-summary.html b/tests/unit/fixtures/gloves-charge-summary.html
+new file mode 100644
+index 0000000..c77997a
+--- /dev/null
++++ b/tests/unit/fixtures/gloves-charge-summary.html
+@@ -0,0 +1,366 @@
++<ul class="a-unordered-list a-nostyle a-vertical">
++    
++        
++            
++            
++                <li><span class="a-list-item">
++                    <div class="a-row od-line-item-row">
++                        <div class="a-column a-span7 od-line-item-row-label">
++                            
++                            
++                            
++                            
++
++
++
++
++
++
++
++    
++    
++    
++        <span class="a-size-base">
++            <span>Item(s) Subtotal: </span>
++        </span>
++    
++
++                        </div>
++                        <div class="a-column a-span5 od-line-item-row-content a-span-last">
++                            
++                            
++
++
++
++
++
++
++            
++                <span class="a-size-base a-color-base">
++                    $46.99
++                </span>
++            
++            
++            
++            
++        
++                        </div>
++                    </div>
++                </span></li>
++            
++        
++    
++        
++            
++            
++                <li><span class="a-list-item">
++                    <div class="a-row od-line-item-row">
++                        <div class="a-column a-span7 od-line-item-row-label">
++                            
++                            
++                            
++                            
++
++
++
++
++
++
++
++    
++    
++    
++        <span class="a-size-base">
++            <span>Shipping &amp; Handling:</span>
++        </span>
++    
++
++                        </div>
++                        <div class="a-column a-span5 od-line-item-row-content a-span-last">
++                            
++                            
++
++
++
++
++
++
++            
++                <span class="a-size-base a-color-base">
++                    $0.00
++                </span>
++            
++            
++            
++            
++        
++                        </div>
++                    </div>
++                </span></li>
++            
++        
++    
++        
++            
++            
++                <li><span class="a-list-item">
++                    <div class="a-row od-line-item-row">
++                        <div class="a-column a-span7 od-line-item-row-label">
++                            
++                            
++                            
++                            
++
++
++
++
++
++
++
++    
++    
++    
++        <span class="a-size-base">
++            <span>Subscribe &amp; Save:</span>
++        </span>
++    
++
++                        </div>
++                        <div class="a-column a-span5 od-line-item-row-content a-span-last">
++                            
++                            
++
++
++
++
++
++
++            
++                <span class="a-size-base a-color-base">
++                    -$4.70
++                </span>
++            
++            
++            
++            
++        
++                        </div>
++                    </div>
++                </span></li>
++            
++        
++    
++        
++            
++            
++                <li><span class="a-list-item">
++                    <div class="a-row od-line-item-row">
++                        <div class="a-column a-span7 od-line-item-row-label">
++                            
++                            
++                            
++                            
++
++
++
++
++
++
++
++    
++    
++    
++        <span class="a-size-base">
++            <span>Subscribe &amp; Save:</span>
++        </span>
++    
++
++                        </div>
++                        <div class="a-column a-span5 od-line-item-row-content a-span-last">
++                            
++                            
++
++
++
++
++
++
++            
++                <span class="a-size-base a-color-base">
++                    -$2.35
++                </span>
++            
++            
++            
++            
++        
++                        </div>
++                    </div>
++                </span></li>
++            
++        
++    
++        
++            
++            
++                <li><span class="a-list-item">
++                    <div class="a-row od-line-item-row">
++                        <div class="a-column a-span7 od-line-item-row-label">
++                            
++                            
++                            
++                            
++
++
++
++
++
++
++
++    
++    
++    
++        <span class="a-size-base">
++            <span>Total before tax:</span>
++        </span>
++    
++
++                        </div>
++                        <div class="a-column a-span5 od-line-item-row-content a-span-last">
++                            
++                            
++
++
++
++
++
++
++            
++                <span class="a-size-base a-color-base">
++                    $39.94
++                </span>
++            
++            
++            
++            
++        
++                        </div>
++                    </div>
++                </span></li>
++            
++        
++    
++        
++            
++            
++                <li><span class="a-list-item">
++                    <div class="a-row od-line-item-row">
++                        <div class="a-column a-span7 od-line-item-row-label">
++                            
++                            
++                            
++                            
++
++
++
++
++
++
++
++    
++    
++    
++        <span class="a-size-base">
++            <span>Estimated tax to be collected:</span>
++        </span>
++    
++
++                        </div>
++                        <div class="a-column a-span5 od-line-item-row-content a-span-last">
++                            
++                            
++
++
++
++
++
++
++            
++                <span class="a-size-base a-color-base">
++                    $0.00
++                </span>
++            
++            
++            
++            
++        
++                        </div>
++                    </div>
++                </span></li>
++            
++        
++    
++        
++            
++            
++                <li><span class="a-list-item">
++                    <div class="a-row od-line-item-row">
++                        <div class="a-column a-span7 od-line-item-row-label">
++                            
++                            
++                            
++                            
++
++
++
++
++
++
++
++    
++    
++        
++        
++
++
++
++
++
++<span class="a-size-base a-color-base a-text-bold">
++    <span>Grand Total:</span>
++</span>
++    
++    
++
++                        </div>
++                        <div class="a-column a-span5 od-line-item-row-content a-span-last">
++                            
++                            
++
++
++
++
++
++
++            
++            
++                
++                
++
++
++
++
++<span class="a-size-base a-color-base a-text-bold">
++    $39.94
++</span>
++            
++            
++            
++        
++                        </div>
++                    </div>
++                </span></li>
++            
++        
++    
++</ul>
+diff --git a/tests/unit/invoice-amounts.test.ts b/tests/unit/invoice-amounts.test.ts
+new file mode 100644
+index 0000000..d4f7e6f
+--- /dev/null
++++ b/tests/unit/invoice-amounts.test.ts
+@@ -0,0 +1,92 @@
++import assert from 'node:assert/strict';
++import { describe, it } from 'node:test';
++
++import { readFileSync } from 'node:fs';
++import { join } from 'node:path';
++
++import {
++  chargeSummaryLinesFromHtml,
++  INVOICE_CHARGE_SUMMARY_ROW,
++  parseInvoiceAmountLines,
++} from '../../src/amazon/extractors/invoice';
++
++describe('parseInvoiceAmountLines', () => {
++  it('fills Grand Total and Subscribe & Save after charge-summary only has subtotal', () => {
++    const pageText = [
++      'Items Subtotal: $46.99',
++      'Shipping & Handling: $0.00',
++      'Subscribe & Save: -$7.05',
++      'Grand Total: $39.94',
++    ].join('\n');
++
++    const parsed = parseInvoiceAmountLines(
++      [
++        { label: 'Item(s) Subtotal:', value: '$46.99' },
++        { label: 'Shipping & Handling:', value: '$0.00' },
++      ],
++      pageText,
++      'USD',
++    );
++
++    assert.equal(parsed.subtotal?.amount, 46.99);
++    assert.equal(parsed.total?.amount, 39.94);
++    assert.equal(parsed.gift?.amount, -7.05);
++  });
++
++  it('reads Subscribe & Save from a charge-summary label', () => {
++    const parsed = parseInvoiceAmountLines(
++      [
++        { label: 'Item(s) Subtotal:', value: '$46.99' },
++        { label: 'Subscribe & Save', value: '-$7.05' },
++        { label: 'Grand Total:', value: '$39.94' },
++      ],
++      '',
++      'USD',
++    );
++    assert.equal(parsed.total?.amount, 39.94);
++    assert.equal(parsed.gift?.amount, -7.05);
++  });
++
++  it('sums stacked Subscribe & Save rows from a live invoice', () => {
++    const parsed = parseInvoiceAmountLines(
++      [
++        { label: 'Item(s) Subtotal:', value: '$46.99' },
++        { label: 'Shipping & Handling:', value: '$0.00' },
++        { label: 'Subscribe & Save:', value: '-$4.70' },
++        { label: 'Subscribe & Save:', value: '-$2.35' },
++        { label: 'Total before tax:', value: '$39.94' },
++        { label: 'Estimated tax to be collected:', value: '$0.00' },
++        { label: 'Grand Total:', value: '$39.94' },
++      ],
++      '',
++      'USD',
++    );
++    assert.equal(parsed.subtotal?.amount, 46.99);
++    assert.equal(parsed.total?.amount, 39.94);
++    assert.equal(parsed.gift?.amount, -7.05);
++  });
++
++  it('waits for charge-summary rows, not the empty wrapper', () => {
++    assert.match(INVOICE_CHARGE_SUMMARY_ROW, /chargeSummary/);
++    assert.match(INVOICE_CHARGE_SUMMARY_ROW, /od-line-item-row/);
++    assert.doesNotMatch(INVOICE_CHARGE_SUMMARY_ROW, /purchasedItems/);
++  });
++
++  it('parses Grand Total and stacked Subscribe & Save from saved gloves invoice HTML', () => {
++    const html = readFileSync(
++      join('tests/unit/fixtures/gloves-charge-summary.html'),
++      'utf8',
++    );
++    const lines = chargeSummaryLinesFromHtml(html);
++    assert.equal(lines.length, 7);
++    assert.equal(lines[0]?.label, 'Item(s) Subtotal:');
++    assert.equal(lines[0]?.value, '$46.99');
++    assert.equal(lines[6]?.label, 'Grand Total:');
++    assert.equal(lines[6]?.value, '$39.94');
++
++    const parsed = parseInvoiceAmountLines(lines, '', 'USD');
++    assert.equal(parsed.subtotal?.amount, 46.99);
++    assert.equal(parsed.total?.amount, 39.94);
++    assert.equal(parsed.gift?.amount, -7.05);
++  });
++});

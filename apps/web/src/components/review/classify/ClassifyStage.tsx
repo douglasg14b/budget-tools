@@ -190,7 +190,7 @@ export function ClassifyStage({
                 {amazon?.asking && !amazon.overlay ? (
                     <p className={classes.llmBanner}>
                         <Loader size={14} color="gray" />
-                        Matching Amazon payment…
+                        Loading Amazon order…
                     </p>
                 ) : null}
             </div>

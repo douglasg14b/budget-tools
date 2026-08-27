@@ -25,7 +25,7 @@ export function ClassifyAmazonContext({ overlay, asking, error, syncing, onSync 
             {asking && !overlay ? (
                 <p className={classes.asking}>
                     <Loader size={14} color="gray" />
-                    Matching Amazon payment…
+                    Loading Amazon order…
                 </p>
             ) : null}
             {overlay?.payment ? (
@@ -70,7 +70,7 @@ export function ClassifyAmazonContext({ overlay, asking, error, syncing, onSync 
                         {order.orderDate ? <span>{formatTransactionDate(order.orderDate)}</span> : null}
                         {order.total != null ? <span>{formatYnabAmount(order.total)}</span> : null}
                     </p>
-                    {orderMeta(order) ? <p className={classes.orderMeta}>{orderMeta(order)}</p> : null}
+                    {orderMeta(order, items) ? <p className={classes.orderMeta}>{orderMeta(order, items)}</p> : null}
                     {items.length > 0 ? (
                         <ul className={classes.items}>
                             {amazonItemKeys(items).map(({ item, key }) => (
@@ -116,6 +116,19 @@ function groupItems(
     if (overlay.orders.length > 0) {
         return overlay.orders.map((order) => ({ order, items: byOrder.get(order.orderId) ?? [] }));
     }
+    if (overlay.orderIds.length > 0) {
+        return overlay.orderIds.map((orderId) => ({
+            order: {
+                orderId,
+                orderDate: null,
+                total: null,
+                tax: null,
+                shipping: null,
+                promotion: null,
+            },
+            items: byOrder.get(orderId) ?? [],
+        }));
+    }
     return [...byOrder.entries()].map(([orderId, items]) => ({
         order: {
             orderId,
@@ -129,8 +142,18 @@ function groupItems(
     }));
 }
 
-function orderMeta(order: AmazonMatchedOrderDto): string | null {
+function orderMeta(order: AmazonMatchedOrderDto, items: AmazonSplitItemDto[]): string | null {
     const parts: string[] = [];
+    const charged = order.total != null ? Math.abs(order.total) : null;
+    const listFromPromo =
+        charged != null && order.promotion != null && order.promotion !== 0
+            ? charged + Math.abs(order.promotion)
+            : null;
+    const listFromItems = items.reduce((sum, item) => sum + Math.abs(item.amount), 0);
+    const list = listFromPromo ?? (charged != null && listFromItems !== charged ? listFromItems : null);
+    if (list != null && charged != null && list !== charged && order.total != null) {
+        parts.push(`list ${formatYnabAmount(Math.sign(order.total) * list)}`);
+    }
     if (order.tax != null) {
         parts.push(`tax ${formatYnabAmount(order.tax)}`);
     }

@@ -3,6 +3,7 @@ import { Body, Get, Post, Route, Tags } from 'tsoa';
 import { getAmazonOrdersSource } from './amazonMcpClient';
 import type { AmazonOrdersStatusDto, AmazonOrdersSyncDto, AmazonOrdersSyncRequestDto } from './amazonOrdersDtos';
 import { getAmazonOrdersStatus as loadAmazonOrdersStatus } from './getAmazonOrdersStatus';
+import { oldestUncategorizedAmazonDate } from './oldestUncategorizedAmazonDate';
 import { syncAmazonOrders } from './syncAmazonOrders';
 
 @Route('amazon-orders')
@@ -18,11 +19,15 @@ export class AmazonOrdersController {
     }
 
     /**
-     * Scrape Amazon payment/order gaps into SQLite. Starts the MCP subprocess if needed.
+     * Index Amazon payments from the oldest uncategorized Amazon charge through today,
+     * then fetch invoices for order IDs in the requested classify window. Starts the MCP subprocess if needed.
      * @summary postAmazonOrdersSync
      */
     @Post('sync')
     public async postAmazonOrdersSync(@Body() body: AmazonOrdersSyncRequestDto): Promise<AmazonOrdersSyncDto> {
-        return await syncAmazonOrders(body, await getAmazonOrdersSource());
+        return await syncAmazonOrders(
+            { ...body, oldestUncategorizedDate: await oldestUncategorizedAmazonDate() },
+            await getAmazonOrdersSource(),
+        );
     }
 }

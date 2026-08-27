@@ -1,4 +1,5 @@
 import { isAbsolute, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import env from 'env-var';
 
@@ -65,7 +66,7 @@ export function getSqliteDbPath(): string {
  */
 export function getAmazonOrdersMcpEntry(): string | undefined {
     const value = env.get('AMAZON_ORDERS_MCP_ENTRY').default('').asString().trim();
-    return value ? resolveFromCwd(value) : undefined;
+    return value ? resolveFromRepoRoot(value) : undefined;
 }
 
 export const AMAZON_ORDERS_REGION = env.get('AMAZON_ORDERS_REGION').default('us').asString();
@@ -74,4 +75,13 @@ export const AMAZON_ORDERS_SYNC_TIMEOUT_MS = env.get('AMAZON_ORDERS_SYNC_TIMEOUT
 
 function resolveFromCwd(value: string): string {
     return isAbsolute(value) ? value : resolve(process.cwd(), value);
+}
+
+/** `pnpm setup:amazon-mcp` writes a path relative to the repo root, not the API cwd. */
+function resolveFromRepoRoot(value: string): string {
+    if (isAbsolute(value)) {
+        return value;
+    }
+    const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
+    return resolve(repoRoot, value);
 }

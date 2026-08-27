@@ -11,6 +11,7 @@ describe('parseAmazonMcp', () => {
     it('parses payment transactions from the MCP envelope', () => {
         const payments = parseAmazonTransactionsPayload({
             status: 'success',
+            paginationComplete: true,
             transactions: [
                 {
                     date: '2026-02-03T12:00:00.000Z',
@@ -21,8 +22,9 @@ describe('parseAmazonMcp', () => {
                 },
             ],
         });
-        expect(payments).toHaveLength(1);
-        expect(payments[0]).toMatchObject({
+        expect(payments.payments).toHaveLength(1);
+        expect(payments.paginationComplete).toBe(true);
+        expect(payments.payments[0]).toMatchObject({
             paymentDate: '2026-02-03',
             amountMilliunits: -47640,
             currency: 'USD',
@@ -75,6 +77,53 @@ describe('parseAmazonMcp', () => {
                 rawJson: expect.any(String),
             },
         ]);
+    });
+
+    it('parses invoice grand total and Subscribe & Save promotion', () => {
+        const order = parseAmazonOrderDetailsPayload(
+            {
+                status: 'success',
+                order: {
+                    id: '112-6525276-5321000',
+                    date: '2026-08-21T00:00:00.000Z',
+                    total: { amount: 39.94, currency: 'USD', formatted: '$39.94' },
+                    promotion: { amount: 7.05, currency: 'USD', formatted: '-$7.05' },
+                    shipping: { amount: 0, formatted: '$0.00' },
+                    tax: { amount: 0, formatted: '$0.00' },
+                },
+                items: [
+                    {
+                        name: 'SAFESKIN nitrile gloves',
+                        asin: 'B091J6NVS5',
+                        quantity: 1,
+                        unitPrice: { amount: 46.99 },
+                        subscriptionFrequency: 'Every 3 months',
+                    },
+                ],
+            },
+            '112-6525276-5321000',
+        );
+        expect(order.totalMilliunits).toBe(39940);
+        expect(order.promotionMilliunits).toBe(7050);
+        expect(order.orderDate).toBe('2026-08-21');
+        expect(order.items[0]?.itemTotalMilliunits).toBe(46990);
+    });
+
+    it('does not store a placeholder $0 total as a real total', () => {
+        const order = parseAmazonOrderDetailsPayload(
+            {
+                status: 'success',
+                order: {
+                    id: '113-7991450-8305811',
+                    total: { amount: 0, currency: 'USD', formatted: '' },
+                },
+                items: [{ name: 'Cervical pillow', quantity: 1, unitPrice: { amount: 35.99 } }],
+            },
+            '113-7991450-8305811',
+        );
+        expect(order.totalMilliunits).toBeNull();
+        expect(order.promotionMilliunits).toBeNull();
+        expect(order.items[0]?.itemTotalMilliunits).toBe(35990);
     });
 
     it('parses auth status', () => {

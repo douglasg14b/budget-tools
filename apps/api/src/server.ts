@@ -4,7 +4,7 @@ import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import { ValidateError } from 'tsoa';
 import { getAppDatabase } from './data-persistence/database';
-import { API_PORT, CATEGORIZATION_QUEUE_CACHE_DIR } from './environment';
+import { API_PORT, CATEGORIZATION_QUEUE_CACHE_DIR, getAmazonOrdersMcpEntry } from './environment';
 import { QueryValidationError } from './features/categorization/filterQueue';
 import { LlmSuggestError } from './features/categorization/llm/LlmSuggestError';
 import { clearLlmOverlayCache } from './features/categorization/llm/overlayCache';
@@ -101,6 +101,7 @@ async function start(): Promise<void> {
     await clearLlmOverlayCache(CATEGORIZATION_QUEUE_CACHE_DIR);
     app.listen(API_PORT, () => {
         console.log(`API listening on http://localhost:${API_PORT}`);
+        console.log(`Amazon MCP entry ${getAmazonOrdersMcpEntry() ?? 'unset'}`);
     });
 }
 

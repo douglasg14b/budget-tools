@@ -1,27 +1,33 @@
 import type { AppDatabaseClient } from '../../data-persistence/database';
 import { getAppDatabase } from '../../data-persistence/database';
 import { AMAZON_ORDERS_REGION } from '../../environment';
-import { amazonOrderLooksIncomplete } from '../amazonClassify/amazonOrderLooksIncomplete';
-import { deleteAmazonSplitOverlaysForOrders } from '../amazonClassify/data/amazonSplitOverlayRepo';
 import { HttpError } from '../travelWindows/HttpError';
 import type { AmazonOrdersSource } from './amazonOrdersSource';
 import {
     countAmazonCache,
     getAmazonSyncState,
-    getOrderWithItems,
     listOrderIdsFromPaymentsInRange,
-    listStoredOrderIds,
     saveAmazonSyncState,
-    upsertAmazonOrder,
     upsertAmazonPayments,
 } from './data/amazonOrdersRepo';
+import { fetchAmazonOrderInvoices } from './fetchAmazonOrderInvoices';
 import type { IsoDateRange } from './isoDate';
-import { isIsoDate, mergeIsoDateRanges, uncoveredIsoDateRanges } from './isoDate';
+import {
+    amazonPaymentIndexRange,
+    coveredRangeFromScrapedPayments,
+    isIsoDate,
+    mergeIsoDateRanges,
+    paymentScrapeRange,
+    uncoveredIsoDateRanges,
+    utcTodayIso,
+} from './isoDate';
 
 export type SyncAmazonOrdersInput = {
     readonly from: string;
     readonly to: string;
     readonly region?: string;
+    readonly oldestUncategorizedDate?: string | null;
+    readonly today?: string;
 };
 
 export type SyncAmazonOrdersResult = {
@@ -53,8 +59,15 @@ export async function syncAmazonOrders(
     const database = db ?? (await getAppDatabase());
     const region = input.region?.trim() || AMAZON_ORDERS_REGION;
     const requested: IsoDateRange = { start: from, end: to };
+    const today = input.today && isIsoDate(input.today) ? input.today : utcTodayIso();
+    const paymentIndex = amazonPaymentIndexRange({
+        requested,
+        oldestUncategorizedDate: input.oldestUncategorizedDate ?? null,
+        today,
+    });
     const state = await getAmazonSyncState(database);
-    const paymentGaps = uncoveredIsoDateRanges(state.coveredRanges, requested);
+    const paymentGaps = uncoveredIsoDateRanges(state.coveredRanges, paymentIndex);
+    const scrape = paymentScrapeRange(paymentGaps, paymentIndex.end);
 
     const auth = await source.checkAuth(region);
     await saveAmazonSyncState(
@@ -73,36 +86,25 @@ export async function syncAmazonOrders(
         );
     }
 
-    for (const gap of paymentGaps) {
-        const payments = await source.getTransactions({ region, range: gap });
-        await upsertAmazonPayments(payments, database);
+    let nextCovered = state.coveredRanges;
+    const scrapedPaymentGaps: IsoDateRange[] = [];
+    if (scrape) {
+        const scraped = await source.getTransactions({ region, range: scrape });
+        await upsertAmazonPayments(scraped.payments, database);
+        scrapedPaymentGaps.push(scrape);
+        const covered = coveredRangeFromScrapedPayments(
+            scrape,
+            scraped.payments.map((payment) => payment.paymentDate),
+            scraped.paginationComplete,
+        );
+        if (covered) {
+            nextCovered = mergeIsoDateRanges([...nextCovered, covered]);
+        }
     }
 
     const orderIds = await listOrderIdsFromPaymentsInRange(requested, database);
-    const stored = await listStoredOrderIds(orderIds, database);
-    const toFetch: string[] = [];
-    for (const orderId of orderIds) {
-        if (!stored.has(orderId)) {
-            toFetch.push(orderId);
-            continue;
-        }
-        const existing = await getOrderWithItems(orderId, database);
-        if (!existing || amazonOrderLooksIncomplete(existing)) {
-            toFetch.push(orderId);
-        }
-    }
-    const fetchedOrderIds: string[] = [];
-    for (const orderId of toFetch) {
-        const order = await source.getOrderDetails({ region, orderId });
-        await upsertAmazonOrder(order, database);
-        fetchedOrderIds.push(orderId);
-    }
-    const refetched = toFetch.filter((orderId) => stored.has(orderId));
-    if (refetched.length > 0) {
-        await deleteAmazonSplitOverlaysForOrders(refetched, database);
-    }
+    const fetchedOrderIds = await fetchAmazonOrderInvoices({ orderIds, source, region, mode: 'sync' }, database);
 
-    const nextCovered = mergeIsoDateRanges([...state.coveredRanges, requested]);
     await saveAmazonSyncState(
         {
             lastAuthCheck: new Date().toISOString(),
@@ -117,7 +119,7 @@ export async function syncAmazonOrders(
         region,
         from,
         to,
-        scrapedPaymentGaps: paymentGaps,
+        scrapedPaymentGaps,
         fetchedOrderIds,
         payments: counts.payments,
         orders: counts.orders,
