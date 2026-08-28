@@ -15,6 +15,7 @@ import type {
 import type { OperatingModeTable } from '../features/operatingMode/data/operatingModeSchema';
 import type { TravelBiasConfigTable } from '../features/travelWindows/data/travelBiasConfigSchema';
 import type { TravelWindowAccountsTable, TravelWindowsTable } from '../features/travelWindows/data/travelWindowsSchema';
+import type { ClassificationSyncTable } from '../features/ynabSync/data/classificationSyncSchema';
 import { migrateToLatest } from './migrate';
 import { SqlDatePlugin } from './plugins/sqlDatePlugin';
 import { SqliteBindingPlugin } from './plugins/sqliteBindingPlugin';
@@ -33,6 +34,7 @@ export type AppDatabase = {
     amazon_sync_state: AmazonSyncStateTable;
     amazon_split_overlays: AmazonSplitOverlaysTable;
     operating_mode: OperatingModeTable;
+    classification_sync: ClassificationSyncTable;
 };
 
 export type AppDatabaseClient = Kysely<AppDatabase>;

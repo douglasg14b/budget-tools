@@ -14,6 +14,7 @@ import {
     previousRowId,
     rejectItem,
     remainingItems,
+    removeDecision,
     resolveClassifyFocus,
     tallySession,
     undoLast,
@@ -75,6 +76,20 @@ describe('sessionDecisions', () => {
         expect(nextRowId(items, 'c')).toBeUndefined();
         expect(previousRowId(items, 'b')).toBe('a');
         expect(previousRowId(items, 'a')).toBeUndefined();
+    });
+
+    it('removes a specific decision without requiring it to be last', () => {
+        const approved = approveSuggestion(first);
+        expect(approved).toBeDefined();
+        if (!approved) {
+            return;
+        }
+        let session = applyDecision(emptySession(), approved);
+        session = applyDecision(session, rejectItem(second));
+        session = removeDecision(session, first.transaction.id);
+        expect(session.byId.a).toBeUndefined();
+        expect(session.byId.b?.action).toBe('rejected');
+        expect(session.undoStack).toEqual(['b']);
     });
 
     it('does not approve when there is no suggestion', () => {

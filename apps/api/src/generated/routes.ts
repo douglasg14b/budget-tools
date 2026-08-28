@@ -231,6 +231,41 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"transactionIds":{"dataType":"array","array":{"dataType":"string"},"required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ClassificationDecisionsResponseDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"pendingCount":{"dataType":"double","required":true},"accepted":{"dataType":"double","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ClassificationDecisionKind": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["category"]},{"dataType":"enum","enums":["split"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ClassificationDecisionLineDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"memo":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}]},"categoryId":{"dataType":"string","required":true},"amount":{"dataType":"double","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ClassificationDecisionDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"lines":{"dataType":"array","array":{"dataType":"refAlias","ref":"ClassificationDecisionLineDto"}},"payeeName":{"dataType":"string"},"categoryId":{"dataType":"string"},"kind":{"ref":"ClassificationDecisionKind","required":true},"transactionId":{"dataType":"string","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ClassificationDecisionsRequestDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"decisions":{"dataType":"array","array":{"dataType":"refAlias","ref":"ClassificationDecisionDto"},"required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "OutboundSyncStatusDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"lastError":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"oldestPendingAt":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"syncedUnconfirmedCount":{"dataType":"double","required":true},"failedCount":{"dataType":"double","required":true},"syncingCount":{"dataType":"double","required":true},"pendingCount":{"dataType":"double","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "OutboundSyncFlushDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"skipReason":{"dataType":"string"},"skipped":{"dataType":"boolean","required":true},"failed":{"dataType":"double","required":true},"synced":{"dataType":"double","required":true},"attempted":{"dataType":"double","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "CategoryDto": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"note":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"hidden":{"dataType":"boolean","required":true},"name":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"validators":{}},
@@ -697,6 +732,124 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'postPredict',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsCategorizationController_postClassificationDecisions: Record<string, TsoaRoute.ParameterSchema> = {
+                body: {"in":"body","name":"body","required":true,"ref":"ClassificationDecisionsRequestDto"},
+        };
+        app.post('/api/categorization/decisions',
+            ...(fetchMiddlewares<RequestHandler>(CategorizationController)),
+            ...(fetchMiddlewares<RequestHandler>(CategorizationController.prototype.postClassificationDecisions)),
+
+            async function CategorizationController_postClassificationDecisions(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsCategorizationController_postClassificationDecisions, request, response });
+
+                const controller = new CategorizationController();
+
+              await templateService.apiHandler({
+                methodName: 'postClassificationDecisions',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsCategorizationController_deleteClassificationDecision: Record<string, TsoaRoute.ParameterSchema> = {
+                transactionId: {"in":"path","name":"transactionId","required":true,"dataType":"string"},
+        };
+        app.delete('/api/categorization/decisions/:transactionId',
+            ...(fetchMiddlewares<RequestHandler>(CategorizationController)),
+            ...(fetchMiddlewares<RequestHandler>(CategorizationController.prototype.deleteClassificationDecision)),
+
+            async function CategorizationController_deleteClassificationDecision(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsCategorizationController_deleteClassificationDecision, request, response });
+
+                const controller = new CategorizationController();
+
+              await templateService.apiHandler({
+                methodName: 'deleteClassificationDecision',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: 204,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsCategorizationController_getOutboundSync: Record<string, TsoaRoute.ParameterSchema> = {
+        };
+        app.get('/api/categorization/outbound-sync',
+            ...(fetchMiddlewares<RequestHandler>(CategorizationController)),
+            ...(fetchMiddlewares<RequestHandler>(CategorizationController.prototype.getOutboundSync)),
+
+            async function CategorizationController_getOutboundSync(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsCategorizationController_getOutboundSync, request, response });
+
+                const controller = new CategorizationController();
+
+              await templateService.apiHandler({
+                methodName: 'getOutboundSync',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsCategorizationController_postOutboundSyncFlush: Record<string, TsoaRoute.ParameterSchema> = {
+        };
+        app.post('/api/categorization/outbound-sync/flush',
+            ...(fetchMiddlewares<RequestHandler>(CategorizationController)),
+            ...(fetchMiddlewares<RequestHandler>(CategorizationController.prototype.postOutboundSyncFlush)),
+
+            async function CategorizationController_postOutboundSyncFlush(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsCategorizationController_postOutboundSyncFlush, request, response });
+
+                const controller = new CategorizationController();
+
+              await templateService.apiHandler({
+                methodName: 'postOutboundSyncFlush',
                 controller,
                 response,
                 next,

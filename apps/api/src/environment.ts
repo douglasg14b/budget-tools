@@ -73,6 +73,29 @@ export const AMAZON_ORDERS_REGION = env.get('AMAZON_ORDERS_REGION').default('us'
 
 export const AMAZON_ORDERS_SYNC_TIMEOUT_MS = env.get('AMAZON_ORDERS_SYNC_TIMEOUT_MS').default('600000').asIntPositive();
 
+export const YNAB_FLUSH_BATCH_SIZE = env.get('YNAB_FLUSH_BATCH_SIZE').default('25').asIntPositive();
+
+export const YNAB_FLUSH_INTERVAL_MS = env.get('YNAB_FLUSH_INTERVAL_MS').default('300000').asIntPositive();
+
+export const YNAB_FLUSH_MIN_INTERVAL_MS = env.get('YNAB_FLUSH_MIN_INTERVAL_MS').default('30000').asIntPositive();
+
+/**
+ * YNAB personal access token. Optional so OpenAPI generation can load without secrets.
+ * Live enqueue succeeds without it; flush fails loud when this is empty.
+ */
+export function getYnabApiKey(): string | undefined {
+    const value = env.get('YNAB_API_KEY').default('').asString().trim();
+    return value || undefined;
+}
+
+/**
+ * YNAB budget display name. Optional so OpenAPI generation can load without secrets.
+ */
+export function getYnabBudgetName(): string | undefined {
+    const value = env.get('YNAB_BUDGET_NAME').default('').asString().trim();
+    return value || undefined;
+}
+
 function resolveFromCwd(value: string): string {
     return isAbsolute(value) ? value : resolve(process.cwd(), value);
 }

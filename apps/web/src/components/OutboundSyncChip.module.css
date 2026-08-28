@@ -1,0 +1,135 @@
+.chip {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0.28rem 0.7rem 0.26rem 0.55rem;
+    border: 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--app-mode-live) 14%, var(--app-bg-elevated));
+    color: var(--app-mode-live-ink);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-mode-live) 45%, transparent);
+    font-family: var(--app-font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.chip:hover {
+    background: color-mix(in srgb, var(--app-mode-live) 22%, var(--app-bg-elevated));
+}
+
+.chip[data-tone="failed"] {
+    background: color-mix(in srgb, var(--app-status-error) 16%, var(--app-bg-elevated));
+    color: var(--app-status-error);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-status-error) 50%, transparent);
+}
+
+.pulse {
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent);
+    animation: outboundPulse 1.8s ease-out infinite;
+}
+
+.chip[data-tone="idle"] .pulse {
+    animation: none;
+    opacity: 0.55;
+}
+
+@keyframes outboundPulse {
+    0% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent);
+    }
+    70% {
+        box-shadow: 0 0 0 0.45rem color-mix(in srgb, currentColor 0%, transparent);
+    }
+    100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent);
+    }
+}
+
+.label {
+    white-space: nowrap;
+}
+
+.dropdown {
+    padding: 0.85rem 0.95rem 0.95rem;
+    background: var(--app-bg-surface);
+    border: 0;
+    box-shadow:
+        inset 0 0 0 1px var(--app-border-strong),
+        0 1rem 2rem color-mix(in srgb, var(--app-bg-root) 55%, transparent);
+}
+
+.title {
+    margin: 0 0 0.7rem;
+    font-family: var(--app-font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--app-text-primary);
+}
+
+.counts {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.35rem 0.85rem;
+    margin: 0 0 0.85rem;
+}
+
+.counts div {
+    display: contents;
+}
+
+.counts dt {
+    font-size: 0.8125rem;
+    color: var(--app-text-muted);
+}
+
+.counts dd {
+    margin: 0;
+    font-family: var(--app-font-mono);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--app-text-primary);
+    text-align: right;
+}
+
+.error {
+    margin: 0 0 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--app-status-error);
+    line-height: 1.35;
+}
+
+.flush {
+    appearance: none;
+    width: 100%;
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    border: 0;
+    border-radius: 0.35rem;
+    background: var(--app-mode-live);
+    color: var(--app-mode-live-on);
+    font-family: var(--app-font-display);
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.flush:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--app-mode-live) 82%, white);
+}
+
+.flush:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}

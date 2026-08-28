@@ -1169,6 +1169,159 @@
 				],
 				"type": "object"
 			},
+			"ClassificationDecisionsResponseDto": {
+				"properties": {
+					"pendingCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"accepted": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"pendingCount",
+					"accepted"
+				],
+				"type": "object"
+			},
+			"ClassificationDecisionKind": {
+				"type": "string",
+				"enum": [
+					"category",
+					"split"
+				]
+			},
+			"ClassificationDecisionLineDto": {
+				"properties": {
+					"memo": {
+						"type": "string",
+						"nullable": true
+					},
+					"categoryId": {
+						"type": "string"
+					},
+					"amount": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"categoryId",
+					"amount"
+				],
+				"type": "object"
+			},
+			"ClassificationDecisionDto": {
+				"properties": {
+					"lines": {
+						"items": {
+							"$ref": "#/components/schemas/ClassificationDecisionLineDto"
+						},
+						"type": "array",
+						"description": "Required when kind is split."
+					},
+					"payeeName": {
+						"type": "string"
+					},
+					"categoryId": {
+						"type": "string",
+						"description": "Required when kind is category."
+					},
+					"kind": {
+						"$ref": "#/components/schemas/ClassificationDecisionKind"
+					},
+					"transactionId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"kind",
+					"transactionId"
+				],
+				"type": "object"
+			},
+			"ClassificationDecisionsRequestDto": {
+				"properties": {
+					"decisions": {
+						"items": {
+							"$ref": "#/components/schemas/ClassificationDecisionDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"decisions"
+				],
+				"type": "object"
+			},
+			"OutboundSyncStatusDto": {
+				"properties": {
+					"lastError": {
+						"type": "string",
+						"nullable": true
+					},
+					"oldestPendingAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"syncedUnconfirmedCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"failedCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"syncingCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"pendingCount": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"lastError",
+					"oldestPendingAt",
+					"syncedUnconfirmedCount",
+					"failedCount",
+					"syncingCount",
+					"pendingCount"
+				],
+				"type": "object"
+			},
+			"OutboundSyncFlushDto": {
+				"properties": {
+					"skipReason": {
+						"type": "string"
+					},
+					"skipped": {
+						"type": "boolean"
+					},
+					"failed": {
+						"type": "number",
+						"format": "double"
+					},
+					"synced": {
+						"type": "number",
+						"format": "double"
+					},
+					"attempted": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"skipped",
+					"failed",
+					"synced",
+					"attempted"
+				],
+				"type": "object"
+			},
 			"CategoryDto": {
 				"properties": {
 					"note": {
@@ -1851,6 +2004,132 @@
 						}
 					}
 				}
+			}
+		},
+		"/categorization/decisions": {
+			"post": {
+				"operationId": "PostClassificationDecisions",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ClassificationDecisionsResponseDto"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "YNAB writes are disabled in practice mode"
+					},
+					"404": {
+						"description": "Transaction not found"
+					},
+					"409": {
+						"description": "Decision cannot replace an in-flight or already-pushed row"
+					}
+				},
+				"description": "Record live classification decisions. Enqueues YNAB writes; does not call YNAB on this request.",
+				"summary": "postClassificationDecisions",
+				"tags": [
+					"categorization"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ClassificationDecisionsRequestDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/categorization/decisions/{transactionId}": {
+			"delete": {
+				"operationId": "DeleteClassificationDecision",
+				"responses": {
+					"204": {
+						"description": "Retracted"
+					},
+					"403": {
+						"description": "YNAB writes are disabled in practice mode"
+					},
+					"409": {
+						"description": "Decision has already been flushed"
+					}
+				},
+				"description": "Retract a pending or failed live decision.",
+				"summary": "deleteClassificationDecision",
+				"tags": [
+					"categorization"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "transactionId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/categorization/outbound-sync": {
+			"get": {
+				"operationId": "GetOutboundSync",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/OutboundSyncStatusDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Outbound YNAB sync queue counts.",
+				"summary": "getOutboundSync",
+				"tags": [
+					"categorization"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/categorization/outbound-sync/flush": {
+			"post": {
+				"operationId": "PostOutboundSyncFlush",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/OutboundSyncFlushDto"
+								}
+							}
+						}
+					},
+					"503": {
+						"description": "YNAB credentials missing"
+					}
+				},
+				"description": "Flush pending classification rows to YNAB now, still respecting rate limits.",
+				"summary": "postOutboundSyncFlush",
+				"tags": [
+					"categorization"
+				],
+				"security": [],
+				"parameters": []
 			}
 		},
 		"/categories": {

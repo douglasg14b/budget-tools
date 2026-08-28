@@ -8,6 +8,7 @@ import { BackendErrorNotice } from '../components/BackendErrorNotice';
 import { ClassifyTable } from '../components/review/classify/ClassifyTable';
 import { ClassifyWorkspace } from '../components/review/classify/ClassifyWorkspace';
 import { pinFocusedQueueItem } from '../components/review/classify/mergeClassifyQueue';
+import { useLiveClassification } from '../components/review/classify/useLiveClassification';
 import { filterQueueItems, QueueLoadState } from '../components/review/QueueLoadState';
 import { QueueSearchInput } from '../components/review/QueueSearchInput';
 import {
@@ -62,6 +63,7 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
     });
     const modeQuery = useQuery(getOperatingModeOptions());
     const mode: OperatingMode = modeQuery.data?.mode ?? 'practice';
+    const live = useLiveClassification(mode === 'live');
 
     const items = queueQuery.data?.items ?? [];
     const visibleItems = useMemo(
@@ -114,12 +116,14 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
             >
                 {layout === 'table' ? (
                     <ClassifyTable
+                        key={mode}
                         categoryGroups={categoriesQuery.data?.groups ?? []}
                         hasMoreNewer={hasMoreNewer}
                         hasMoreOlder={hasMoreOlder}
                         isExpandingNewer={isExpandingNewer}
                         isExpandingOlder={isExpandingOlder}
                         items={visibleItems}
+                        live={live}
                         requestedId={search.transactionId}
                         onCurrentIdChange={writeTransactionId}
                         onNeedNewer={querySettled ? expandNewer : ignoreNeedMore}
@@ -127,12 +131,14 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
                     />
                 ) : (
                     <ClassifyWorkspace
+                        key={mode}
                         categoryGroups={categoriesQuery.data?.groups ?? []}
                         hasMoreNewer={hasMoreNewer}
                         hasMoreOlder={hasMoreOlder}
                         isExpandingNewer={isExpandingNewer}
                         isExpandingOlder={isExpandingOlder}
                         items={visibleItems}
+                        live={live}
                         requestedId={search.transactionId}
                         onCurrentIdChange={writeTransactionId}
                         onNeedNewer={querySettled ? expandNewer : ignoreNeedMore}

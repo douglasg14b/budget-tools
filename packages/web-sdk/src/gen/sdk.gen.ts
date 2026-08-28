@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetOperatingModeData, GetOperatingModeResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListTravelWindowsData, ListTravelWindowsResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostPredictData, PostPredictResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
+import type { CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteClassificationDecisionData, DeleteClassificationDecisionErrors, DeleteClassificationDecisionResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetOperatingModeData, GetOperatingModeResponses, GetOutboundSyncData, GetOutboundSyncResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListTravelWindowsData, ListTravelWindowsResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostClassificationDecisionsData, PostClassificationDecisionsErrors, PostClassificationDecisionsResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostOutboundSyncFlushData, PostOutboundSyncFlushErrors, PostOutboundSyncFlushResponses, PostPredictData, PostPredictResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -180,6 +180,49 @@ export class Categorization {
                 ...options.headers
             }
         });
+    }
+    
+    /**
+     * postClassificationDecisions
+     *
+     * Record live classification decisions. Enqueues YNAB writes; does not call YNAB on this request.
+     */
+    public static request5<ThrowOnError extends boolean = false>(options: Options<PostClassificationDecisionsData, ThrowOnError>): RequestResult<PostClassificationDecisionsResponses, PostClassificationDecisionsErrors, ThrowOnError> {
+        return (options.client ?? client).post<PostClassificationDecisionsResponses, PostClassificationDecisionsErrors, ThrowOnError>({
+            url: '/categorization/decisions',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    /**
+     * deleteClassificationDecision
+     *
+     * Retract a pending or failed live decision.
+     */
+    public static request6<ThrowOnError extends boolean = false>(options: Options<DeleteClassificationDecisionData, ThrowOnError>): RequestResult<DeleteClassificationDecisionResponses, DeleteClassificationDecisionErrors, ThrowOnError> {
+        return (options.client ?? client).delete<DeleteClassificationDecisionResponses, DeleteClassificationDecisionErrors, ThrowOnError>({ url: '/categorization/decisions/{transactionId}', ...options });
+    }
+    
+    /**
+     * getOutboundSync
+     *
+     * Outbound YNAB sync queue counts.
+     */
+    public static request7<ThrowOnError extends boolean = false>(options?: Options<GetOutboundSyncData, ThrowOnError>): RequestResult<GetOutboundSyncResponses, unknown, ThrowOnError> {
+        return (options?.client ?? client).get<GetOutboundSyncResponses, unknown, ThrowOnError>({ url: '/categorization/outbound-sync', ...options });
+    }
+    
+    /**
+     * postOutboundSyncFlush
+     *
+     * Flush pending classification rows to YNAB now, still respecting rate limits.
+     */
+    public static request8<ThrowOnError extends boolean = false>(options?: Options<PostOutboundSyncFlushData, ThrowOnError>): RequestResult<PostOutboundSyncFlushResponses, PostOutboundSyncFlushErrors, ThrowOnError> {
+        return (options?.client ?? client).post<PostOutboundSyncFlushResponses, PostOutboundSyncFlushErrors, ThrowOnError>({ url: '/categorization/outbound-sync/flush', ...options });
     }
 }
 

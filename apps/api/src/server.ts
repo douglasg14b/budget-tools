@@ -10,6 +10,7 @@ import { LlmSuggestError } from './features/categorization/llm/LlmSuggestError';
 import { clearLlmOverlayCache } from './features/categorization/llm/overlayCache';
 import { PredictJsonError } from './features/categorization/predictJson';
 import { HttpError } from './features/travelWindows/HttpError';
+import { startOutboundSyncFlusher } from './features/ynabSync/flush/startOutboundSyncFlusher';
 import { RegisterRoutes } from './generated/routes';
 import { getRequestId, requestContextMiddleware } from './services/requestContext';
 
@@ -99,6 +100,7 @@ app.use(errorHandler);
 async function start(): Promise<void> {
     await getAppDatabase();
     await clearLlmOverlayCache(CATEGORIZATION_QUEUE_CACHE_DIR);
+    startOutboundSyncFlusher();
     app.listen(API_PORT, () => {
         console.log(`API listening on http://localhost:${API_PORT}`);
         console.log(`Amazon MCP entry ${getAmazonOrdersMcpEntry() ?? 'unset'}`);

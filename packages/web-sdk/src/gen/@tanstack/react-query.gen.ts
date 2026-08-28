@@ -4,7 +4,7 @@ import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanst
 
 import { client } from '../client.gen';
 import { Accounts, AmazonOrders, Categories, Categorization, Health, OperatingMode, type Options, TravelBias, TravelWindows } from '../sdk.gen';
-import type { CreateTravelWindowData, CreateTravelWindowResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetOperatingModeData, GetOperatingModeResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListTravelWindowsData, ListTravelWindowsResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostPredictData, PostPredictResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
+import type { CreateTravelWindowData, CreateTravelWindowResponse, DeleteClassificationDecisionData, DeleteClassificationDecisionResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetOperatingModeData, GetOperatingModeResponse, GetOutboundSyncData, GetOutboundSyncResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListTravelWindowsData, ListTravelWindowsResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostClassificationDecisionsData, PostClassificationDecisionsResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostOutboundSyncFlushData, PostOutboundSyncFlushResponse, PostPredictData, PostPredictResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -279,6 +279,83 @@ export const postPredictMutation = (options?: Partial<Options<PostPredictData>>)
     const mutationOptions: UseMutationOptions<PostPredictResponse, DefaultError, Options<PostPredictData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await Categorization.request4({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * postClassificationDecisions
+ *
+ * Record live classification decisions. Enqueues YNAB writes; does not call YNAB on this request.
+ */
+export const postClassificationDecisionsMutation = (options?: Partial<Options<PostClassificationDecisionsData>>): UseMutationOptions<PostClassificationDecisionsResponse, DefaultError, Options<PostClassificationDecisionsData>> => {
+    const mutationOptions: UseMutationOptions<PostClassificationDecisionsResponse, DefaultError, Options<PostClassificationDecisionsData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await Categorization.request5({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * deleteClassificationDecision
+ *
+ * Retract a pending or failed live decision.
+ */
+export const deleteClassificationDecisionMutation = (options?: Partial<Options<DeleteClassificationDecisionData>>): UseMutationOptions<DeleteClassificationDecisionResponse, DefaultError, Options<DeleteClassificationDecisionData>> => {
+    const mutationOptions: UseMutationOptions<DeleteClassificationDecisionResponse, DefaultError, Options<DeleteClassificationDecisionData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await Categorization.request6({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getOutboundSyncQueryKey = (options?: Options<GetOutboundSyncData>) => createQueryKey('getOutboundSync', options);
+
+/**
+ * getOutboundSync
+ *
+ * Outbound YNAB sync queue counts.
+ */
+export const getOutboundSyncOptions = (options?: Options<GetOutboundSyncData>) => queryOptions<GetOutboundSyncResponse, DefaultError, GetOutboundSyncResponse, ReturnType<typeof getOutboundSyncQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await Categorization.request7({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getOutboundSyncQueryKey(options)
+});
+
+/**
+ * postOutboundSyncFlush
+ *
+ * Flush pending classification rows to YNAB now, still respecting rate limits.
+ */
+export const postOutboundSyncFlushMutation = (options?: Partial<Options<PostOutboundSyncFlushData>>): UseMutationOptions<PostOutboundSyncFlushResponse, DefaultError, Options<PostOutboundSyncFlushData>> => {
+    const mutationOptions: UseMutationOptions<PostOutboundSyncFlushResponse, DefaultError, Options<PostOutboundSyncFlushData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await Categorization.request8({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

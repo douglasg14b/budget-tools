@@ -34,12 +34,15 @@ import {
     previousRowId,
     rejectItem,
     remainingItems,
+    removeDecision,
     resolveClassifyFocus,
     tallySession,
     undoLast,
 } from './sessionDecisions';
 import type { SplitLine } from './splitLines';
 import { seedSingleSplitLine, validateSplitLines } from './splitLines';
+import type { LiveClassification } from './useLiveClassification';
+import { liveClassificationErrorMessage } from './useLiveClassification';
 
 type UseClassifySessionOptions = {
     /**
@@ -53,6 +56,7 @@ type UseClassifySessionOptions = {
     navigate: 'remaining' | 'rows';
     requestedId?: string;
     onCurrentIdChange?: (transactionId: string | undefined) => void;
+    live?: LiveClassification;
 };
 
 export function useClassifySession(
@@ -63,6 +67,7 @@ export function useClassifySession(
     const [session, setSession] = useState(emptySession);
     const [payeeEdits, setPayeeEdits] = useState<PayeeEdits>(emptyPayeeEdits);
     const [splitDrafts, setSplitDrafts] = useState<Readonly<Record<string, readonly SplitLine[]>>>({});
+    const [liveError, setLiveError] = useState<string | null>(null);
     const [currentId, setCurrentId] = useState<string | undefined>(options.requestedId ?? items[0]?.transaction.id);
 
     const choices = useMemo(() => flattenCategoryChoices(categoryGroups), [categoryGroups]);
@@ -110,6 +115,28 @@ export function useClassifySession(
             return next;
         });
         setCurrentId(nextRemainingId(items, nextSession, decision.transactionId) ?? decision.transactionId);
+        persistLive([decision]);
+    }
+
+    function persistLive(decisions: readonly SessionDecision[]): void {
+        if (!options.live || decisions.length === 0) {
+            return;
+        }
+        void options.live.persist(decisions, payeeEdits).then(
+            () => {
+                setLiveError(null);
+            },
+            (error: unknown) => {
+                setLiveError(liveClassificationErrorMessage(error));
+                setSession((current) => {
+                    let next = current;
+                    for (const decision of decisions) {
+                        next = removeDecision(next, decision.transactionId);
+                    }
+                    return next;
+                });
+            },
+        );
     }
 
     function displayedCurrent(): CategorizationQueueItemDto | undefined {
@@ -215,24 +242,40 @@ export function useClassifySession(
 
     function undo(): void {
         const lastId = session.undoStack.at(-1);
+        const last = lastId ? session.byId[lastId] : undefined;
         const nextSession = undoLast(session);
         setSession(nextSession);
         setCurrentId(lastId ?? currentId);
+        if (!options.live || !last) {
+            return;
+        }
+        void options.live.retract(last).then(
+            () => {
+                setLiveError(null);
+            },
+            (error: unknown) => {
+                setLiveError(liveClassificationErrorMessage(error));
+                setSession((current) => applyDecision(current, last));
+            },
+        );
     }
 
     function acceptAllCertain(): void {
         let nextSession = session;
         let lastId = currentId;
+        const applied: SessionDecision[] = [];
         for (const item of certainRemaining) {
             const decision = approveSuggestion(item);
             if (!decision) {
                 continue;
             }
             nextSession = applyDecision(nextSession, decision);
+            applied.push(decision);
             lastId = item.transaction.id;
         }
         setSession(nextSession);
         setCurrentId(nextRemainingId(items, nextSession, lastId) ?? lastId);
+        persistLive(applied);
     }
 
     function goNext(): void {
@@ -310,6 +353,7 @@ export function useClassifySession(
         commitPayee,
         current,
         dismissRename,
+        liveError,
         payeeName,
         payeeRename,
         pickCategoryId,

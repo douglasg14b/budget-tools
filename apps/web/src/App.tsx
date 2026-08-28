@@ -7,6 +7,7 @@ import classes from './App.module.css';
 import { AppNav } from './components/AppNav';
 import { NavbarHealthBadge } from './components/NavbarHealthBadge';
 import { OperatingModeToggle } from './components/OperatingModeToggle';
+import { OutboundSyncChip } from './components/OutboundSyncChip';
 import { cssVariablesResolver } from './cssVariablesResolver';
 import type { OperatingMode } from './operatingMode/operatingModeCopy';
 import { ClassifyPage } from './pages/ClassifyPage';
@@ -43,6 +44,7 @@ function AppLayout() {
                             <AppNav />
                         </div>
                         <div className={classes.headerEnd}>
+                            <OutboundSyncChip />
                             <OperatingModeToggle />
                             <NavbarHealthBadge />
                         </div>

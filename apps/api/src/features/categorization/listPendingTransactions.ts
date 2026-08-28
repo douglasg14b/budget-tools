@@ -1,6 +1,7 @@
 import { sql } from 'kysely';
 
 import { getDatabase } from '../../data/database';
+import { reconcileClassificationSync } from '../ynabSync/reconcileClassificationSync';
 import { scoringFingerprint } from './cache/proposalFingerprint';
 import type { TransactionDetailDto } from './categorizationDtos';
 import { formatTransactionDate, mapTransactionDetail, TRANSACTION_DETAIL_COLUMNS } from './mapTransactionDetail';
@@ -35,7 +36,7 @@ export async function listPendingTransactions(): Promise<PendingTransactionRow[]
         .orderBy('id', 'asc')
         .execute();
 
-    return rows.map((row) => {
+    const mapped = rows.map((row) => {
         const detail = mapTransactionDetail(row);
         return {
             ...detail,
@@ -51,6 +52,8 @@ export async function listPendingTransactions(): Promise<PendingTransactionRow[]
             }),
         };
     });
+    const excluded = await reconcileClassificationSync(mapped.map((row) => row.id));
+    return mapped.filter((row) => !excluded.has(row.id));
 }
 
 export function toTransactionDetail(row: PendingTransactionRow): TransactionDetailDto {

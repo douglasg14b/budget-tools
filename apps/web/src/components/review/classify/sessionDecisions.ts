@@ -45,11 +45,21 @@ export function undoLast(session: SessionDecisions): SessionDecisions {
         return session;
     }
 
+    return removeDecision(session, transactionId);
+}
+
+/**
+ * Drops a decision without requiring it to be the latest undo entry.
+ */
+export function removeDecision(session: SessionDecisions, transactionId: string): SessionDecisions {
+    if (!session.byId[transactionId]) {
+        return session;
+    }
     const nextById = { ...session.byId };
     delete nextById[transactionId];
     return {
         byId: nextById,
-        undoStack: session.undoStack.slice(0, -1),
+        undoStack: session.undoStack.filter((id) => id !== transactionId),
     };
 }
 

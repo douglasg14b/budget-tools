@@ -99,6 +99,9 @@ importers:
       tsoa:
         specifier: 7.0.0-alpha.0
         version: 7.0.0-alpha.0
+      ynab:
+        specifier: ^2.6.0
+        version: 2.6.0
     devDependencies:
       '@budget-tools/config-typescript':
         specifier: workspace:^

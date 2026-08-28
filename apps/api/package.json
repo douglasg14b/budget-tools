@@ -27,7 +27,8 @@
     "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
     "talisman": "^1.1.4",
-    "tsoa": "7.0.0-alpha.0"
+    "tsoa": "7.0.0-alpha.0",
+    "ynab": "^2.6.0"
   },
   "devDependencies": {
     "@budget-tools/config-typescript": "workspace:^",

@@ -308,6 +308,54 @@ export type CategorizationPredictRequestDto = {
     transactionIds: Array<string>;
 };
 
+export type ClassificationDecisionsResponseDto = {
+    pendingCount: number;
+    accepted: number;
+};
+
+export type ClassificationDecisionKind = 'category' | 'split';
+
+export type ClassificationDecisionLineDto = {
+    memo?: string | null;
+    categoryId: string;
+    amount: number;
+};
+
+export type ClassificationDecisionDto = {
+    /**
+     * Required when kind is split.
+     */
+    lines?: Array<ClassificationDecisionLineDto>;
+    payeeName?: string;
+    /**
+     * Required when kind is category.
+     */
+    categoryId?: string;
+    kind: ClassificationDecisionKind;
+    transactionId: string;
+};
+
+export type ClassificationDecisionsRequestDto = {
+    decisions: Array<ClassificationDecisionDto>;
+};
+
+export type OutboundSyncStatusDto = {
+    lastError: string | null;
+    oldestPendingAt: string | null;
+    syncedUnconfirmedCount: number;
+    failedCount: number;
+    syncingCount: number;
+    pendingCount: number;
+};
+
+export type OutboundSyncFlushDto = {
+    skipReason?: string;
+    skipped: boolean;
+    failed: number;
+    synced: number;
+    attempted: number;
+};
+
 export type CategoryDto = {
     note: string | null;
     hidden: boolean;
@@ -634,6 +682,105 @@ export type PostPredictResponses = {
 };
 
 export type PostPredictResponse = PostPredictResponses[keyof PostPredictResponses];
+
+export type PostClassificationDecisionsData = {
+    body: ClassificationDecisionsRequestDto;
+    path?: never;
+    query?: never;
+    url: '/categorization/decisions';
+};
+
+export type PostClassificationDecisionsErrors = {
+    /**
+     * YNAB writes are disabled in practice mode
+     */
+    403: unknown;
+    /**
+     * Transaction not found
+     */
+    404: unknown;
+    /**
+     * Decision cannot replace an in-flight or already-pushed row
+     */
+    409: unknown;
+};
+
+export type PostClassificationDecisionsResponses = {
+    /**
+     * Ok
+     */
+    200: ClassificationDecisionsResponseDto;
+};
+
+export type PostClassificationDecisionsResponse = PostClassificationDecisionsResponses[keyof PostClassificationDecisionsResponses];
+
+export type DeleteClassificationDecisionData = {
+    body?: never;
+    path: {
+        transactionId: string;
+    };
+    query?: never;
+    url: '/categorization/decisions/{transactionId}';
+};
+
+export type DeleteClassificationDecisionErrors = {
+    /**
+     * YNAB writes are disabled in practice mode
+     */
+    403: unknown;
+    /**
+     * Decision has already been flushed
+     */
+    409: unknown;
+};
+
+export type DeleteClassificationDecisionResponses = {
+    /**
+     * Retracted
+     */
+    204: void;
+};
+
+export type DeleteClassificationDecisionResponse = DeleteClassificationDecisionResponses[keyof DeleteClassificationDecisionResponses];
+
+export type GetOutboundSyncData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/categorization/outbound-sync';
+};
+
+export type GetOutboundSyncResponses = {
+    /**
+     * Ok
+     */
+    200: OutboundSyncStatusDto;
+};
+
+export type GetOutboundSyncResponse = GetOutboundSyncResponses[keyof GetOutboundSyncResponses];
+
+export type PostOutboundSyncFlushData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/categorization/outbound-sync/flush';
+};
+
+export type PostOutboundSyncFlushErrors = {
+    /**
+     * YNAB credentials missing
+     */
+    503: unknown;
+};
+
+export type PostOutboundSyncFlushResponses = {
+    /**
+     * Ok
+     */
+    200: OutboundSyncFlushDto;
+};
+
+export type PostOutboundSyncFlushResponse = PostOutboundSyncFlushResponses[keyof PostOutboundSyncFlushResponses];
 
 export type GetCategoriesData = {
     body?: never;

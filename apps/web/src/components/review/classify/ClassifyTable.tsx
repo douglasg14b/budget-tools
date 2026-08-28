@@ -7,7 +7,7 @@ import type {
 import { Select, UnstyledButton } from '@mantine/core';
 import type { Ref } from 'react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-
+import { BackendErrorNotice } from '../../BackendErrorNotice';
 import { TravelWindowChip } from '../FlagChips';
 import { formatConfidence } from '../formatConfidence';
 import { formatTransactionDate } from '../formatTransactionDate';
@@ -25,6 +25,7 @@ import { isCertainProposal } from './isCertainProposal';
 import type { SessionDecision } from './sessionDecisions';
 import { decisionCategoryId, decisionCategoryName, isSplitDecision } from './sessionDecisions';
 import { useClassifySession } from './useClassifySession';
+import type { LiveClassification } from './useLiveClassification';
 import { usePredictWindow } from './usePredictWindow';
 
 type ClassifyTableProps = {
@@ -38,6 +39,7 @@ type ClassifyTableProps = {
     onNeedNewer: () => void;
     onNeedOlder: () => void;
     requestedId?: string;
+    live?: LiveClassification;
 };
 
 /** Table layout never requests JIT LLM overlays — that lives on the classify card. */
@@ -52,8 +54,10 @@ export function ClassifyTable({
     onNeedNewer,
     onNeedOlder,
     requestedId,
+    live,
 }: ClassifyTableProps) {
     const classify = useClassifySession(items, categoryGroups, {
+        live,
         navigate: 'rows',
         onCurrentIdChange,
         requestedId,
@@ -92,6 +96,7 @@ export function ClassifyTable({
 
     return (
         <div className={classes.workspace}>
+            {classify.liveError ? <BackendErrorNotice error={new Error(classify.liveError)} /> : null}
             <ClassifyProgress
                 certainCount={classify.certainRemaining.length}
                 completeHint="Batch reviewed. Select any row to edit, or undo."

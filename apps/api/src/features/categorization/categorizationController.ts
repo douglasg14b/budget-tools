@@ -1,8 +1,22 @@
 import type { Request as ExpressRequest } from 'express';
-import { Body, Get, Post, Query, Request, Route, Tags } from 'tsoa';
+import { Body, Delete, Get, Path, Post, Query, Request, Response, Route, SuccessResponse, Tags } from 'tsoa';
 
 import type { AmazonSplitOverlayDto, AmazonSuggestRequestDto } from '../amazonClassify/amazonClassifyDtos';
 import { suggestAmazonSplits } from '../amazonClassify/suggestAmazonSplits';
+import {
+    countClassificationSyncByStatus,
+    latestClassificationSyncError,
+    oldestPendingCreatedAt,
+} from '../ynabSync/data/classificationSyncRepo';
+import { flushOutboundSync } from '../ynabSync/flush/flushOutboundSync';
+import { recordDecisions } from '../ynabSync/recordDecisions';
+import { retractDecision } from '../ynabSync/retractDecision';
+import type {
+    ClassificationDecisionsRequestDto,
+    ClassificationDecisionsResponseDto,
+    OutboundSyncFlushDto,
+    OutboundSyncStatusDto,
+} from '../ynabSync/ynabSyncDtos';
 import type {
     CategorizationPredictDto,
     CategorizationPredictRequestDto,
@@ -83,6 +97,63 @@ export class CategorizationController {
     @Post('predict')
     public async postPredict(@Body() body: CategorizationPredictRequestDto): Promise<CategorizationPredictDto> {
         return await predictTransactions(body);
+    }
+
+    /**
+     * Record live classification decisions. Enqueues YNAB writes; does not call YNAB on this request.
+     * @summary postClassificationDecisions
+     */
+    @Post('decisions')
+    @Response(403, 'YNAB writes are disabled in practice mode')
+    @Response(404, 'Transaction not found')
+    @Response(409, 'Decision cannot replace an in-flight or already-pushed row')
+    public async postClassificationDecisions(
+        @Body() body: ClassificationDecisionsRequestDto,
+    ): Promise<ClassificationDecisionsResponseDto> {
+        return await recordDecisions(body.decisions);
+    }
+
+    /**
+     * Retract a pending or failed live decision.
+     * @summary deleteClassificationDecision
+     */
+    @Delete('decisions/{transactionId}')
+    @SuccessResponse(204, 'Retracted')
+    @Response(403, 'YNAB writes are disabled in practice mode')
+    @Response(409, 'Decision has already been flushed')
+    public async deleteClassificationDecision(@Path() transactionId: string): Promise<void> {
+        await retractDecision(transactionId);
+    }
+
+    /**
+     * Outbound YNAB sync queue counts.
+     * @summary getOutboundSync
+     */
+    @Get('outbound-sync')
+    public async getOutboundSync(): Promise<OutboundSyncStatusDto> {
+        const [counts, oldestPendingAt, lastError] = await Promise.all([
+            countClassificationSyncByStatus(),
+            oldestPendingCreatedAt(),
+            latestClassificationSyncError(),
+        ]);
+        return {
+            pendingCount: counts.pending,
+            syncingCount: counts.syncing,
+            failedCount: counts.failed,
+            syncedUnconfirmedCount: counts.synced,
+            oldestPendingAt,
+            lastError,
+        };
+    }
+
+    /**
+     * Flush pending classification rows to YNAB now, still respecting rate limits.
+     * @summary postOutboundSyncFlush
+     */
+    @Post('outbound-sync/flush')
+    @Response(503, 'YNAB credentials missing')
+    public async postOutboundSyncFlush(): Promise<OutboundSyncFlushDto> {
+        return await flushOutboundSync();
     }
 }
 

@@ -1,6 +1,7 @@
 import type { CategorizationQueueItemDto, CategoryGroupDto } from '@budget-tools/web-sdk';
 import { useEffect, useRef } from 'react';
 
+import { BackendErrorNotice } from '../../BackendErrorNotice';
 import { shouldPrefetchMore, shouldPrefetchNewer } from '../shouldPrefetchMore';
 import { selectAmazonPrefetchNeighbors, selectLlmPrefetchNeighbors } from './applyLlmOverlay';
 import { ClassifyFilmstrip } from './ClassifyFilmstrip';
@@ -12,6 +13,7 @@ import { isAmazonTransaction } from './isAmazonTransaction';
 import { remainingItems } from './sessionDecisions';
 import { useAmazonSplitOverlay } from './useAmazonSplitOverlay';
 import { useClassifySession } from './useClassifySession';
+import type { LiveClassification } from './useLiveClassification';
 import { useLlmOverlay } from './useLlmOverlay';
 import { usePredictWindow } from './usePredictWindow';
 
@@ -26,6 +28,7 @@ type ClassifyWorkspaceProps = {
     onNeedOlder: () => void;
     onCurrentIdChange?: (transactionId: string | undefined) => void;
     requestedId?: string;
+    live?: LiveClassification;
 };
 
 export function ClassifyWorkspace({
@@ -39,11 +42,13 @@ export function ClassifyWorkspace({
     onNeedNewer,
     onNeedOlder,
     requestedId,
+    live,
 }: ClassifyWorkspaceProps) {
     const displayedItemRef = useRef<CategorizationQueueItemDto | undefined>(undefined);
     const amazonDismissedRef = useRef(new Set<string>());
     const classify = useClassifySession(items, categoryGroups, {
         displayedItemRef,
+        live,
         navigate: 'remaining',
         onCurrentIdChange,
         requestedId,
@@ -104,6 +109,7 @@ export function ClassifyWorkspace({
 
     return (
         <div className={classes.workspace}>
+            {classify.liveError ? <BackendErrorNotice error={new Error(classify.liveError)} /> : null}
             <ClassifyProgress
                 certainCount={classify.certainRemaining.length}
                 completeHint="Batch reviewed. Select any row to edit, or undo."
