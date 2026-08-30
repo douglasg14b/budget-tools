@@ -47,6 +47,36 @@ export type AccountsDto = {
     accounts: Array<AccountDto>;
 };
 
+export type ReceiptExtractStatus = 'pending' | 'gated' | 'ungated' | 'failed';
+
+export type ReceiptDto = {
+    frameCount: number;
+    totalsDisagree: boolean;
+    contentHash: string;
+    transactionId: string | null;
+    rawText: string | null;
+    extractJson: string | null;
+    extractStatus: ReceiptExtractStatus;
+    printedMilliunits: number | null;
+    purchaseDate: string | null;
+    vendor: string | null;
+    createdAt: string;
+    id: string;
+};
+
+export type ReceiptsDto = {
+    receipts: Array<ReceiptDto>;
+};
+
+export type CreateReceiptDto = {
+    transactionId?: string;
+    frames: Array<string>;
+};
+
+export type BindReceiptDto = {
+    transactionId: string;
+};
+
 export type OperatingModeDto = {
     mode: 'practice' | 'live';
 };
@@ -537,6 +567,192 @@ export type ListAccountsResponses = {
 };
 
 export type ListAccountsResponse = ListAccountsResponses[keyof ListAccountsResponses];
+
+export type ListReceiptsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/receipts';
+};
+
+export type ListReceiptsResponses = {
+    /**
+     * Ok
+     */
+    200: ReceiptsDto;
+};
+
+export type ListReceiptsResponse = ListReceiptsResponses[keyof ListReceiptsResponses];
+
+export type CreateReceiptData = {
+    body: CreateReceiptDto;
+    path?: never;
+    query?: never;
+    url: '/receipts';
+};
+
+export type CreateReceiptErrors = {
+    /**
+     * Invalid frames
+     */
+    400: unknown;
+    /**
+     * Practice mode
+     */
+    403: unknown;
+    /**
+     * JSON body too large
+     */
+    413: unknown;
+};
+
+export type CreateReceiptResponses = {
+    /**
+     * Created
+     */
+    201: ReceiptDto;
+};
+
+export type CreateReceiptResponse = CreateReceiptResponses[keyof CreateReceiptResponses];
+
+export type GetReceiptImageData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: {
+        frame?: number;
+    };
+    url: '/receipts/{id}/image';
+};
+
+export type GetReceiptImageErrors = {
+    /**
+     * Invalid frame
+     */
+    400: unknown;
+    /**
+     * Not found
+     */
+    404: unknown;
+};
+
+export type GetReceiptImageResponses = {
+    /**
+     * No content
+     */
+    204: void;
+};
+
+export type GetReceiptImageResponse = GetReceiptImageResponses[keyof GetReceiptImageResponses];
+
+export type DeleteReceiptData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/receipts/{id}';
+};
+
+export type DeleteReceiptErrors = {
+    /**
+     * Practice mode
+     */
+    403: unknown;
+};
+
+export type DeleteReceiptResponses = {
+    /**
+     * No content
+     */
+    204: void;
+};
+
+export type DeleteReceiptResponse = DeleteReceiptResponses[keyof DeleteReceiptResponses];
+
+export type GetReceiptData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/receipts/{id}';
+};
+
+export type GetReceiptErrors = {
+    /**
+     * Not found
+     */
+    404: unknown;
+};
+
+export type GetReceiptResponses = {
+    /**
+     * Ok
+     */
+    200: ReceiptDto;
+};
+
+export type GetReceiptResponse = GetReceiptResponses[keyof GetReceiptResponses];
+
+export type DetachReceiptData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/receipts/{id}/bind';
+};
+
+export type DetachReceiptErrors = {
+    /**
+     * Practice mode
+     */
+    403: unknown;
+    /**
+     * Not found
+     */
+    404: unknown;
+};
+
+export type DetachReceiptResponses = {
+    /**
+     * Ok
+     */
+    200: ReceiptDto;
+};
+
+export type DetachReceiptResponse = DetachReceiptResponses[keyof DetachReceiptResponses];
+
+export type BindReceiptData = {
+    body: BindReceiptDto;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/receipts/{id}/bind';
+};
+
+export type BindReceiptErrors = {
+    /**
+     * Practice mode
+     */
+    403: unknown;
+    /**
+     * Not found
+     */
+    404: unknown;
+};
+
+export type BindReceiptResponses = {
+    /**
+     * Ok
+     */
+    200: ReceiptDto;
+};
+
+export type BindReceiptResponse = BindReceiptResponses[keyof BindReceiptResponses];
 
 export type GetOperatingModeData = {
     body?: never;

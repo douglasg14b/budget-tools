@@ -66,6 +66,12 @@ export function getReceiptsDir(): string {
     return resolveFromCwd(env.get('RECEIPTS_DIR').default('apps/api/data/receipts').asString());
 }
 
+/** API JSON body limit in bytes. Sized for receipt data-URL frames; applies to every express.json route. Default 15 MiB. */
+export const RECEIPTS_JSON_BODY_LIMIT = env
+    .get('RECEIPTS_JSON_BODY_LIMIT')
+    .default(String(15 * 1024 * 1024))
+    .asIntPositive();
+
 /**
  * Path to the Amazon order-history MCP `dist/index.js`.
  * Optional so OpenAPI generation can load without it. Sync fails loud (503) when unset.

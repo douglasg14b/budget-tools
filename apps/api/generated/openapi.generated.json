@@ -157,6 +157,120 @@
 				],
 				"type": "object"
 			},
+			"ReceiptExtractStatus": {
+				"type": "string",
+				"enum": [
+					"pending",
+					"gated",
+					"ungated",
+					"failed"
+				]
+			},
+			"ReceiptDto": {
+				"properties": {
+					"frameCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"totalsDisagree": {
+						"type": "boolean"
+					},
+					"contentHash": {
+						"type": "string"
+					},
+					"transactionId": {
+						"type": "string",
+						"nullable": true
+					},
+					"rawText": {
+						"type": "string",
+						"nullable": true
+					},
+					"extractJson": {
+						"type": "string",
+						"nullable": true
+					},
+					"extractStatus": {
+						"$ref": "#/components/schemas/ReceiptExtractStatus"
+					},
+					"printedMilliunits": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
+					"purchaseDate": {
+						"type": "string",
+						"nullable": true
+					},
+					"vendor": {
+						"type": "string",
+						"nullable": true
+					},
+					"createdAt": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"frameCount",
+					"totalsDisagree",
+					"contentHash",
+					"transactionId",
+					"rawText",
+					"extractJson",
+					"extractStatus",
+					"printedMilliunits",
+					"purchaseDate",
+					"vendor",
+					"createdAt",
+					"id"
+				],
+				"type": "object"
+			},
+			"ReceiptsDto": {
+				"properties": {
+					"receipts": {
+						"items": {
+							"$ref": "#/components/schemas/ReceiptDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"receipts"
+				],
+				"type": "object"
+			},
+			"CreateReceiptDto": {
+				"properties": {
+					"transactionId": {
+						"type": "string"
+					},
+					"frames": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"frames"
+				],
+				"type": "object"
+			},
+			"BindReceiptDto": {
+				"properties": {
+					"transactionId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"transactionId"
+				],
+				"type": "object"
+			},
 			"OperatingModeDto": {
 				"properties": {
 					"mode": {
@@ -1730,6 +1844,255 @@
 				],
 				"security": [],
 				"parameters": []
+			}
+		},
+		"/receipts": {
+			"get": {
+				"operationId": "ListReceipts",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptsDto"
+								}
+							}
+						}
+					}
+				},
+				"summary": "listReceipts",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": []
+			},
+			"post": {
+				"operationId": "CreateReceipt",
+				"responses": {
+					"201": {
+						"description": "Created",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptDto"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Invalid frames"
+					},
+					"403": {
+						"description": "Practice mode"
+					},
+					"413": {
+						"description": "JSON body too large"
+					}
+				},
+				"summary": "createReceipt",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/CreateReceiptDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/receipts/{id}/image": {
+			"get": {
+				"operationId": "GetReceiptImage",
+				"responses": {
+					"204": {
+						"description": "No content"
+					},
+					"400": {
+						"description": "Invalid frame"
+					},
+					"404": {
+						"description": "Not found"
+					}
+				},
+				"summary": "getReceiptImage",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "frame",
+						"required": false,
+						"schema": {
+							"default": 0,
+							"format": "double",
+							"type": "number"
+						}
+					}
+				]
+			}
+		},
+		"/receipts/{id}": {
+			"get": {
+				"operationId": "GetReceipt",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptDto"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Not found"
+					}
+				},
+				"summary": "getReceipt",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			},
+			"delete": {
+				"operationId": "DeleteReceipt",
+				"responses": {
+					"204": {
+						"description": "No content"
+					},
+					"403": {
+						"description": "Practice mode"
+					}
+				},
+				"summary": "deleteReceipt",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/receipts/{id}/bind": {
+			"post": {
+				"operationId": "BindReceipt",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptDto"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Practice mode"
+					},
+					"404": {
+						"description": "Not found"
+					}
+				},
+				"summary": "bindReceipt",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/BindReceiptDto"
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "DetachReceipt",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptDto"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Practice mode"
+					},
+					"404": {
+						"description": "Not found"
+					}
+				},
+				"summary": "detachReceipt",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
 			}
 		},
 		"/operating-mode": {

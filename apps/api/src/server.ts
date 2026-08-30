@@ -4,7 +4,12 @@ import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import { ValidateError } from 'tsoa';
 import { getAppDatabase } from './data-persistence/database';
-import { API_PORT, CATEGORIZATION_QUEUE_CACHE_DIR, getAmazonOrdersMcpEntry } from './environment';
+import {
+    API_PORT,
+    CATEGORIZATION_QUEUE_CACHE_DIR,
+    getAmazonOrdersMcpEntry,
+    RECEIPTS_JSON_BODY_LIMIT,
+} from './environment';
 import { QueryValidationError } from './features/categorization/filterQueue';
 import { LlmSuggestError } from './features/categorization/llm/LlmSuggestError';
 import { clearLlmOverlayCache } from './features/categorization/llm/overlayCache';
@@ -12,11 +17,12 @@ import { PredictJsonError } from './features/categorization/predictJson';
 import { HttpError } from './features/travelWindows/HttpError';
 import { startOutboundSyncFlusher } from './features/ynabSync/flush/startOutboundSyncFlusher';
 import { RegisterRoutes } from './generated/routes';
+import { isPayloadTooLargeError, receiptsJsonBodyTooLargeMessage } from './payloadTooLarge';
 import { getRequestId, requestContextMiddleware } from './services/requestContext';
 
 export const app = express();
 app.use(requestContextMiddleware);
-app.use(express.json());
+app.use(express.json({ limit: RECEIPTS_JSON_BODY_LIMIT }));
 
 RegisterRoutes(app);
 
@@ -39,6 +45,13 @@ function causeText(cause: unknown): string | undefined {
 }
 
 function errorHandler(error: unknown, request: Request, response: Response, _next: NextFunction): void {
+    if (isPayloadTooLargeError(error)) {
+        response.status(413).json({
+            message: receiptsJsonBodyTooLargeMessage(),
+        });
+        return;
+    }
+
     if (error instanceof ValidateError) {
         response.status(422).json({
             details: error?.fields,
