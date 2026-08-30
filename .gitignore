@@ -144,3 +144,6 @@ apps/categorization-ai/.idea/
 
 # Local Amazon order-history MCP clone (`pnpm setup:amazon-mcp`)
 third_party/amazon-order-history-csv-download-mcp/
+
+# PRD builder session state (local progress only)
+.cursor/prd-sessions/
