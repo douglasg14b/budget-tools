@@ -1,8 +1,8 @@
 import { getCategoriesOptions, getOperatingModeOptions } from '@budget-tools/web-sdk';
-import { useDebouncedValue } from '@mantine/hooks';
+import { useDebouncedValue, useMediaQuery } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 
 import { BackendErrorNotice } from '../components/BackendErrorNotice';
 import { ClassifyTable } from '../components/review/classify/ClassifyTable';
@@ -26,7 +26,11 @@ type ClassifyPageProps = {
     layout: 'card' | 'table';
 };
 
+/** Keep in sync with classify / nav CSS (`max-width: 56rem`). */
+const NARROW_VIEWPORT = '(max-width: 56rem)';
+
 export function ClassifyPage({ layout }: ClassifyPageProps) {
+    const isNarrow = useMediaQuery(NARROW_VIEWPORT, false, { getInitialValueInEffect: false });
     const [searchParams, setSearchParams] = useSearchParams();
     const search = parseQueueSearchParams(searchParams);
     const [debouncedQ] = useDebouncedValue(search.q ?? '', 250);
@@ -71,6 +75,10 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
             pinFocusedQueueItem(sortQueueItemsByDateDesc(filterQueueItems(items, search)), items, search.transactionId),
         [items, search],
     );
+
+    if (layout === 'table' && isNarrow) {
+        return <Navigate replace to={{ pathname: '/classify', search: searchParams.toString() }} />;
+    }
 
     return (
         <div className={classes.page}>

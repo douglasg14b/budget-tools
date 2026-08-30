@@ -2,6 +2,7 @@
     display: flex;
     flex-direction: column;
     gap: 1.1rem;
+    min-width: 0;
     padding: 1.6rem 1.7rem 1.35rem;
     background: var(--app-bg-surface);
     border-radius: 0.65rem;
@@ -43,6 +44,7 @@
     color: var(--app-text-secondary);
     font-weight: 500;
     text-align: right;
+    overflow-wrap: anywhere;
 }
 
 .hero {
@@ -343,6 +345,21 @@
     color: var(--app-text-secondary);
 }
 
+@media (max-width: 56rem) {
+    .stage {
+        padding: 1.25rem 1.1rem 1.2rem;
+    }
+
+    .kbd,
+    .optionKey {
+        display: none;
+    }
+
+    .catalog {
+        max-width: none;
+    }
+}
+
 @media (max-width: 40rem) {
     .hero {
         flex-direction: column;
@@ -352,6 +369,20 @@
 
     .payee {
         font-size: 1.55rem;
+    }
+
+    .amount {
+        font-size: 1.4rem;
+    }
+
+    .context {
+        flex-wrap: wrap;
+        gap: 0.35rem 0.75rem;
+    }
+
+    .originalName {
+        margin-left: 0;
+        text-align: left;
     }
 
     .verdict {
@@ -365,5 +396,19 @@
         align-items: baseline;
         justify-content: flex-start;
         gap: 0.65rem;
+    }
+
+    .actions {
+        flex-direction: column;
+    }
+
+    .accept,
+    .reject {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .option {
+        padding: 0.65rem 0.15rem;
     }
 }

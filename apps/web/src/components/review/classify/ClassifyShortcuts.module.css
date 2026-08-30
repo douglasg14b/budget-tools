@@ -73,12 +73,6 @@
 
 @media (max-width: 56rem) {
     .card {
-        position: static;
-    }
-
-    .list {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
-        gap: 0.4rem 0.85rem;
+        display: none;
     }
 }

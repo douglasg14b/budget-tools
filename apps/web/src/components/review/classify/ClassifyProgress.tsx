@@ -6,35 +6,66 @@ import { CERTAIN_EXPLANATION } from './isCertainProposal';
 import type { SessionTally } from './sessionDecisions';
 
 type ClassifyProgressProps = {
+    canGoNext?: boolean;
+    canGoPrevious?: boolean;
     certainCount: number;
     completeHint: string;
     hasMore?: boolean;
     isExpanding?: boolean;
     itemCount: number;
     onAcceptAllCertain: () => void;
+    onNext?: () => void;
+    onPrevious?: () => void;
     position: number;
     tally: SessionTally;
 };
 
 export function ClassifyProgress({
+    canGoNext = false,
+    canGoPrevious = false,
     certainCount,
     completeHint,
     hasMore = false,
     isExpanding = false,
     itemCount,
     onAcceptAllCertain,
+    onNext,
+    onPrevious,
     position,
     tally,
 }: ClassifyProgressProps) {
+    const showStepper = Boolean(onNext && onPrevious);
     return (
         <div className={classes.progress}>
-            <p className={classes.tally}>
-                {position} of {itemCount}
-                {tally.remaining > 0 ? ` · ${tally.remaining} left` : ''}
-                {tally.accepted > 0 ? ` · ${tally.accepted} accepted` : ''}
-                {tally.changed > 0 ? ` · ${tally.changed} changed` : ''}
-                {tally.rejected > 0 ? ` · ${tally.rejected} rejected` : ''}
-            </p>
+            <div className={classes.tallyRow}>
+                <p className={classes.tally}>
+                    {position} of {itemCount}
+                    {tally.remaining > 0 ? ` · ${tally.remaining} left` : ''}
+                    {tally.accepted > 0 ? ` · ${tally.accepted} accepted` : ''}
+                    {tally.changed > 0 ? ` · ${tally.changed} changed` : ''}
+                    {tally.rejected > 0 ? ` · ${tally.rejected} rejected` : ''}
+                </p>
+                {showStepper ? (
+                    <div className={classes.stepper}>
+                        <UnstyledButton
+                            className={classes.step}
+                            disabled={!canGoPrevious}
+                            aria-label="Previous transaction"
+                            onClick={onPrevious}
+                        >
+                            Prev
+                        </UnstyledButton>
+                        <UnstyledButton
+                            className={classes.step}
+                            disabled={!canGoNext}
+                            aria-label="Next transaction"
+                            onClick={onNext}
+                        >
+                            Next
+                        </UnstyledButton>
+                    </div>
+                ) : null}
+            </div>
             <div className={classes.track} aria-hidden="true">
                 <span
                     className={classes.fill}

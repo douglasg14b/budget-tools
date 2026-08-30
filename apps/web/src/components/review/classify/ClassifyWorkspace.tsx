@@ -111,12 +111,16 @@ export function ClassifyWorkspace({
         <div className={classes.workspace}>
             {classify.liveError ? <BackendErrorNotice error={new Error(classify.liveError)} /> : null}
             <ClassifyProgress
+                canGoNext={classify.canGoNext}
+                canGoPrevious={classify.canGoPrevious}
                 certainCount={classify.certainRemaining.length}
-                completeHint="Batch reviewed. Select any row to edit, or undo."
+                completeHint="Batch reviewed. Undo to go back."
                 hasMore={hasMoreOlder}
                 isExpanding={isExpandingOlder}
                 itemCount={items.length}
                 onAcceptAllCertain={classify.acceptAllCertain}
+                onNext={classify.goNext}
+                onPrevious={classify.goPrevious}
                 position={classify.position}
                 tally={classify.tally}
             />

@@ -114,3 +114,9 @@
 .amount[data-inflow] {
     color: var(--app-amount-inflow);
 }
+
+@media (max-width: 56rem) {
+    .rail {
+        display: none;
+    }
+}

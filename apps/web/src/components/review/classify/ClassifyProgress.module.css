@@ -5,12 +5,42 @@
     gap: 0.35rem;
 }
 
+.tallyRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.45rem 0.85rem;
+}
+
 .tally {
     margin: 0;
     font-family: var(--app-font-mono);
     font-size: 0.8125rem;
     font-variant-numeric: tabular-nums;
     color: var(--app-text-muted);
+}
+
+.stepper {
+    display: none;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.step {
+    padding: 0.2rem 0.55rem;
+    color: var(--app-text-secondary);
+    font-size: 0.8125rem;
+    font-weight: 700;
+}
+
+.step:hover:not(:disabled) {
+    color: var(--app-text-primary);
+}
+
+.step:disabled {
+    opacity: 0.35;
+    cursor: default;
 }
 
 .track {
@@ -65,4 +95,19 @@
     margin: 0.15rem 0 0;
     font-size: 0.9375rem;
     color: var(--app-text-secondary);
+}
+
+@media (max-width: 56rem) {
+    .stepper {
+        display: flex;
+    }
+
+    .step {
+        padding: 0.4rem 0.75rem;
+        min-height: 2.25rem;
+    }
+
+    .kbd {
+        display: none;
+    }
 }

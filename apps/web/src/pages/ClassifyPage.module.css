@@ -40,3 +40,14 @@
     color: var(--app-mode-live-ink);
     font-weight: 700;
 }
+
+@media (max-width: 40rem) {
+    .header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .title {
+        font-size: 1.6rem;
+    }
+}

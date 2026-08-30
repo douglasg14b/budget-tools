@@ -23,4 +23,8 @@
     .workspace {
         grid-template-columns: 1fr;
     }
+
+    .shortcuts {
+        display: none;
+    }
 }

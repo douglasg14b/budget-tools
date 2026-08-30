@@ -28,3 +28,13 @@
     color: var(--app-text-primary);
     box-shadow: inset 0 0 0 1px var(--app-border-strong);
 }
+
+@media (max-width: 56rem) {
+    .tableLink {
+        display: none;
+    }
+
+    .link {
+        padding: 0.35rem 0.7rem;
+    }
+}

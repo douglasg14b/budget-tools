@@ -125,3 +125,28 @@
     margin: 0 auto;
     padding: 2rem 1.5rem 4rem;
 }
+
+@media (max-width: 56rem) {
+    .headerInner {
+        gap: 0.65rem;
+        padding: 0 0.85rem;
+    }
+
+    .brand {
+        gap: 0.65rem;
+    }
+
+    .headerEnd {
+        gap: 0.45rem;
+    }
+
+    .page {
+        padding: 1.25rem 0.85rem 3rem;
+    }
+}
+
+@media (max-width: 40rem) {
+    .wordmark {
+        display: none;
+    }
+}

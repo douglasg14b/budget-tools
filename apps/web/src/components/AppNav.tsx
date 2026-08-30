@@ -13,7 +13,10 @@ export function AppNav() {
             <NavLink className={navClassName} end to={{ pathname: '/classify', search: location.search }}>
                 Classify
             </NavLink>
-            <NavLink className={navClassName} to={{ pathname: '/classify/table', search: location.search }}>
+            <NavLink
+                className={(state) => `${navClassName(state)} ${classes.tableLink}`}
+                to={{ pathname: '/classify/table', search: location.search }}
+            >
                 Table
             </NavLink>
             <NavLink className={navClassName} to="/trips">

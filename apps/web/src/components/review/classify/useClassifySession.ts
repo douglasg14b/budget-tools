@@ -298,6 +298,17 @@ export function useClassifySession(
         }
     }
 
+    const canGoNext = Boolean(
+        options.navigate === 'rows'
+            ? nextRowId(items, current?.transaction.id)
+            : nextRemainingId(items, session, current?.transaction.id),
+    );
+    const canGoPrevious = Boolean(
+        options.navigate === 'rows'
+            ? previousRowId(items, current?.transaction.id)
+            : previousRemainingId(items, session, current?.transaction.id),
+    );
+
     function commitPayee(transactionId: string, name: string): void {
         setPayeeEdits((edits) => setPayeeName(edits, transactionId, name));
     }
@@ -347,12 +358,16 @@ export function useClassifySession(
         acceptCurrent,
         assignableIds,
         beginSplit,
+        canGoNext,
+        canGoPrevious,
         cancelSplit,
         certainRemaining,
         choicesById,
         commitPayee,
         current,
         dismissRename,
+        goNext,
+        goPrevious,
         liveError,
         payeeName,
         payeeRename,

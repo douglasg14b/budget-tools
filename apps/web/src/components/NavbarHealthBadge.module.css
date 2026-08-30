@@ -25,3 +25,9 @@
 .label {
     font-weight: 400;
 }
+
+@media (max-width: 40rem) {
+    .status {
+        display: none;
+    }
+}

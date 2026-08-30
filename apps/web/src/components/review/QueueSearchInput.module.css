@@ -20,3 +20,9 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
 }
+
+@media (max-width: 40rem) {
+    .input {
+        width: 100%;
+    }
+}
