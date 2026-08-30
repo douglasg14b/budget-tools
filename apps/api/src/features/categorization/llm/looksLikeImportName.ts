@@ -1,6 +1,6 @@
 import { nameSimilarity } from '../nameSimilarity';
 
-const RAW_PAYEE_SIMILARITY_THRESHOLD = 0.85;
+export const RAW_PAYEE_SIMILARITY_THRESHOLD = 0.85;
 
 function firstNonEmpty(primary: string | null | undefined, fallback: string | null | undefined): string | null {
     const first = primary?.trim();

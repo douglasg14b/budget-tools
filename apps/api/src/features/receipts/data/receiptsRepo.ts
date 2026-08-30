@@ -107,6 +107,25 @@ export async function listReceipts(db?: AppDatabaseClient): Promise<ReceiptRow[]
     return database.selectFrom('receipts').selectAll().orderBy('createdAt', 'desc').execute();
 }
 
+/**
+ * Indexed purchase-date window for Classify lookup. Null dates are excluded by the comparison.
+ */
+export async function listReceiptsInPurchaseDateWindow(
+    earliestDate: string,
+    latestDate: string,
+    db?: AppDatabaseClient,
+): Promise<ReceiptRow[]> {
+    const database = db ?? (await getAppDatabase());
+    return database
+        .selectFrom('receipts')
+        .selectAll()
+        .where('purchaseDate', '>=', earliestDate)
+        .where('purchaseDate', '<=', latestDate)
+        .orderBy('purchaseDate', 'asc')
+        .orderBy('id', 'asc')
+        .execute();
+}
+
 export async function requireReceipt(id: string, db?: AppDatabaseClient): Promise<ReceiptRow> {
     const row = await getReceiptById(id, db);
     if (!row) {

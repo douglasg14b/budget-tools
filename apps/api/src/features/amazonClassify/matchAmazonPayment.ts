@@ -1,5 +1,10 @@
 import type { AmazonOrderRecord, AmazonPaymentRecord } from '../amazonOrders/data/amazonOrdersRepo';
-import { addIsoDays, uncoveredIsoDateRanges } from '../amazonOrders/isoDate';
+import {
+    addIsoDays,
+    PAYMENT_MATCH_LOOKAHEAD_DAYS,
+    PAYMENT_MATCH_LOOKBACK_DAYS,
+    uncoveredIsoDateRanges,
+} from '../amazonOrders/isoDate';
 
 export type AmazonMatchKind = 'payment' | 'batched-orders' | 'partial-order' | 'unmatched';
 
@@ -9,13 +14,10 @@ export type AmazonPaymentMatch = {
     readonly orderIds: readonly string[];
 };
 
-const DAYS_AFTER_PAYMENT = 5;
-const DAYS_BEFORE_PAYMENT = 1;
-
 export function amazonPaymentDateWindow(bankDate: string): { earliestDate: string; latestDate: string } {
     return {
-        earliestDate: addIsoDays(bankDate, -DAYS_AFTER_PAYMENT),
-        latestDate: addIsoDays(bankDate, DAYS_BEFORE_PAYMENT),
+        earliestDate: addIsoDays(bankDate, -PAYMENT_MATCH_LOOKBACK_DAYS),
+        latestDate: addIsoDays(bankDate, PAYMENT_MATCH_LOOKAHEAD_DAYS),
     };
 }
 

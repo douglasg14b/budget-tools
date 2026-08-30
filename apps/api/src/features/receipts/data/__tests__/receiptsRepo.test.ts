@@ -12,6 +12,7 @@ import {
     deleteReceipt,
     findReceiptByContentHash,
     insertReceiptOriginal,
+    listReceiptsInPurchaseDateWindow,
     setReceiptExtract,
     setReceiptTransactionId,
 } from '../receiptsRepo';
@@ -133,5 +134,43 @@ describe('receiptsRepo', () => {
         await deleteReceipt(created.id, database);
         await expect(readFile(created.originalPath)).rejects.toMatchObject({ code: 'ENOENT' });
         expect(await findReceiptByContentHash(created.contentHash, database)).toBeUndefined();
+    });
+
+    it('lists receipts by indexed purchase date window', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = join(directory, 'files');
+        const inWindow = await insertReceiptOriginal({ bytes: jpegBytes, receiptsDir }, database);
+        const outside = await insertReceiptOriginal(
+            { bytes: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x11]), receiptsDir },
+            database,
+        );
+        await setReceiptExtract(
+            inWindow.id,
+            {
+                extractStatus: 'gated',
+                extractJson: null,
+                rawText: null,
+                vendor: 'Store',
+                purchaseDate: '2026-02-09',
+                printedMilliunits: 50000,
+                totalsDisagree: false,
+            },
+            database,
+        );
+        await setReceiptExtract(
+            outside.id,
+            {
+                extractStatus: 'gated',
+                extractJson: null,
+                rawText: null,
+                vendor: 'Other',
+                purchaseDate: '2026-01-01',
+                printedMilliunits: 50000,
+                totalsDisagree: false,
+            },
+            database,
+        );
+        const listed = await listReceiptsInPurchaseDateWindow('2026-02-05', '2026-02-11', database);
+        expect(listed.map((row) => row.id)).toEqual([inWindow.id]);
     });
 });

@@ -1,5 +1,10 @@
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Days before the bank posting that a payment or receipt date may fall. */
+export const PAYMENT_MATCH_LOOKBACK_DAYS = 5;
+/** Days after the bank posting that a payment or receipt date may fall. */
+export const PAYMENT_MATCH_LOOKAHEAD_DAYS = 1;
+
 export type IsoDateRange = {
     readonly start: string;
     readonly end: string;

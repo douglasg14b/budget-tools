@@ -12,7 +12,20 @@ import {
     requireReceipt,
     setReceiptTransactionId,
 } from './data/receiptsRepo';
-import type { BindReceiptDto, CreateReceiptDto, ReceiptDto, ReceiptsDto } from './receiptsDtos';
+import {
+    lookupByReceipt as lookupReceiptRow,
+    lookupByTransaction as lookupTransactionRow,
+    matchPreview as previewReceiptMatch,
+    toReceiptMatchDto,
+} from './lookupReceiptMatch';
+import type {
+    BindReceiptDto,
+    CreateReceiptDto,
+    MatchPreviewDto,
+    ReceiptDto,
+    ReceiptMatchDto,
+    ReceiptsDto,
+} from './receiptsDtos';
 
 async function toReceiptDto(row: ReceiptRow): Promise<ReceiptDto> {
     return {
@@ -58,6 +71,36 @@ export class ReceiptsController {
                 transactionId: body.transactionId,
             }),
         );
+    }
+
+    /**
+     * @summary lookupByTransaction
+     */
+    @Response(403, 'Practice mode')
+    @Response(404, 'Not found')
+    @Get('lookup-by-transaction')
+    public async lookupByTransaction(@Query() transactionId: string): Promise<ReceiptMatchDto> {
+        return toReceiptMatchDto(await lookupTransactionRow(transactionId));
+    }
+
+    /**
+     * @summary lookupByReceipt
+     */
+    @Response(403, 'Practice mode')
+    @Response(404, 'Not found')
+    @Get('lookup-by-receipt')
+    public async lookupByReceipt(@Query() receiptId: string): Promise<ReceiptMatchDto> {
+        return toReceiptMatchDto(await lookupReceiptRow(receiptId));
+    }
+
+    /**
+     * @summary matchPreview
+     */
+    @Response(400, 'Invalid preview')
+    @Response(404, 'Not found')
+    @Post('match-preview')
+    public async matchPreview(@Body() body: MatchPreviewDto): Promise<ReceiptMatchDto> {
+        return toReceiptMatchDto(await previewReceiptMatch(body));
     }
 
     /**

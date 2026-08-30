@@ -260,6 +260,168 @@
 				],
 				"type": "object"
 			},
+			"ClosePairReason": {
+				"type": "string",
+				"enum": [
+					"fuzzy-tip",
+					"blocked-exact"
+				]
+			},
+			"ClosePairMatch": {
+				"properties": {
+					"tipRatio": {
+						"type": "number",
+						"format": "double"
+					},
+					"tipMilliunits": {
+						"type": "number",
+						"format": "double"
+					},
+					"payeeSimilarity": {
+						"type": "number",
+						"format": "double"
+					},
+					"reason": {
+						"$ref": "#/components/schemas/ClosePairReason"
+					},
+					"transactionId": {
+						"type": "string"
+					},
+					"receiptId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"tipRatio",
+					"tipMilliunits",
+					"payeeSimilarity",
+					"reason",
+					"transactionId",
+					"receiptId"
+				],
+				"type": "object"
+			},
+			"ReceiptMatchCloseDto": {
+				"$ref": "#/components/schemas/ClosePairMatch"
+			},
+			"ReceiptMatchDto": {
+				"properties": {
+					"closeMatches": {
+						"items": {
+							"$ref": "#/components/schemas/ReceiptMatchCloseDto"
+						},
+						"type": "array"
+					},
+					"exactTransactionId": {
+						"type": "string",
+						"nullable": true
+					},
+					"exactReceiptId": {
+						"type": "string",
+						"nullable": true
+					},
+					"autoBind": {
+						"type": "boolean"
+					},
+					"amazonSkipped": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"closeMatches",
+					"exactTransactionId",
+					"exactReceiptId",
+					"autoBind",
+					"amazonSkipped"
+				],
+				"type": "object"
+			},
+			"MatchPreviewReceiptDto": {
+				"properties": {
+					"totalsDisagree": {
+						"type": "boolean"
+					},
+					"printedMilliunits": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
+					"purchaseDate": {
+						"type": "string",
+						"nullable": true
+					},
+					"vendor": {
+						"type": "string",
+						"nullable": true
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"totalsDisagree",
+					"printedMilliunits",
+					"purchaseDate",
+					"vendor",
+					"id"
+				],
+				"type": "object"
+			},
+			"MatchPreviewTransactionDto": {
+				"properties": {
+					"importPayeeNameOriginal": {
+						"type": "string",
+						"nullable": true
+					},
+					"importPayeeName": {
+						"type": "string",
+						"nullable": true
+					},
+					"payeeName": {
+						"type": "string",
+						"nullable": true
+					},
+					"amount": {
+						"type": "number",
+						"format": "double"
+					},
+					"date": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"importPayeeNameOriginal",
+					"importPayeeName",
+					"payeeName",
+					"amount",
+					"date",
+					"id"
+				],
+				"type": "object"
+			},
+			"MatchPreviewDto": {
+				"properties": {
+					"transaction": {
+						"$ref": "#/components/schemas/MatchPreviewTransactionDto"
+					},
+					"transactionId": {
+						"type": "string"
+					},
+					"receipts": {
+						"items": {
+							"$ref": "#/components/schemas/MatchPreviewReceiptDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"receipts"
+				],
+				"type": "object"
+			},
 			"BindReceiptDto": {
 				"properties": {
 					"transactionId": {
@@ -1903,6 +2065,121 @@
 						"application/json": {
 							"schema": {
 								"$ref": "#/components/schemas/CreateReceiptDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/receipts/lookup-by-transaction": {
+			"get": {
+				"operationId": "LookupByTransaction",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptMatchDto"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Practice mode"
+					},
+					"404": {
+						"description": "Not found"
+					}
+				},
+				"summary": "lookupByTransaction",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "transactionId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/receipts/lookup-by-receipt": {
+			"get": {
+				"operationId": "LookupByReceipt",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptMatchDto"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Practice mode"
+					},
+					"404": {
+						"description": "Not found"
+					}
+				},
+				"summary": "lookupByReceipt",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "query",
+						"name": "receiptId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/receipts/match-preview": {
+			"post": {
+				"operationId": "MatchPreview",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptMatchDto"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Invalid preview"
+					},
+					"404": {
+						"description": "Not found"
+					}
+				},
+				"summary": "matchPreview",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/MatchPreviewDto"
 							}
 						}
 					}

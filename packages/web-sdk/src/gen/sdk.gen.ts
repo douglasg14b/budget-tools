@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BindReceiptData, BindReceiptErrors, BindReceiptResponses, CreateReceiptData, CreateReceiptErrors, CreateReceiptResponses, CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteClassificationDecisionData, DeleteClassificationDecisionErrors, DeleteClassificationDecisionResponses, DeleteReceiptData, DeleteReceiptErrors, DeleteReceiptResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, DetachReceiptData, DetachReceiptErrors, DetachReceiptResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetOperatingModeData, GetOperatingModeResponses, GetOutboundSyncData, GetOutboundSyncResponses, GetReceiptData, GetReceiptErrors, GetReceiptImageData, GetReceiptImageErrors, GetReceiptImageResponses, GetReceiptResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListReceiptsData, ListReceiptsResponses, ListTravelWindowsData, ListTravelWindowsResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostClassificationDecisionsData, PostClassificationDecisionsErrors, PostClassificationDecisionsResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostOutboundSyncFlushData, PostOutboundSyncFlushErrors, PostOutboundSyncFlushResponses, PostPredictData, PostPredictResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
+import type { BindReceiptData, BindReceiptErrors, BindReceiptResponses, CreateReceiptData, CreateReceiptErrors, CreateReceiptResponses, CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteClassificationDecisionData, DeleteClassificationDecisionErrors, DeleteClassificationDecisionResponses, DeleteReceiptData, DeleteReceiptErrors, DeleteReceiptResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, DetachReceiptData, DetachReceiptErrors, DetachReceiptResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetOperatingModeData, GetOperatingModeResponses, GetOutboundSyncData, GetOutboundSyncResponses, GetReceiptData, GetReceiptErrors, GetReceiptImageData, GetReceiptImageErrors, GetReceiptImageResponses, GetReceiptResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListReceiptsData, ListReceiptsResponses, ListTravelWindowsData, ListTravelWindowsResponses, LookupByReceiptData, LookupByReceiptErrors, LookupByReceiptResponses, LookupByTransactionData, LookupByTransactionErrors, LookupByTransactionResponses, MatchPreviewData, MatchPreviewErrors, MatchPreviewResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostClassificationDecisionsData, PostClassificationDecisionsErrors, PostClassificationDecisionsResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostOutboundSyncFlushData, PostOutboundSyncFlushErrors, PostOutboundSyncFlushResponses, PostPredictData, PostPredictResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -119,37 +119,65 @@ export class Receipts {
     }
     
     /**
+     * lookupByTransaction
+     */
+    public static request3<ThrowOnError extends boolean = false>(options: Options<LookupByTransactionData, ThrowOnError>): RequestResult<LookupByTransactionResponses, LookupByTransactionErrors, ThrowOnError> {
+        return (options.client ?? client).get<LookupByTransactionResponses, LookupByTransactionErrors, ThrowOnError>({ url: '/receipts/lookup-by-transaction', ...options });
+    }
+    
+    /**
+     * lookupByReceipt
+     */
+    public static request4<ThrowOnError extends boolean = false>(options: Options<LookupByReceiptData, ThrowOnError>): RequestResult<LookupByReceiptResponses, LookupByReceiptErrors, ThrowOnError> {
+        return (options.client ?? client).get<LookupByReceiptResponses, LookupByReceiptErrors, ThrowOnError>({ url: '/receipts/lookup-by-receipt', ...options });
+    }
+    
+    /**
+     * matchPreview
+     */
+    public static request5<ThrowOnError extends boolean = false>(options: Options<MatchPreviewData, ThrowOnError>): RequestResult<MatchPreviewResponses, MatchPreviewErrors, ThrowOnError> {
+        return (options.client ?? client).post<MatchPreviewResponses, MatchPreviewErrors, ThrowOnError>({
+            url: '/receipts/match-preview',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    /**
      * getReceiptImage
      */
-    public static request3<ThrowOnError extends boolean = false>(options: Options<GetReceiptImageData, ThrowOnError>): RequestResult<GetReceiptImageResponses, GetReceiptImageErrors, ThrowOnError> {
+    public static request6<ThrowOnError extends boolean = false>(options: Options<GetReceiptImageData, ThrowOnError>): RequestResult<GetReceiptImageResponses, GetReceiptImageErrors, ThrowOnError> {
         return (options.client ?? client).get<GetReceiptImageResponses, GetReceiptImageErrors, ThrowOnError>({ url: '/receipts/{id}/image', ...options });
     }
     
     /**
      * deleteReceipt
      */
-    public static request4<ThrowOnError extends boolean = false>(options: Options<DeleteReceiptData, ThrowOnError>): RequestResult<DeleteReceiptResponses, DeleteReceiptErrors, ThrowOnError> {
+    public static request7<ThrowOnError extends boolean = false>(options: Options<DeleteReceiptData, ThrowOnError>): RequestResult<DeleteReceiptResponses, DeleteReceiptErrors, ThrowOnError> {
         return (options.client ?? client).delete<DeleteReceiptResponses, DeleteReceiptErrors, ThrowOnError>({ url: '/receipts/{id}', ...options });
     }
     
     /**
      * getReceipt
      */
-    public static request5<ThrowOnError extends boolean = false>(options: Options<GetReceiptData, ThrowOnError>): RequestResult<GetReceiptResponses, GetReceiptErrors, ThrowOnError> {
+    public static request8<ThrowOnError extends boolean = false>(options: Options<GetReceiptData, ThrowOnError>): RequestResult<GetReceiptResponses, GetReceiptErrors, ThrowOnError> {
         return (options.client ?? client).get<GetReceiptResponses, GetReceiptErrors, ThrowOnError>({ url: '/receipts/{id}', ...options });
     }
     
     /**
      * detachReceipt
      */
-    public static request6<ThrowOnError extends boolean = false>(options: Options<DetachReceiptData, ThrowOnError>): RequestResult<DetachReceiptResponses, DetachReceiptErrors, ThrowOnError> {
+    public static request9<ThrowOnError extends boolean = false>(options: Options<DetachReceiptData, ThrowOnError>): RequestResult<DetachReceiptResponses, DetachReceiptErrors, ThrowOnError> {
         return (options.client ?? client).delete<DetachReceiptResponses, DetachReceiptErrors, ThrowOnError>({ url: '/receipts/{id}/bind', ...options });
     }
     
     /**
      * bindReceipt
      */
-    public static request7<ThrowOnError extends boolean = false>(options: Options<BindReceiptData, ThrowOnError>): RequestResult<BindReceiptResponses, BindReceiptErrors, ThrowOnError> {
+    public static request10<ThrowOnError extends boolean = false>(options: Options<BindReceiptData, ThrowOnError>): RequestResult<BindReceiptResponses, BindReceiptErrors, ThrowOnError> {
         return (options.client ?? client).post<BindReceiptResponses, BindReceiptErrors, ThrowOnError>({
             url: '/receipts/{id}/bind',
             ...options,

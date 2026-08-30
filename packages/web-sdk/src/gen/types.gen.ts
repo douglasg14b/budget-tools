@@ -73,6 +73,50 @@ export type CreateReceiptDto = {
     frames: Array<string>;
 };
 
+export type ClosePairReason = 'fuzzy-tip' | 'blocked-exact';
+
+export type ClosePairMatch = {
+    tipRatio: number;
+    tipMilliunits: number;
+    payeeSimilarity: number;
+    reason: ClosePairReason;
+    transactionId: string;
+    receiptId: string;
+};
+
+export type ReceiptMatchCloseDto = ClosePairMatch;
+
+export type ReceiptMatchDto = {
+    closeMatches: Array<ClosePairMatch>;
+    exactTransactionId: string | null;
+    exactReceiptId: string | null;
+    autoBind: boolean;
+    amazonSkipped: boolean;
+};
+
+export type MatchPreviewReceiptDto = {
+    totalsDisagree: boolean;
+    printedMilliunits: number | null;
+    purchaseDate: string | null;
+    vendor: string | null;
+    id: string;
+};
+
+export type MatchPreviewTransactionDto = {
+    importPayeeNameOriginal: string | null;
+    importPayeeName: string | null;
+    payeeName: string | null;
+    amount: number;
+    date: string;
+    id: string;
+};
+
+export type MatchPreviewDto = {
+    transaction?: MatchPreviewTransactionDto;
+    transactionId?: string;
+    receipts: Array<MatchPreviewReceiptDto>;
+};
+
 export type BindReceiptDto = {
     transactionId: string;
 };
@@ -614,6 +658,91 @@ export type CreateReceiptResponses = {
 };
 
 export type CreateReceiptResponse = CreateReceiptResponses[keyof CreateReceiptResponses];
+
+export type LookupByTransactionData = {
+    body?: never;
+    path?: never;
+    query: {
+        transactionId: string;
+    };
+    url: '/receipts/lookup-by-transaction';
+};
+
+export type LookupByTransactionErrors = {
+    /**
+     * Practice mode
+     */
+    403: unknown;
+    /**
+     * Not found
+     */
+    404: unknown;
+};
+
+export type LookupByTransactionResponses = {
+    /**
+     * Ok
+     */
+    200: ReceiptMatchDto;
+};
+
+export type LookupByTransactionResponse = LookupByTransactionResponses[keyof LookupByTransactionResponses];
+
+export type LookupByReceiptData = {
+    body?: never;
+    path?: never;
+    query: {
+        receiptId: string;
+    };
+    url: '/receipts/lookup-by-receipt';
+};
+
+export type LookupByReceiptErrors = {
+    /**
+     * Practice mode
+     */
+    403: unknown;
+    /**
+     * Not found
+     */
+    404: unknown;
+};
+
+export type LookupByReceiptResponses = {
+    /**
+     * Ok
+     */
+    200: ReceiptMatchDto;
+};
+
+export type LookupByReceiptResponse = LookupByReceiptResponses[keyof LookupByReceiptResponses];
+
+export type MatchPreviewData = {
+    body: MatchPreviewDto;
+    path?: never;
+    query?: never;
+    url: '/receipts/match-preview';
+};
+
+export type MatchPreviewErrors = {
+    /**
+     * Invalid preview
+     */
+    400: unknown;
+    /**
+     * Not found
+     */
+    404: unknown;
+};
+
+export type MatchPreviewResponses = {
+    /**
+     * Ok
+     */
+    200: ReceiptMatchDto;
+};
+
+export type MatchPreviewResponse = MatchPreviewResponses[keyof MatchPreviewResponses];
 
 export type GetReceiptImageData = {
     body?: never;

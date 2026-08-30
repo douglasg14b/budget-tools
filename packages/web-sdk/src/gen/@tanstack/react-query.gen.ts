@@ -4,7 +4,7 @@ import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanst
 
 import { client } from '../client.gen';
 import { Accounts, AmazonOrders, Categories, Categorization, Health, OperatingMode, type Options, Receipts, TravelBias, TravelWindows } from '../sdk.gen';
-import type { BindReceiptData, BindReceiptResponse, CreateReceiptData, CreateReceiptResponse, CreateTravelWindowData, CreateTravelWindowResponse, DeleteClassificationDecisionData, DeleteClassificationDecisionResponse, DeleteReceiptData, DeleteReceiptResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, DetachReceiptData, DetachReceiptResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetOperatingModeData, GetOperatingModeResponse, GetOutboundSyncData, GetOutboundSyncResponse, GetReceiptData, GetReceiptImageData, GetReceiptImageResponse, GetReceiptResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListReceiptsData, ListReceiptsResponse, ListTravelWindowsData, ListTravelWindowsResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostClassificationDecisionsData, PostClassificationDecisionsResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostOutboundSyncFlushData, PostOutboundSyncFlushResponse, PostPredictData, PostPredictResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
+import type { BindReceiptData, BindReceiptResponse, CreateReceiptData, CreateReceiptResponse, CreateTravelWindowData, CreateTravelWindowResponse, DeleteClassificationDecisionData, DeleteClassificationDecisionResponse, DeleteReceiptData, DeleteReceiptResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, DetachReceiptData, DetachReceiptResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetOperatingModeData, GetOperatingModeResponse, GetOutboundSyncData, GetOutboundSyncResponse, GetReceiptData, GetReceiptImageData, GetReceiptImageResponse, GetReceiptResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListReceiptsData, ListReceiptsResponse, ListTravelWindowsData, ListTravelWindowsResponse, LookupByReceiptData, LookupByReceiptResponse, LookupByTransactionData, LookupByTransactionResponse, MatchPreviewData, MatchPreviewResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostClassificationDecisionsData, PostClassificationDecisionsResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostOutboundSyncFlushData, PostOutboundSyncFlushResponse, PostPredictData, PostPredictResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -198,6 +198,59 @@ export const createReceiptMutation = (options?: Partial<Options<CreateReceiptDat
     return mutationOptions;
 };
 
+export const lookupByTransactionQueryKey = (options: Options<LookupByTransactionData>) => createQueryKey('lookupByTransaction', options);
+
+/**
+ * lookupByTransaction
+ */
+export const lookupByTransactionOptions = (options: Options<LookupByTransactionData>) => queryOptions<LookupByTransactionResponse, DefaultError, LookupByTransactionResponse, ReturnType<typeof lookupByTransactionQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await Receipts.request3({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: lookupByTransactionQueryKey(options)
+});
+
+export const lookupByReceiptQueryKey = (options: Options<LookupByReceiptData>) => createQueryKey('lookupByReceipt', options);
+
+/**
+ * lookupByReceipt
+ */
+export const lookupByReceiptOptions = (options: Options<LookupByReceiptData>) => queryOptions<LookupByReceiptResponse, DefaultError, LookupByReceiptResponse, ReturnType<typeof lookupByReceiptQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await Receipts.request4({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: lookupByReceiptQueryKey(options)
+});
+
+/**
+ * matchPreview
+ */
+export const matchPreviewMutation = (options?: Partial<Options<MatchPreviewData>>): UseMutationOptions<MatchPreviewResponse, DefaultError, Options<MatchPreviewData>> => {
+    const mutationOptions: UseMutationOptions<MatchPreviewResponse, DefaultError, Options<MatchPreviewData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await Receipts.request5({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const getReceiptImageQueryKey = (options: Options<GetReceiptImageData>) => createQueryKey('getReceiptImage', options);
 
 /**
@@ -205,7 +258,7 @@ export const getReceiptImageQueryKey = (options: Options<GetReceiptImageData>) =
  */
 export const getReceiptImageOptions = (options: Options<GetReceiptImageData>) => queryOptions<GetReceiptImageResponse, DefaultError, GetReceiptImageResponse, ReturnType<typeof getReceiptImageQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await Receipts.request3({
+        const { data } = await Receipts.request6({
             ...options,
             ...queryKey[0],
             signal,
@@ -222,7 +275,7 @@ export const getReceiptImageOptions = (options: Options<GetReceiptImageData>) =>
 export const deleteReceiptMutation = (options?: Partial<Options<DeleteReceiptData>>): UseMutationOptions<DeleteReceiptResponse, DefaultError, Options<DeleteReceiptData>> => {
     const mutationOptions: UseMutationOptions<DeleteReceiptResponse, DefaultError, Options<DeleteReceiptData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await Receipts.request4({
+            const { data } = await Receipts.request7({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -240,7 +293,7 @@ export const getReceiptQueryKey = (options: Options<GetReceiptData>) => createQu
  */
 export const getReceiptOptions = (options: Options<GetReceiptData>) => queryOptions<GetReceiptResponse, DefaultError, GetReceiptResponse, ReturnType<typeof getReceiptQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await Receipts.request5({
+        const { data } = await Receipts.request8({
             ...options,
             ...queryKey[0],
             signal,
@@ -257,7 +310,7 @@ export const getReceiptOptions = (options: Options<GetReceiptData>) => queryOpti
 export const detachReceiptMutation = (options?: Partial<Options<DetachReceiptData>>): UseMutationOptions<DetachReceiptResponse, DefaultError, Options<DetachReceiptData>> => {
     const mutationOptions: UseMutationOptions<DetachReceiptResponse, DefaultError, Options<DetachReceiptData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await Receipts.request6({
+            const { data } = await Receipts.request9({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -274,7 +327,7 @@ export const detachReceiptMutation = (options?: Partial<Options<DetachReceiptDat
 export const bindReceiptMutation = (options?: Partial<Options<BindReceiptData>>): UseMutationOptions<BindReceiptResponse, DefaultError, Options<BindReceiptData>> => {
     const mutationOptions: UseMutationOptions<BindReceiptResponse, DefaultError, Options<BindReceiptData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await Receipts.request7({
+            const { data } = await Receipts.request10({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

@@ -88,6 +88,41 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"transactionId":{"dataType":"string"},"frames":{"dataType":"array","array":{"dataType":"string"},"required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ClosePairReason": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["fuzzy-tip"]},{"dataType":"enum","enums":["blocked-exact"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ClosePairMatch": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"tipRatio":{"dataType":"double","required":true},"tipMilliunits":{"dataType":"double","required":true},"payeeSimilarity":{"dataType":"double","required":true},"reason":{"ref":"ClosePairReason","required":true},"transactionId":{"dataType":"string","required":true},"receiptId":{"dataType":"string","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ReceiptMatchCloseDto": {
+        "dataType": "refAlias",
+        "type": {"ref":"ClosePairMatch","validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ReceiptMatchDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"closeMatches":{"dataType":"array","array":{"dataType":"refAlias","ref":"ReceiptMatchCloseDto"},"required":true},"exactTransactionId":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"exactReceiptId":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"autoBind":{"dataType":"boolean","required":true},"amazonSkipped":{"dataType":"boolean","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "MatchPreviewReceiptDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"totalsDisagree":{"dataType":"boolean","required":true},"printedMilliunits":{"dataType":"union","subSchemas":[{"dataType":"double"},{"dataType":"enum","enums":[null]}],"required":true},"purchaseDate":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"vendor":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"id":{"dataType":"string","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "MatchPreviewTransactionDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"importPayeeNameOriginal":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"importPayeeName":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"payeeName":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"amount":{"dataType":"double","required":true},"date":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "MatchPreviewDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"transaction":{"ref":"MatchPreviewTransactionDto"},"transactionId":{"dataType":"string"},"receipts":{"dataType":"array","array":{"dataType":"refAlias","ref":"MatchPreviewReceiptDto"},"required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "BindReceiptDto": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"transactionId":{"dataType":"string","required":true}},"validators":{}},
@@ -606,6 +641,96 @@ export function RegisterRoutes(app: Router) {
                 next,
                 validatedArgs,
                 successStatus: 201,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsReceiptsController_lookupByTransaction: Record<string, TsoaRoute.ParameterSchema> = {
+                transactionId: {"in":"query","name":"transactionId","required":true,"dataType":"string"},
+        };
+        app.get('/api/receipts/lookup-by-transaction',
+            ...(fetchMiddlewares<RequestHandler>(ReceiptsController)),
+            ...(fetchMiddlewares<RequestHandler>(ReceiptsController.prototype.lookupByTransaction)),
+
+            async function ReceiptsController_lookupByTransaction(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsReceiptsController_lookupByTransaction, request, response });
+
+                const controller = new ReceiptsController();
+
+              await templateService.apiHandler({
+                methodName: 'lookupByTransaction',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsReceiptsController_lookupByReceipt: Record<string, TsoaRoute.ParameterSchema> = {
+                receiptId: {"in":"query","name":"receiptId","required":true,"dataType":"string"},
+        };
+        app.get('/api/receipts/lookup-by-receipt',
+            ...(fetchMiddlewares<RequestHandler>(ReceiptsController)),
+            ...(fetchMiddlewares<RequestHandler>(ReceiptsController.prototype.lookupByReceipt)),
+
+            async function ReceiptsController_lookupByReceipt(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsReceiptsController_lookupByReceipt, request, response });
+
+                const controller = new ReceiptsController();
+
+              await templateService.apiHandler({
+                methodName: 'lookupByReceipt',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsReceiptsController_matchPreview: Record<string, TsoaRoute.ParameterSchema> = {
+                body: {"in":"body","name":"body","required":true,"ref":"MatchPreviewDto"},
+        };
+        app.post('/api/receipts/match-preview',
+            ...(fetchMiddlewares<RequestHandler>(ReceiptsController)),
+            ...(fetchMiddlewares<RequestHandler>(ReceiptsController.prototype.matchPreview)),
+
+            async function ReceiptsController_matchPreview(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsReceiptsController_matchPreview, request, response });
+
+                const controller = new ReceiptsController();
+
+              await templateService.apiHandler({
+                methodName: 'matchPreview',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
               });
             } catch (err) {
                 return next(err);
