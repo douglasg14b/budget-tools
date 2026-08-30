@@ -22,7 +22,7 @@ export const CATEGORIZATION_QUEUE_BATCH_SIZE = env.get('CATEGORIZATION_QUEUE_BAT
 
 export const OPENROUTER_MODEL = env.get('OPENROUTER_MODEL').default('qwen/qwen3.7-flash').asString();
 
-/** Stronger vision slug for the one-shot receipt repair call. Must be a vision model, not text-only. */
+/** Stronger vision slug for receipt line-item extraction. Must be a vision model, not text-only. */
 export const OPENROUTER_RECEIPT_REPAIR_MODEL = env
     .get('OPENROUTER_RECEIPT_REPAIR_MODEL')
     .default('qwen/qwen3.7-plus')
@@ -67,9 +67,11 @@ export function getSqliteDbPath(): string {
 
 /**
  * Directory for Live receipt originals. Gitignored with apps/api/data/.
+ * Relative RECEIPTS_DIR is resolved from the repo root (same as AMAZON_ORDERS_MCP_ENTRY), not
+ * process.cwd(), so Vitest in apps/api does not write to apps/api/apps/api/data.
  */
 export function getReceiptsDir(): string {
-    return resolveFromCwd(env.get('RECEIPTS_DIR').default('apps/api/data/receipts').asString());
+    return resolveFromRepoRoot(env.get('RECEIPTS_DIR').default('apps/api/data/receipts').asString());
 }
 
 /** API JSON body limit in bytes. Sized for receipt data-URL frames; applies to every express.json route. Default 15 MiB. */

@@ -54,8 +54,7 @@
     "onlyBuiltDependencies": [
       "lefthook",
       "better-sqlite3",
-      "sharp",
-      "tesseract.js"
+      "sharp"
     ]
   },
   "_moduleAliases": {

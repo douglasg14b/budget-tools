@@ -18,7 +18,7 @@ export type ReceiptFixtureInput = {
 };
 
 /**
- * Rasterizes a high-contrast receipt SVG to PNG for live vision/OCR tests.
+ * Rasterizes a high-contrast receipt SVG to PNG for live vision tests.
  */
 export async function renderReceiptPng(input: ReceiptFixtureInput): Promise<Buffer> {
     const svg = receiptSvg(input);

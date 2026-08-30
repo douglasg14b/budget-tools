@@ -10,21 +10,20 @@ import { completeOpenRouterJson } from '../categorization/llm/openRouterClient';
 import type { ReceiptExtractStatus } from './data/receiptsSchema';
 import type { ReceiptExtractLine } from './pipeline/arithmeticGate';
 import { arithmeticGate, printedTotalsDisagree } from './pipeline/arithmeticGate';
-import type { OcrReceiptResult } from './pipeline/ocrReceiptLines';
-import { ocrReceiptLines } from './pipeline/ocrReceiptLines';
 import { jpegDataUrl, prepReceiptImage } from './pipeline/prepReceiptImage';
-import type { CompleteOpenRouterJson, ReceiptHeaderVision } from './pipeline/receiptHeaderVision';
+import type { CompleteOpenRouterJson, ReceiptHeaderVision, ReceiptLinesVision } from './pipeline/receiptHeaderVision';
 import {
     RECEIPT_HEADER_TIMEOUT_MS,
-    RECEIPT_REPAIR_TIMEOUT_MS,
+    RECEIPT_LINES_TIMEOUT_MS,
     readReceiptHeaders,
-    repairReceiptExtract,
+    readReceiptLines,
 } from './pipeline/receiptHeaderVision';
 
 export type ReceiptExtractPayload = {
     readonly repaired: boolean;
     readonly gated: boolean;
     readonly headerPrintedMilliunits: number | null;
+    /** Printed total from the line-vision call (legacy key; not local OCR). */
     readonly ocrPrintedMilliunits: number | null;
     readonly taxMilliunits: number;
     readonly discountMilliunits: number;
@@ -54,7 +53,6 @@ export type ExtractFramesFn = (input: { readonly frames: readonly Buffer[] }) =>
 export type ExtractReceiptInput = {
     readonly frames: readonly Buffer[];
     readonly completeJson?: CompleteOpenRouterJson;
-    readonly ocr?: (processedJpeg: Buffer) => Promise<OcrReceiptResult>;
     readonly prep?: (frames: readonly Buffer[]) => Promise<Buffer>;
     readonly apiKey?: string;
     readonly headerModel?: string;
@@ -76,14 +74,13 @@ export function isAmazonReceiptVendor(vendor: string | null): boolean {
 }
 
 /**
- * Prep → cheap vision headers → local OCR lines → arithmetic gate → one repair.
- * Processed bytes go to OpenRouter and OCR, not the stored original.
+ * Prep → cheap vision headers → schema-constrained vision lines → arithmetic gate.
+ * Processed bytes go to OpenRouter, not the stored original.
  */
 export async function extractReceipt(input: ExtractReceiptInput): Promise<ReceiptExtractResult> {
     const apiKey = input.apiKey ?? requireOpenRouterApiKey();
     const completeJson = input.completeJson ?? completeOpenRouterJson;
     const prep = input.prep ?? defaultPrep;
-    const ocr = input.ocr ?? ocrReceiptLines;
     const processed = await prep(input.frames);
     const processedDataUrl = jpegDataUrl(processed);
     const visionBase = {
@@ -102,52 +99,40 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
         return { kind: 'amazon' };
     }
 
-    const ocrAttempt = await tryOcr(ocr, processed);
     const header = headerAttempt.header ?? emptyHeader();
-    const ocrResult = ocrAttempt.result ?? emptyOcr();
-    if (!header.vendor && ocrLooksLikeAmazon(ocrResult)) {
-        return { kind: 'amazon' };
-    }
-
-    let vendor = header.vendor;
-    let purchaseDate = header.purchaseDate;
-    const printedMilliunits = header.printedMilliunits ?? ocrResult.printedMilliunits;
-    let lines = ocrResult.lines;
-    let taxMilliunits = ocrResult.taxMilliunits;
-    let discountMilliunits = ocrResult.discountMilliunits;
+    let error = headerAttempt.error;
+    let linesVision: ReceiptLinesVision | null = null;
     let repaired = false;
-    let error = joinErrors(headerAttempt.error, ocrAttempt.error);
 
-    let gated = gateMatches(lines, taxMilliunits, discountMilliunits, printedMilliunits);
-    let totalsDisagree = printedTotalsDisagree(header.printedMilliunits, ocrResult.printedMilliunits);
-    // Header/OCR total mismatch warrants repair even when line arithmetic already gates.
-    const shouldRepair = printedMilliunits != null && (!gated || totalsDisagree);
-
-    if (shouldRepair) {
-        const repairAttempt = await tryRepair({
+    if (headerAttempt.error == null) {
+        const linesAttempt = await tryReadLines({
             ...visionBase,
             model: input.repairModel ?? OPENROUTER_RECEIPT_REPAIR_MODEL,
-            timeoutMs: input.repairTimeoutMs ?? RECEIPT_REPAIR_TIMEOUT_MS,
-            expectedPrintedMilliunits: printedMilliunits,
-            ocrDump: ocrResult.rawText,
+            timeoutMs: input.repairTimeoutMs ?? RECEIPT_LINES_TIMEOUT_MS,
+            expectedPrintedMilliunits: header.printedMilliunits,
         });
-        if (repairAttempt.repair) {
+        error = joinErrors(error, linesAttempt.error);
+        if (linesAttempt.lines) {
             repaired = true;
-            vendor = repairAttempt.repair.vendor ?? vendor;
-            purchaseDate = repairAttempt.repair.purchaseDate ?? purchaseDate;
-            if (isAmazonReceiptVendor(vendor)) {
+            linesVision = linesAttempt.lines;
+            if (isAmazonReceiptVendor(linesVision.vendor)) {
                 return { kind: 'amazon' };
             }
-            lines = repairAttempt.repair.lines;
-            taxMilliunits = repairAttempt.repair.taxMilliunits;
-            discountMilliunits = repairAttempt.repair.discountMilliunits;
-            gated = gateMatches(lines, taxMilliunits, discountMilliunits, printedMilliunits);
-            totalsDisagree = printedTotalsDisagree(printedMilliunits, ocrResult.printedMilliunits);
-        } else {
-            error = joinErrors(error, repairAttempt.error);
         }
     }
 
+    const vendor = header.vendor ?? linesVision?.vendor ?? null;
+    const purchaseDate = header.purchaseDate ?? linesVision?.purchaseDate ?? null;
+    const printedMilliunits = header.printedMilliunits ?? linesVision?.printedMilliunits ?? null;
+    const lines = linesVision?.lines ?? [];
+    const taxMilliunits = linesVision?.taxMilliunits ?? 0;
+    const discountMilliunits = linesVision?.discountMilliunits ?? 0;
+    if (isAmazonReceiptVendor(vendor)) {
+        return { kind: 'amazon' };
+    }
+
+    const gated = gateMatches(lines, taxMilliunits, discountMilliunits, printedMilliunits);
+    const totalsDisagree = printedTotalsDisagree(header.printedMilliunits, linesVision?.printedMilliunits ?? null);
     const hasKeys = Boolean(vendor && purchaseDate && printedMilliunits != null);
     const extractStatus: ReceiptExtractStatus = !hasKeys ? 'failed' : gated && !totalsDisagree ? 'gated' : 'ungated';
 
@@ -155,7 +140,7 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
         repaired,
         gated,
         headerPrintedMilliunits: header.printedMilliunits,
-        ocrPrintedMilliunits: ocrResult.printedMilliunits,
+        ocrPrintedMilliunits: linesVision?.printedMilliunits ?? null,
         taxMilliunits,
         discountMilliunits,
         lines,
@@ -170,7 +155,7 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
         printedMilliunits,
         totalsDisagree,
         extractJson: JSON.stringify(payload),
-        rawText: ocrResult.rawText || null,
+        rawText: formatLinesDump(lines, taxMilliunits, discountMilliunits),
     };
 }
 
@@ -216,10 +201,6 @@ function emptyHeader(): ReceiptHeaderVision {
     return { vendor: null, purchaseDate: null, printedMilliunits: null };
 }
 
-function emptyOcr(): OcrReceiptResult {
-    return { rawText: '', lines: [], taxMilliunits: 0, discountMilliunits: 0, printedMilliunits: null };
-}
-
 function gateMatches(
     lines: readonly ReceiptExtractLine[],
     taxMilliunits: number,
@@ -230,6 +211,26 @@ function gateMatches(
         return false;
     }
     return arithmeticGate({ lines, taxMilliunits, discountMilliunits, printedMilliunits }).gated;
+}
+
+function formatLinesDump(
+    lines: readonly ReceiptExtractLine[],
+    taxMilliunits: number,
+    discountMilliunits: number,
+): string | null {
+    const rows: string[] = lines.map((line) => {
+        if (line.amountMilliunits == null) {
+            return line.name;
+        }
+        return `${line.name} ${(line.amountMilliunits / 1000).toFixed(2)}`;
+    });
+    if (taxMilliunits !== 0) {
+        rows.push(`Tax ${(taxMilliunits / 1000).toFixed(2)}`);
+    }
+    if (discountMilliunits !== 0) {
+        rows.push(`Discount ${(discountMilliunits / 1000).toFixed(2)}`);
+    }
+    return rows.length > 0 ? rows.join('\n') : null;
 }
 
 function joinErrors(left: string | null, right: string | null): string | null {
@@ -255,43 +256,17 @@ async function tryReadHeaders(input: Parameters<typeof readReceiptHeaders>[0]): 
     }
 }
 
-type OcrAttempt = { result: OcrReceiptResult | null; error: string | null };
-
-async function tryOcr(
-    ocr: (processedJpeg: Buffer) => Promise<OcrReceiptResult>,
-    processed: Buffer,
-): Promise<OcrAttempt> {
-    try {
-        return { result: await ocr(processed), error: null };
-    } catch (error) {
-        const message = errorMessage(error);
-        console.warn('receipt OCR failed', message);
-        return { result: null, error: message };
-    }
-}
-
-type RepairAttempt = {
-    repair: Awaited<ReturnType<typeof repairReceiptExtract>> | null;
+type LinesAttempt = {
+    lines: ReceiptLinesVision | null;
     error: string | null;
 };
 
-async function tryRepair(input: Parameters<typeof repairReceiptExtract>[0]): Promise<RepairAttempt> {
+async function tryReadLines(input: Parameters<typeof readReceiptLines>[0]): Promise<LinesAttempt> {
     try {
-        return { repair: await repairReceiptExtract(input), error: null };
+        return { lines: await readReceiptLines(input), error: null };
     } catch (error) {
         const message = errorMessage(error);
-        console.warn('receipt extract repair failed', message);
-        return { repair: null, error: message };
+        console.warn('receipt line vision failed', message);
+        return { lines: null, error: message };
     }
-}
-
-function ocrLooksLikeAmazon(ocr: OcrReceiptResult): boolean {
-    if (isAmazonReceiptVendor(ocr.rawText)) {
-        return true;
-    }
-    const firstLines = ocr.lines
-        .slice(0, 8)
-        .map((line) => line.name)
-        .join(' ');
-    return isAmazonReceiptVendor(firstLines);
 }

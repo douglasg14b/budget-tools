@@ -5,7 +5,7 @@ import type { OpenRouterJsonInput } from '../../categorization/llm/openRouterCli
 import type { ReceiptExtractLine } from './arithmeticGate';
 
 export const RECEIPT_HEADER_TIMEOUT_MS = 60_000;
-export const RECEIPT_REPAIR_TIMEOUT_MS = 90_000;
+export const RECEIPT_LINES_TIMEOUT_MS = 90_000;
 
 export type ReceiptHeaderVision = {
     readonly vendor: string | null;
@@ -13,7 +13,7 @@ export type ReceiptHeaderVision = {
     readonly printedMilliunits: number | null;
 };
 
-export type ReceiptRepairVision = ReceiptHeaderVision & {
+export type ReceiptLinesVision = ReceiptHeaderVision & {
     readonly taxMilliunits: number;
     readonly discountMilliunits: number;
     readonly lines: ReceiptExtractLine[];
@@ -30,9 +30,8 @@ export type ReceiptHeaderVisionInput = {
     readonly completeJson: CompleteOpenRouterJson;
 };
 
-export type ReceiptRepairVisionInput = ReceiptHeaderVisionInput & {
-    readonly expectedPrintedMilliunits: number;
-    readonly ocrDump: string;
+export type ReceiptLinesVisionInput = ReceiptHeaderVisionInput & {
+    readonly expectedPrintedMilliunits: number | null;
 };
 
 const HEADER_SCHEMA = {
@@ -90,27 +89,27 @@ export async function readReceiptHeaders(input: ReceiptHeaderVisionInput): Promi
 }
 
 /**
- * One schema-constrained repair: processed image plus OCR dump plus expected printed total.
+ * Schema-constrained line items, tax, and discount. Printed total is locked when headers already read it.
  */
-export async function repairReceiptExtract(input: ReceiptRepairVisionInput): Promise<ReceiptRepairVision> {
-    const expectedDollars = (input.expectedPrintedMilliunits / 1000).toFixed(2);
+export async function readReceiptLines(input: ReceiptLinesVisionInput): Promise<ReceiptLinesVision> {
+    const expectedDollars =
+        input.expectedPrintedMilliunits == null ? null : (input.expectedPrintedMilliunits / 1000).toFixed(2);
+    const lockTotal =
+        expectedDollars == null
+            ? 'Read the printed grand total the customer paid. Do not invent a total that is not on the tape.'
+            : `Printed grand total must stay ${expectedDollars} dollars. Do not change that total.`;
     const content = await input.completeJson({
         apiKey: input.apiKey,
         baseUrl: input.baseUrl,
         model: input.model,
         timeoutMs: input.timeoutMs,
-        schemaName: 'receipt_repair',
+        schemaName: 'receipt_lines',
         schema: REPAIR_SCHEMA,
-        system: 'Repair receipt line items so they arithmetically match the printed grand total. Do not change that total. purchaseDate must be YYYY-MM-DD. Do not invent products or amounts. If you cannot make the math work, return the best OCR lines without fabricating.',
-        user: [
-            `Printed grand total must stay ${expectedDollars} dollars.`,
-            'Return purchaseDate as YYYY-MM-DD if readable.',
-            'OCR dump:',
-            input.ocrDump || '(empty)',
-        ].join('\n'),
+        system: 'Extract receipt line items from the photo. purchaseDate must be YYYY-MM-DD. Do not invent products or amounts. If you cannot make the math work, return the best readable lines without fabricating.',
+        user: [lockTotal, 'Return purchaseDate as YYYY-MM-DD if readable.'].join('\n'),
         images: [input.processedDataUrl],
     });
-    return parseRepairCompletion(content);
+    return parseLinesCompletion(content);
 }
 
 export function parseHeaderCompletion(content: string): ReceiptHeaderVision {
@@ -122,8 +121,8 @@ export function parseHeaderCompletion(content: string): ReceiptHeaderVision {
     };
 }
 
-export function parseRepairCompletion(content: string): ReceiptRepairVision {
-    const record = parseObjectContent(content, 'receipt repair');
+export function parseLinesCompletion(content: string): ReceiptLinesVision {
+    const record = parseObjectContent(content, 'receipt lines');
     const linesRaw = record.lines;
     const lines: ReceiptExtractLine[] = Array.isArray(linesRaw)
         ? linesRaw.map((entry) => parseRepairLine(entry)).filter((line): line is ReceiptExtractLine => line != null)
@@ -160,6 +159,14 @@ function parseObjectContent(content: string, label: string): Record<string, unkn
         parsed = JSON.parse(content);
     } catch (error) {
         throw new LlmSuggestError(503, `OpenRouter ${label} was not valid JSON`, { cause: error });
+    }
+    if (Array.isArray(parsed)) {
+        const only = parsed[0];
+        if (parsed.length === 1 && only && typeof only === 'object' && !Array.isArray(only)) {
+            parsed = only;
+        } else {
+            throw new LlmSuggestError(503, `OpenRouter ${label} was an array`);
+        }
     }
     if (!parsed || typeof parsed !== 'object') {
         throw new LlmSuggestError(503, `OpenRouter ${label} was not an object`);

@@ -11,7 +11,7 @@ export type PrepReceiptImageInput = {
 
 /**
  * Downsample, normalise contrast, and vertically stitch frames. Deskew is not applied.
- * Returns JPEG bytes for OpenRouter and OCR — never the stored original.
+ * Returns JPEG bytes for OpenRouter — never the stored original.
  */
 export async function prepReceiptImage(input: PrepReceiptImageInput): Promise<Buffer> {
     if (input.frames.length === 0) {

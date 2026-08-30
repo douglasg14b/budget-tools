@@ -37,11 +37,11 @@ export function arithmeticGate(input: ArithmeticGateInput): ArithmeticGateResult
 
 export function printedTotalsDisagree(
     headerPrintedMilliunits: number | null,
-    ocrPrintedMilliunits: number | null,
+    linesPrintedMilliunits: number | null,
 ): boolean {
     return (
         headerPrintedMilliunits != null &&
-        ocrPrintedMilliunits != null &&
-        headerPrintedMilliunits !== ocrPrintedMilliunits
+        linesPrintedMilliunits != null &&
+        headerPrintedMilliunits !== linesPrintedMilliunits
     );
 }

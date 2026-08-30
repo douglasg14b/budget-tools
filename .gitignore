@@ -133,7 +133,6 @@ apps/transaction-cleaner/data/
 .pnpm-store
 apps/transactions-retrieval/.env.dev
 apps/api/data/
-*.traineddata
 __data__/
 models/
 cleaning-output.json
@@ -148,3 +147,6 @@ third_party/amazon-order-history-csv-download-mcp/
 
 # PRD builder session state (local progress only)
 .cursor/prd-sessions/
+
+# Unprocessed Commons downloads; downsampled copies live in fixtures/
+apps/api/src/features/receipts/__tests__/fixtures/raw/
