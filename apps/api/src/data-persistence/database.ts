@@ -13,6 +13,7 @@ import type {
     AmazonSyncStateTable,
 } from '../features/amazonOrders/data/amazonOrdersSchema';
 import type { OperatingModeTable } from '../features/operatingMode/data/operatingModeSchema';
+import type { ReceiptsTable } from '../features/receipts/data/receiptsSchema';
 import type { TravelBiasConfigTable } from '../features/travelWindows/data/travelBiasConfigSchema';
 import type { TravelWindowAccountsTable, TravelWindowsTable } from '../features/travelWindows/data/travelWindowsSchema';
 import type { ClassificationSyncTable } from '../features/ynabSync/data/classificationSyncSchema';
@@ -35,6 +36,7 @@ export type AppDatabase = {
     amazon_split_overlays: AmazonSplitOverlaysTable;
     operating_mode: OperatingModeTable;
     classification_sync: ClassificationSyncTable;
+    receipts: ReceiptsTable;
 };
 
 export type AppDatabaseClient = Kysely<AppDatabase>;
@@ -55,6 +57,7 @@ export function createAppDatabase(filePath: string): AppDatabaseClient {
                 travel_bias_config: ['enabled'],
                 amazon_payments: ['isRefund'],
                 amazon_sync_state: ['lastAuthenticated'],
+                receipts: ['totalsDisagree'],
             }),
             new CamelCasePlugin(),
             new SqlDatePlugin<AppDatabase>({

@@ -60,6 +60,13 @@ export function getSqliteDbPath(): string {
 }
 
 /**
+ * Directory for Live receipt originals. Gitignored with apps/api/data/.
+ */
+export function getReceiptsDir(): string {
+    return resolveFromCwd(env.get('RECEIPTS_DIR').default('apps/api/data/receipts').asString());
+}
+
+/**
  * Path to the Amazon order-history MCP `dist/index.js`.
  * Optional so OpenAPI generation can load without it. Sync fails loud (503) when unset.
  * Produce the clone with `pnpm setup:amazon-mcp`.

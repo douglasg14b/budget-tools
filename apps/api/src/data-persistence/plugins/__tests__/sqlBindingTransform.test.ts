@@ -36,4 +36,15 @@ describe('sqlite binding transform', () => {
 
         expect(compiled.parameters).toEqual([1]);
     });
+
+    it('coerces integer 0/1 on snake_case result columns', async () => {
+        const plugin = new SqliteBindingPlugin<{ receipts: { totalsDisagree: boolean } }>({
+            receipts: ['totalsDisagree'],
+        });
+        const result = await plugin.transformResult({
+            queryId: { queryId: 'test' },
+            result: { rows: [{ totals_disagree: 0 }, { totalsDisagree: 1 }] },
+        });
+        expect(result.rows).toEqual([{ totals_disagree: false }, { totalsDisagree: true }]);
+    });
 });

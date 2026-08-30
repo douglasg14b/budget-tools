@@ -10,6 +10,12 @@ import type {
 
 import { transformSqliteQueryBindings } from './sqlBindingTransform';
 
+/** Result rows may still be snake_case when this plugin runs before CamelCasePlugin. */
+function sqliteBoolColumnNames(camelName: string): readonly string[] {
+    const snake = camelName.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+    return snake === camelName ? [camelName] : [camelName, snake];
+}
+
 type BooleanOnlyKeys<TSchema> = {
     [K in keyof TSchema]: TSchema[K] extends ColumnType<boolean, 0 | 1, 0 | 1> | boolean ? K : never;
 }[keyof TSchema];
@@ -25,8 +31,19 @@ type BoolColumns<DB> = {
 export class SqliteBindingPlugin<DB> implements KyselyPlugin {
     private readonly allBoolColumns: Set<string>;
 
-    constructor(private readonly boolCols: BoolColumns<DB>) {
-        this.allBoolColumns = new Set<string>(Object.values(this.boolCols ?? {}).flat() as string[]);
+    constructor(boolCols: BoolColumns<DB>) {
+        this.allBoolColumns = new Set<string>();
+        const columnLists = Object.values(boolCols) as Array<readonly string[] | undefined>;
+        for (const columns of columnLists) {
+            if (!columns) {
+                continue;
+            }
+            for (const column of columns) {
+                for (const name of sqliteBoolColumnNames(String(column))) {
+                    this.allBoolColumns.add(name);
+                }
+            }
+        }
     }
 
     transformQuery(args: PluginTransformQueryArgs): RootOperationNode {
