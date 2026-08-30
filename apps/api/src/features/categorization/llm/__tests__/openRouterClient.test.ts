@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { formatUsd, parseOpenRouterPrediction, parseOpenRouterUsage } from '../openRouterClient';
+import {
+    completeOpenRouterJson,
+    formatUsd,
+    openRouterUserContent,
+    parseOpenRouterPrediction,
+    parseOpenRouterUsage,
+} from '../openRouterClient';
 
 describe('parseOpenRouterPrediction', () => {
     it('reads primary and alternate categories', () => {
@@ -92,5 +98,91 @@ describe('formatUsd', () => {
     it('formats zero and missing costs', () => {
         expect(formatUsd(0)).toBe('$0');
         expect(formatUsd(null)).toBeNull();
+    });
+});
+
+describe('openRouterUserContent', () => {
+    it('keeps string user content when images are omitted', () => {
+        expect(openRouterUserContent('read this receipt')).toBe('read this receipt');
+        expect(openRouterUserContent('read this receipt', [])).toBe('read this receipt');
+    });
+
+    it('builds a text plus image_url content array for vision', () => {
+        const dataUrl = 'data:image/jpeg;base64,AAAA';
+        expect(openRouterUserContent('extract headers', [dataUrl])).toEqual([
+            { type: 'text', text: 'extract headers' },
+            { type: 'image_url', image_url: { url: dataUrl } },
+        ]);
+    });
+});
+
+describe('completeOpenRouterJson vision payload', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+    });
+
+    it('posts image_url data URLs when images are provided', async () => {
+        const dataUrl = 'data:image/jpeg;base64,AAAA';
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                id: 'gen-1',
+                model: 'qwen/qwen3.7-flash',
+                choices: [{ message: { content: '{"vendor":"Cafe"}' } }],
+                usage: { prompt_tokens: 10, completion_tokens: 4, cost: 0.0001 },
+            }),
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        await completeOpenRouterJson({
+            apiKey: 'test-key',
+            baseUrl: 'https://openrouter.example/api/v1',
+            model: 'qwen/qwen3.7-flash',
+            system: 'system',
+            user: 'extract headers',
+            timeoutMs: 5_000,
+            schemaName: 'receipt_headers',
+            schema: { type: 'object' },
+            images: [dataUrl],
+        });
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const [, init] = fetchMock.mock.calls[0] as [string, { body: string }];
+        const body = JSON.parse(init.body) as {
+            messages: Array<{ role: string; content: unknown }>;
+        };
+        expect(body.messages[1]?.content).toEqual([
+            { type: 'text', text: 'extract headers' },
+            { type: 'image_url', image_url: { url: dataUrl } },
+        ]);
+    });
+
+    it('posts string user content when images are omitted', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                choices: [{ message: { content: '{"ok":true}' } }],
+                usage: { prompt_tokens: 1, completion_tokens: 1 },
+            }),
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        await completeOpenRouterJson({
+            apiKey: 'test-key',
+            baseUrl: 'https://openrouter.example/api/v1',
+            model: 'qwen/qwen3.7-flash',
+            system: 'system',
+            user: 'hello',
+            timeoutMs: 5_000,
+            schemaName: 'category_prediction',
+            schema: { type: 'object' },
+        });
+
+        const [, init] = fetchMock.mock.calls[0] as [string, { body: string }];
+        const body = JSON.parse(init.body) as {
+            messages: Array<{ role: string; content: unknown }>;
+        };
+        expect(body.messages[1]?.content).toBe('hello');
     });
 });

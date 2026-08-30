@@ -22,6 +22,12 @@ export const CATEGORIZATION_QUEUE_BATCH_SIZE = env.get('CATEGORIZATION_QUEUE_BAT
 
 export const OPENROUTER_MODEL = env.get('OPENROUTER_MODEL').default('qwen/qwen3.7-flash').asString();
 
+/** Stronger vision slug for the one-shot receipt repair call. Must be a vision model, not text-only. */
+export const OPENROUTER_RECEIPT_REPAIR_MODEL = env
+    .get('OPENROUTER_RECEIPT_REPAIR_MODEL')
+    .default('qwen/qwen3.7-plus')
+    .asString();
+
 export const OPENROUTER_BASE_URL = env.get('OPENROUTER_BASE_URL').default('https://openrouter.ai/api/v1').asString();
 
 /**

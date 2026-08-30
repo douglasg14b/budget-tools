@@ -123,6 +123,16 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"transaction":{"ref":"MatchPreviewTransactionDto"},"transactionId":{"dataType":"string"},"receipts":{"dataType":"array","array":{"dataType":"refAlias","ref":"MatchPreviewReceiptDto"},"required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ExtractPreviewResultDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"rawText":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"extractJson":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"totalsDisagree":{"dataType":"boolean","required":true},"printedMilliunits":{"dataType":"union","subSchemas":[{"dataType":"double"},{"dataType":"enum","enums":[null]}],"required":true},"purchaseDate":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"vendor":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"extractStatus":{"dataType":"union","subSchemas":[{"ref":"ReceiptExtractStatus"},{"dataType":"enum","enums":[null]}],"required":true},"droppedAsAmazon":{"dataType":"boolean","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ExtractPreviewDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"frames":{"dataType":"array","array":{"dataType":"string"},"required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "BindReceiptDto": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"transactionId":{"dataType":"string","required":true}},"validators":{}},
@@ -726,6 +736,36 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'matchPreview',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsReceiptsController_extractPreview: Record<string, TsoaRoute.ParameterSchema> = {
+                body: {"in":"body","name":"body","required":true,"ref":"ExtractPreviewDto"},
+        };
+        app.post('/api/receipts/extract-preview',
+            ...(fetchMiddlewares<RequestHandler>(ReceiptsController)),
+            ...(fetchMiddlewares<RequestHandler>(ReceiptsController.prototype.extractPreview)),
+
+            async function ReceiptsController_extractPreview(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsReceiptsController_extractPreview, request, response });
+
+                const controller = new ReceiptsController();
+
+              await templateService.apiHandler({
+                methodName: 'extractPreview',
                 controller,
                 response,
                 next,

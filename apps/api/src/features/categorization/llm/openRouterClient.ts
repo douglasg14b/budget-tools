@@ -12,6 +12,18 @@ export type OpenRouterChatInput = {
     readonly signal?: AbortSignal;
 };
 
+export type OpenRouterImageUrlPart = {
+    readonly type: 'image_url';
+    readonly image_url: { readonly url: string };
+};
+
+export type OpenRouterTextPart = {
+    readonly type: 'text';
+    readonly text: string;
+};
+
+export type OpenRouterUserContentPart = OpenRouterTextPart | OpenRouterImageUrlPart;
+
 export type OpenRouterJsonInput = {
     readonly apiKey: string;
     readonly baseUrl: string;
@@ -22,6 +34,8 @@ export type OpenRouterJsonInput = {
     readonly schemaName: string;
     readonly schema: Record<string, unknown>;
     readonly signal?: AbortSignal;
+    /** Data-URL images for vision models. Omitted or empty keeps string user content. */
+    readonly images?: readonly string[];
 };
 
 export type OpenRouterPrediction = {
@@ -101,6 +115,16 @@ export async function completeLlmPrediction(input: OpenRouterChatInput): Promise
 }
 
 /**
+ * User message content: a string for text-only callers, or a text+image_url array for vision.
+ */
+export function openRouterUserContent(user: string, images?: readonly string[]): string | OpenRouterUserContentPart[] {
+    if (!images?.length) {
+        return user;
+    }
+    return [{ type: 'text', text: user }, ...images.map((url) => ({ type: 'image_url' as const, image_url: { url } }))];
+}
+
+/**
  * Shared OpenRouter JSON-schema completion. Returns the raw content string.
  */
 export async function completeOpenRouterJson(input: OpenRouterJsonInput): Promise<string> {
@@ -141,7 +165,7 @@ export async function completeOpenRouterJson(input: OpenRouterJsonInput): Promis
                 },
                 messages: [
                     { role: 'system', content: input.system },
-                    { role: 'user', content: input.user },
+                    { role: 'user', content: openRouterUserContent(input.user, input.images) },
                 ],
             }),
         });

@@ -14,6 +14,7 @@ import { QueryValidationError } from './features/categorization/filterQueue';
 import { LlmSuggestError } from './features/categorization/llm/LlmSuggestError';
 import { clearLlmOverlayCache } from './features/categorization/llm/overlayCache';
 import { PredictJsonError } from './features/categorization/predictJson';
+import { sweepPendingReceiptExtracts } from './features/receipts/extractStoredReceipt';
 import { HttpError } from './features/travelWindows/HttpError';
 import { startOutboundSyncFlusher } from './features/ynabSync/flush/startOutboundSyncFlusher';
 import { RegisterRoutes } from './generated/routes';
@@ -114,6 +115,7 @@ async function start(): Promise<void> {
     await getAppDatabase();
     await clearLlmOverlayCache(CATEGORIZATION_QUEUE_CACHE_DIR);
     startOutboundSyncFlusher();
+    await sweepPendingReceiptExtracts();
     app.listen(API_PORT, () => {
         console.log(`API listening on http://localhost:${API_PORT}`);
         console.log(`Amazon MCP entry ${getAmazonOrdersMcpEntry() ?? 'unset'}`);

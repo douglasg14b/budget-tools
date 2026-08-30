@@ -3,6 +3,7 @@ import { HttpError } from '../travelWindows/HttpError';
 import { assertReceiptWritesAllowed } from './assertReceiptWritesAllowed';
 import type { ReceiptRow } from './data/receiptsRepo';
 import { insertReceiptOriginal } from './data/receiptsRepo';
+import { assertReceiptFrameCountWithinLimit } from './receiptLimits';
 
 export type CreateReceiptInput = {
     readonly frames: readonly string[];
@@ -37,6 +38,7 @@ export async function createReceipt(input: CreateReceiptInput, db?: AppDatabaseC
     if (input.frames.length === 0) {
         throw new HttpError(400, 'Receipt create requires at least one frame');
     }
+    assertReceiptFrameCountWithinLimit(input.frames.length);
     const buffers = input.frames.map(decodeDataUrlFrame);
     const [bytes, ...extraFrames] = buffers;
     if (!bytes) {

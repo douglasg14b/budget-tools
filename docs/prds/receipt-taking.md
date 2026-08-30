@@ -109,11 +109,18 @@ Legend: **Done** / **Not done**.
 
 ### 5.3 Extraction
 
+Extract is a **pipeline with gates**, not a single “send the JPEG to a frontier model” call. Prep and local OCR exist because thermal-phone photos and grocery line grouping fail in ways a VLM will paper over (ReceiptBench: Gemini 3 Pro will alter a line or invent tax so items sum). Paid vision is for **match keys** and **repair**, not as the owner of YNAB cents.
+
 - [ ] **Match keys**: The pipeline attempts vendor (merchant), purchase date, and printed total (milliunits). Failure is a stored extract status, not a silent empty success. (**Not done**)
 - [ ] **Amazon extract dropped**: If the vendor is Amazon, the capture is not a receipt in this product (no row, no matcher candidate, no overlay). Classify Amazon cards already skip capture. (**Not done**)
+- [ ] **Prep before read**: The original is stored. A processed image is what OCR and paid vision see: crop / deskew / contrast, stitch overlapping frames of one tape into one document, and downsample before an OpenRouter image call. Prep is quality and cost control, not optional garnish. (**Not done**)
+- [ ] **Two tools, two jobs**: Cheap OpenRouter vision JSON (same `OPENROUTER_API_KEY` as classify; no new vendor) for vendor / date / total. Default header model is today’s classify default `qwen/qwen3.7-flash` (already VL). Repair may use a stronger **vision** slug on the same account (`qwen/qwen3.7-plus`, `qwen/qwen3.8-max`, `google/gemini-3.7-flash`, …). Skip text-only ids such as `qwen/qwen3.7-max`. Local OCR with bounding boxes for line candidates and a raw text dump. Do not use a document-table model as the grocery parser — tapes are not invoices. (**Not done**)
 - [ ] **Line items**: The pipeline attempts line items (name, amount, quantity when present). Missing or partial line items are allowed. (**Not done**)
 - [ ] **Raw text**: Recognized text (OCR and/or vision dump) is stored on the receipt for agent context and for reviewer inspection. (**Not done**)
+- [ ] **Arithmetic gate**: Structured lines + tax − discounts must equal the printed total (and, once bound, the bank milliunits) before those prices may own split cents. A model that “makes the math work” by changing a line is a failed extract, not a pass. (**Not done**)
+- [ ] **VLM repair is fallback only**: If the gate fails, one schema-constrained OpenRouter vision call may see the processed image + OCR dump + expected total, then the gate runs again. Repair never auto-binds and never writes ungated milliunits. (**Not done**)
 - [ ] **Cross-check on total**: When both a vision/header total and an OCR-derived total exist, disagreement is recorded and blocks **auto-match** (G6). It does not delete the dumps. (**Not done**)
+- [ ] **Extract is off the Classify hot path**: Capture enqueues extract. Classify focus only reads stored keys. A miss does not start OCR or OpenRouter. (**Not done**)
 
 ### 5.4 Matching
 
@@ -205,6 +212,22 @@ flowchart TD
 
 Amazon classify remains the only overlay for Amazon payees ([amazon-classify-sync](../amazon-classify-sync.md)). Receipt matching does not apply to those transactions.
 
+**Extract** (background; not Classify focus):
+
+```mermaid
+flowchart TD
+    Orig[Store original] --> Prep[Crop deskew contrast stitch downsample]
+    Prep --> Keys[Cheap OpenRouter JSON: vendor date total]
+    Prep --> Ocr[Local OCR boxes + text dump]
+    Keys --> Gate{Totals agree and lines plus tax minus discounts equal printed?}
+    Ocr --> Gate
+    Gate -->|yes| Stored[Store gated or ungated extract]
+    Gate -->|no| Repair[One OpenRouter repair: image + OCR dump + expected total]
+    Repair --> Gate2{Gate again}
+    Gate2 -->|yes| Stored
+    Gate2 -->|no| Loud[Loud failure; dumps still stored for the agent]
+```
+
 ## 7) Constraints & invariants
 
 - **Single household, local API**: Same trust model as today (no new auth product). Receipt images are household financial documents; they stay on the API host, not in a third-party receipt SaaS, except via existing OpenRouter (or equivalent) calls the API already uses for classify.
@@ -215,6 +238,8 @@ Amazon classify remains the only overlay for Amazon payees ([amazon-classify-syn
 - **Web camera**: Feature detection and permission failure are first-class UX, not a silent fallback that pretends capture succeeded.
 - **NFR — persistence**: After Live API restart, previously captured originals and SQLite rows are intact. Practice has no durable receipt rows.
 - **NFR — match safety over recall**: Prefer unmatched over a wrong bind.
+- **NFR — extract cost**: Typical extract is a cheap OpenRouter vision JSON call for headers plus local OCR. It must not use a frontier model as the primary parser. Household volume is small; the quality failure mode (invented lines) matters more than dollars. Order-of-magnitude target: well under **$0.01 per receipt** on the recommended path (see cost notes in open questions).
+- **Delivery — review before commit**: Each implementation phase’s tracked source is code-reviewed (local-review on that phase slice) **before** that phase is git-committed. Fix Critical, High, and Medium findings, and Lows that simplify or improve consistency, quality, or duplication. Remaining phases for this milestone: matcher, extract, Classify capture, inbox/splits.
 - Latency, retention days, and max image size are **open questions** (no invented numbers).
 
 ## 8) Open questions
@@ -222,6 +247,7 @@ Amazon classify remains the only overlay for Amazon payees ([amazon-classify-syn
 - **Image bytes**: Filesystem next to SQLite vs blob column. Product only requires Live durability and association.
 - **Retention**: Keep Live originals forever, or a delete/purge control?
 - **HTTPS / phone hitting local API**: Camera on a phone is in scope; how the phone reaches the API is design/ops.
+- **Extract cost, measured**: OpenRouter image-token formulas differ by vendor (OpenAI tiles vs Gemini 768px crops vs Qwen patches). The PRD target is “cheap header VLM + local OCR, repair rarely.” Actual cents per receipt should be logged from `usage.cost` the same way classify already logs inference cost (`openRouterClient.ts`).
 
 Resolved:
 
@@ -238,6 +264,9 @@ Resolved:
 - **Ungated allocation**: Equal bank-milliunit shares across inferred categories.
 - **Unmatched UX**: Indicate exact failure; close-match options; then search/filter.
 - **Practice matching**: Live persist only; Practice is session-only including capture rows.
+- **Extract method**: Prep the photo; cheap VLM for vendor/date/total; local boxed OCR for lines; arithmetic gate; one VLM repair only if the gate fails. Not a frontier model as the primary parser.
+- **Extract vendor**: Same OpenRouter account as classify. Header/repair are vision model ids on that router; gold-set A/B picks among them.
+- **Review before phase commit**: Each remaining RPI Pxx commit is preceded by local-review on that phase slice. Fix Critical, High, and Medium findings first, plus Lows that simplify or improve consistency, quality, or duplication.
 
 ## 9) Acceptance criteria
 
@@ -253,6 +282,7 @@ Resolved:
 8. Header vs OCR total disagreement blocks exact auto-bind.
 9. Ungated drafts split the bank amount equally across inferred categories; gated drafts use reconciled line amounts; Live accept uses `classification_sync`.
 10. After Live API restart, receipt ids still serve originals and extract. Practice refresh has no leftover binds.
+11. Extract preprocesses the original, fills vendor/date/total via a cheap vision JSON call, fills line candidates via local boxed OCR, and only then (on arithmetic failure) may run one repair vision call. Ungated prices never become split milliunits.
 
 ### Later (not this slice)
 

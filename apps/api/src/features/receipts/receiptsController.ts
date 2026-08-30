@@ -12,6 +12,8 @@ import {
     requireReceipt,
     setReceiptTransactionId,
 } from './data/receiptsRepo';
+import { extractPreview as previewReceiptExtract } from './extractPreview';
+import { kickReceiptExtractIfPending } from './extractStoredReceipt';
 import {
     lookupByReceipt as lookupReceiptRow,
     lookupByTransaction as lookupTransactionRow,
@@ -21,6 +23,8 @@ import {
 import type {
     BindReceiptDto,
     CreateReceiptDto,
+    ExtractPreviewDto,
+    ExtractPreviewResultDto,
     MatchPreviewDto,
     ReceiptDto,
     ReceiptMatchDto,
@@ -65,12 +69,12 @@ export class ReceiptsController {
     @Response(413, 'JSON body too large')
     @Post()
     public async createReceipt(@Body() body: CreateReceiptDto): Promise<ReceiptDto> {
-        return toReceiptDto(
-            await createReceipt({
-                frames: body.frames,
-                transactionId: body.transactionId,
-            }),
-        );
+        const row = await createReceipt({
+            frames: body.frames,
+            transactionId: body.transactionId,
+        });
+        kickReceiptExtractIfPending(row);
+        return toReceiptDto(row);
     }
 
     /**
@@ -101,6 +105,16 @@ export class ReceiptsController {
     @Post('match-preview')
     public async matchPreview(@Body() body: MatchPreviewDto): Promise<ReceiptMatchDto> {
         return toReceiptMatchDto(await previewReceiptMatch(body));
+    }
+
+    /**
+     * @summary extractPreview
+     */
+    @Response(400, 'Invalid frames')
+    @Response(503, 'Extract unavailable')
+    @Post('extract-preview')
+    public async extractPreview(@Body() body: ExtractPreviewDto): Promise<ExtractPreviewResultDto> {
+        return previewReceiptExtract(body);
     }
 
     /**

@@ -10,6 +10,7 @@ import { migrateToLatest } from '../../../data-persistence/migrate';
 import { setOperatingMode } from '../../operatingMode/data/operatingModeRepo';
 import { createReceipt, decodeDataUrlFrame } from '../createReceipt';
 import { findReceiptByContentHash, readReceiptOriginalBytes } from '../data/receiptsRepo';
+import { MAX_RECEIPT_FRAMES } from '../receiptLimits';
 
 function jpegDataUrl(bytes: Buffer): string {
     return `data:image/jpeg;base64,${bytes.toString('base64')}`;
@@ -38,6 +39,14 @@ describe('createReceipt', () => {
 
     it('rejects invalid base64 payloads', () => {
         expect(() => decodeDataUrlFrame('data:image/jpeg;base64,???')).toThrow(/valid base64/);
+    });
+
+    it('rejects more than MAX_RECEIPT_FRAMES frames', async () => {
+        await setOperatingMode('live', database);
+        const frames = Array.from({ length: MAX_RECEIPT_FRAMES + 1 }, () => jpegDataUrl(jpegBytes));
+        await expect(createReceipt({ frames, receiptsDir: join(directory, 'files') }, database)).rejects.toMatchObject({
+            statusCode: 400,
+        });
     });
 
     it('refuses Practice creates', async () => {

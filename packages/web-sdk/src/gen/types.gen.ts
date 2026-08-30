@@ -117,6 +117,21 @@ export type MatchPreviewDto = {
     receipts: Array<MatchPreviewReceiptDto>;
 };
 
+export type ExtractPreviewResultDto = {
+    rawText: string | null;
+    extractJson: string | null;
+    totalsDisagree: boolean;
+    printedMilliunits: number | null;
+    purchaseDate: string | null;
+    vendor: string | null;
+    extractStatus: ReceiptExtractStatus | null;
+    droppedAsAmazon: boolean;
+};
+
+export type ExtractPreviewDto = {
+    frames: Array<string>;
+};
+
 export type BindReceiptDto = {
     transactionId: string;
 };
@@ -743,6 +758,33 @@ export type MatchPreviewResponses = {
 };
 
 export type MatchPreviewResponse = MatchPreviewResponses[keyof MatchPreviewResponses];
+
+export type ExtractPreviewData = {
+    body: ExtractPreviewDto;
+    path?: never;
+    query?: never;
+    url: '/receipts/extract-preview';
+};
+
+export type ExtractPreviewErrors = {
+    /**
+     * Invalid frames
+     */
+    400: unknown;
+    /**
+     * Extract unavailable
+     */
+    503: unknown;
+};
+
+export type ExtractPreviewResponses = {
+    /**
+     * Ok
+     */
+    200: ExtractPreviewResultDto;
+};
+
+export type ExtractPreviewResponse = ExtractPreviewResponses[keyof ExtractPreviewResponses];
 
 export type GetReceiptImageData = {
     body?: never;

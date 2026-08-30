@@ -108,6 +108,20 @@ export async function listReceipts(db?: AppDatabaseClient): Promise<ReceiptRow[]
 }
 
 /**
+ * Rows whose extract never finished — used to resume after process restart.
+ */
+export async function listPendingExtractReceipts(db?: AppDatabaseClient): Promise<ReceiptRow[]> {
+    const database = db ?? (await getAppDatabase());
+    return database
+        .selectFrom('receipts')
+        .selectAll()
+        .where('extractStatus', '=', 'pending')
+        .orderBy('createdAt', 'asc')
+        .orderBy('id', 'asc')
+        .execute();
+}
+
+/**
  * Indexed purchase-date window for Classify lookup. Null dates are excluded by the comparison.
  */
 export async function listReceiptsInPurchaseDateWindow(
@@ -156,6 +170,22 @@ export async function countReceiptFrames(originalPath: string): Promise<number> 
         count += 1;
     }
     return count;
+}
+
+/**
+ * Original frame bytes in capture order. Processed extract must not use these; prep first.
+ */
+export async function readReceiptAllFrameBytes(id: string, db?: AppDatabaseClient): Promise<readonly Buffer[]> {
+    const row = await requireReceipt(id, db);
+    const count = await countReceiptFrames(row.originalPath);
+    if (count === 0) {
+        throw new NotFoundError(`receipt frames not found: ${id}`);
+    }
+    const frames: Buffer[] = [];
+    for (let frameIndex = 0; frameIndex < count; frameIndex += 1) {
+        frames.push(await readFile(receiptFramePath(row.originalPath, frameIndex)));
+    }
+    return frames;
 }
 
 export async function readReceiptOriginalBytes(

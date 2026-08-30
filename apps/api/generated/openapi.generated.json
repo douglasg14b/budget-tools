@@ -422,6 +422,70 @@
 				],
 				"type": "object"
 			},
+			"ExtractPreviewResultDto": {
+				"properties": {
+					"rawText": {
+						"type": "string",
+						"nullable": true
+					},
+					"extractJson": {
+						"type": "string",
+						"nullable": true
+					},
+					"totalsDisagree": {
+						"type": "boolean"
+					},
+					"printedMilliunits": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
+					"purchaseDate": {
+						"type": "string",
+						"nullable": true
+					},
+					"vendor": {
+						"type": "string",
+						"nullable": true
+					},
+					"extractStatus": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/ReceiptExtractStatus"
+							}
+						],
+						"nullable": true
+					},
+					"droppedAsAmazon": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"rawText",
+					"extractJson",
+					"totalsDisagree",
+					"printedMilliunits",
+					"purchaseDate",
+					"vendor",
+					"extractStatus",
+					"droppedAsAmazon"
+				],
+				"type": "object"
+			},
+			"ExtractPreviewDto": {
+				"properties": {
+					"frames": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"frames"
+				],
+				"type": "object"
+			},
 			"BindReceiptDto": {
 				"properties": {
 					"transactionId": {
@@ -2180,6 +2244,45 @@
 						"application/json": {
 							"schema": {
 								"$ref": "#/components/schemas/MatchPreviewDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/receipts/extract-preview": {
+			"post": {
+				"operationId": "ExtractPreview",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ExtractPreviewResultDto"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Invalid frames"
+					},
+					"503": {
+						"description": "Extract unavailable"
+					}
+				},
+				"summary": "extractPreview",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ExtractPreviewDto"
 							}
 						}
 					}

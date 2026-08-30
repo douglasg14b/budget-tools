@@ -39,6 +39,21 @@ export type ReceiptMatchDto = {
     closeMatches: ReceiptMatchCloseDto[];
 };
 
+export type ExtractPreviewDto = {
+    frames: string[];
+};
+
+export type ExtractPreviewResultDto = {
+    droppedAsAmazon: boolean;
+    extractStatus: ReceiptExtractStatus | null;
+    vendor: string | null;
+    purchaseDate: string | null;
+    printedMilliunits: number | null;
+    totalsDisagree: boolean;
+    extractJson: string | null;
+    rawText: string | null;
+};
+
 export type MatchPreviewReceiptDto = {
     id: string;
     vendor: string | null;
