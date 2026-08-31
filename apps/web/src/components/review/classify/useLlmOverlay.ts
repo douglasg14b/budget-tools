@@ -3,13 +3,20 @@ import { Categorization } from '@budget-tools/web-sdk';
 import { useQuery } from '@tanstack/react-query';
 
 import { getBackendErrorMessage } from '../../BackendErrorNotice';
-import { applyLlmOverlay, needsLlmSuggest, overlayQueryKey } from './applyLlmOverlay';
+import {
+    applyLlmOverlay,
+    needsLlmSuggest,
+    overlayQueryKey,
+    type ReceiptLlmSkip,
+    receiptSkipsLlmSuggest,
+} from './applyLlmOverlay';
 
 type UseLlmOverlayInput = {
     readonly current: CategorizationQueueItemDto | undefined;
     readonly currentDecided: boolean;
     readonly prefetchPrevious: CategorizationQueueItemDto | undefined;
     readonly prefetchNext: CategorizationQueueItemDto | undefined;
+    readonly receiptSkip?: ReceiptLlmSkip | null;
 };
 
 type UseLlmOverlayResult = {
@@ -26,8 +33,9 @@ export function useLlmOverlay({
     currentDecided,
     prefetchPrevious,
     prefetchNext,
+    receiptSkip,
 }: UseLlmOverlayInput): UseLlmOverlayResult {
-    const currentEnabled = Boolean(current && needsLlmSuggest(current, currentDecided));
+    const currentEnabled = Boolean(current && needsLlmSuggest(current, currentDecided, receiptSkip));
 
     const currentQuery = useQuery({
         queryKey: ['categorization', 'llm-suggest', ...(current ? overlayQueryKey(current) : ['none'])],
@@ -43,7 +51,8 @@ export function useLlmOverlay({
     usePrefetchOverlay(prefetchNext, 'prefetch-next');
 
     const overlay = currentQuery.data;
-    const item = current && overlay ? applyLlmOverlay(current, overlay) : current;
+    const item =
+        current && overlay && !receiptSkipsLlmSuggest(receiptSkip) ? applyLlmOverlay(current, overlay) : current;
 
     return {
         errorMessage: currentQuery.isError ? formatLlmError(currentQuery.error) : null,

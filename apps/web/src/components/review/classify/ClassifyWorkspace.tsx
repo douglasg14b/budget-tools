@@ -1,21 +1,29 @@
 import type { CategorizationQueueItemDto, CategoryGroupDto } from '@budget-tools/web-sdk';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { BackendErrorNotice } from '../../BackendErrorNotice';
 import { shouldPrefetchMore, shouldPrefetchNewer } from '../shouldPrefetchMore';
-import { selectAmazonPrefetchNeighbors, selectLlmPrefetchNeighbors } from './applyLlmOverlay';
+import {
+    canCaptureReceipt,
+    selectAmazonPrefetchNeighbors,
+    selectLlmPrefetchNeighbors,
+    selectReceiptPrefetchNeighbors,
+} from './applyLlmOverlay';
 import { ClassifyFilmstrip } from './ClassifyFilmstrip';
 import { ClassifyProgress } from './ClassifyProgress';
 import { ClassifyShortcuts } from './ClassifyShortcuts';
 import { ClassifyStage } from './ClassifyStage';
 import classes from './ClassifyWorkspace.module.css';
 import { isAmazonTransaction } from './isAmazonTransaction';
+import type { PracticeReceipt } from './practiceReceipts';
 import { remainingItems } from './sessionDecisions';
 import { useAmazonSplitOverlay } from './useAmazonSplitOverlay';
 import { useClassifySession } from './useClassifySession';
 import type { LiveClassification } from './useLiveClassification';
 import { useLlmOverlay } from './useLlmOverlay';
 import { usePredictWindow } from './usePredictWindow';
+import { useReceiptCapture } from './useReceiptCapture';
+import { useReceiptOverlay } from './useReceiptOverlay';
 
 type ClassifyWorkspaceProps = {
     categoryGroups: readonly CategoryGroupDto[];
@@ -46,6 +54,7 @@ export function ClassifyWorkspace({
 }: ClassifyWorkspaceProps) {
     const displayedItemRef = useRef<CategorizationQueueItemDto | undefined>(undefined);
     const amazonDismissedRef = useRef(new Set<string>());
+    const [sessionReceipts, setSessionReceipts] = useState<PracticeReceipt[]>([]);
     const classify = useClassifySession(items, categoryGroups, {
         displayedItemRef,
         live,
@@ -58,11 +67,22 @@ export function ClassifyWorkspace({
     const remaining = remainingItems(items, classify.session);
     const predict = usePredictWindow({ currentId: current?.transaction.id, items });
     const llmPrefetch = selectLlmPrefetchNeighbors(remaining, current?.transaction.id);
+    const isLive = Boolean(live);
+    const receiptPrefetch = selectReceiptPrefetchNeighbors(remaining, current?.transaction.id);
+    const receipt = useReceiptOverlay({
+        current,
+        currentDecided,
+        prefetchPrevious: receiptPrefetch.previous,
+        prefetchNext: receiptPrefetch.next,
+        live: isLive,
+        sessionReceipts,
+    });
     const overlay = useLlmOverlay({
         current,
         currentDecided,
         prefetchPrevious: llmPrefetch.previous,
         prefetchNext: llmPrefetch.next,
+        receiptSkip: receipt.llmSkip,
     });
     const amazonPrefetch = selectAmazonPrefetchNeighbors(remaining, current?.transaction.id);
     const amazon = useAmazonSplitOverlay({
@@ -70,6 +90,16 @@ export function ClassifyWorkspace({
         currentDecided,
         prefetchPrevious: amazonPrefetch.previous,
         prefetchNext: amazonPrefetch.next,
+    });
+    const capture = useReceiptCapture({
+        live: isLive,
+        transactionId: current?.transaction.id ?? '',
+        onPracticeReceipt: (row) => {
+            setSessionReceipts((previous) => [
+                ...previous.filter((existing) => existing.transactionId !== row.transactionId),
+                row,
+            ]);
+        },
     });
     const displayItem = overlay.item ?? current;
     displayedItemRef.current = displayItem;
@@ -159,6 +189,16 @@ export function ClassifyWorkspace({
                               onSync: amazon.sync,
                           }
                         : undefined
+                }
+                receipt={
+                    isAmazonTransaction(displayItem.transaction)
+                        ? undefined
+                        : {
+                              overlay: receipt.overlay,
+                              asking: receipt.isPending,
+                              error: receipt.errorMessage,
+                              capture: canCaptureReceipt(displayItem) ? capture : null,
+                          }
                 }
                 onAccept={classify.acceptCurrent}
                 onBeginSplit={() => {

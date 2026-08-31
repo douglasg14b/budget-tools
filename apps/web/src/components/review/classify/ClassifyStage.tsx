@@ -14,6 +14,8 @@ import { ProposalDetails } from '../ProposalDetails';
 import { alternativeOptions } from './alternativeOptions';
 import { ClassifyAmazonContext } from './ClassifyAmazonContext';
 import { ClassifyPayee } from './ClassifyPayee';
+import { ClassifyReceiptCapture } from './ClassifyReceiptCapture';
+import { ClassifyReceiptContext } from './ClassifyReceiptContext';
 import { ClassifySplitEditor } from './ClassifySplitEditor';
 import classes from './ClassifyStage.module.css';
 import { CLASSIFY_KEY_LABELS } from './classifyKeys';
@@ -26,6 +28,8 @@ import type { SessionDecision } from './sessionDecisions';
 import { decisionCategoryId, decisionCategoryName, isSplitDecision } from './sessionDecisions';
 import type { SplitLine } from './splitLines';
 import { validateSplitLines } from './splitLines';
+import type { ReceiptCaptureState } from './useReceiptCapture';
+import type { ReceiptOverlayModel } from './useReceiptOverlay';
 
 type ClassifyStageProps = {
     assignableIds: ReadonlySet<string>;
@@ -57,6 +61,12 @@ type ClassifyStageProps = {
         syncing: boolean;
         onSync: () => void;
     };
+    receipt?: {
+        overlay: ReceiptOverlayModel | undefined;
+        asking: boolean;
+        error: string | null;
+        capture: ReceiptCaptureState | null;
+    };
 };
 
 export function ClassifyStage({
@@ -83,6 +93,7 @@ export function ClassifyStage({
     scoring = false,
     splitLines,
     amazon,
+    receipt,
 }: ClassifyStageProps) {
     const { transaction, proposal } = item;
     const originalName = originalImportName(transaction);
@@ -193,6 +204,12 @@ export function ClassifyStage({
                         Loading Amazon order…
                     </p>
                 ) : null}
+                {receipt?.asking && !receipt.overlay ? (
+                    <p className={classes.llmBanner}>
+                        <Loader size={14} color="gray" />
+                        Looking up receipt…
+                    </p>
+                ) : null}
             </div>
             {proposal ? (
                 <FlagChips
@@ -271,8 +288,10 @@ export function ClassifyStage({
                 }}
             />
 
+            {receipt?.capture ? <ClassifyReceiptCapture capture={receipt.capture} /> : null}
+
             {amazon && (amazon.overlay || amazon.error) ? (
-                <div className={classes.amazonDetails}>
+                <div className={classes.contextDetails}>
                     <ClassifyAmazonContext
                         asking={false}
                         error={amazon.error}
@@ -280,6 +299,12 @@ export function ClassifyStage({
                         syncing={amazon.syncing}
                         onSync={amazon.onSync}
                     />
+                </div>
+            ) : null}
+
+            {receipt && (receipt.overlay || receipt.error) ? (
+                <div className={classes.contextDetails}>
+                    <ClassifyReceiptContext error={receipt.error} overlay={receipt.overlay} />
                 </div>
             ) : null}
 

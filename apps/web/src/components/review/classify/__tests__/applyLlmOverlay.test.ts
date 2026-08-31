@@ -7,12 +7,18 @@ import { describe, expect, it } from 'vitest';
 
 import {
     applyLlmOverlay,
+    buildReceiptLlmSkip,
+    canCaptureReceipt,
+    isReceiptExtractReady,
     needsAmazonSuggest,
     needsLlmSuggest,
+    needsReceiptLookup,
     nextUncertainRemaining,
     previousUncertainRemaining,
+    receiptSkipsLlmSuggest,
     selectAmazonPrefetchNeighbors,
     selectLlmPrefetchNeighbors,
+    selectReceiptPrefetchNeighbors,
 } from '../applyLlmOverlay';
 
 describe('needsLlmSuggest', () => {
@@ -30,6 +36,101 @@ describe('needsLlmSuggest', () => {
         expect(needsAmazonSuggest(amazon, false)).toBe(true);
         expect(needsAmazonSuggest(amazon, true)).toBe(true);
         expect(needsAmazonSuggest(item({ confidence: 0.4, suggestedCategory: 'Groceries' }), false)).toBe(false);
+        expect(needsReceiptLookup(amazon, false)).toBe(false);
+        expect(canCaptureReceipt(amazon)).toBe(false);
+    });
+
+    it('skips generic llm-suggest when exact unique extract is ready', () => {
+        const grocery = item({ confidence: 0.4, suggestedCategory: 'Groceries' });
+        const ready = {
+            autoBind: true,
+            boundToCurrent: false,
+            extractStatus: 'gated' as const,
+            totalsDisagree: false,
+        };
+        expect(isReceiptExtractReady(ready)).toBe(true);
+        expect(receiptSkipsLlmSuggest(ready)).toBe(true);
+        expect(needsLlmSuggest(grocery, false, ready)).toBe(false);
+        expect(needsLlmSuggest(grocery, false, { ...ready, extractStatus: 'ungated' })).toBe(false);
+    });
+
+    it('keeps llm-suggest while extract is pending, failed, or totals disagree', () => {
+        const grocery = item({ confidence: 0.4, suggestedCategory: 'Groceries' });
+        expect(
+            needsLlmSuggest(grocery, false, {
+                autoBind: true,
+                boundToCurrent: false,
+                extractStatus: 'pending',
+                totalsDisagree: false,
+            }),
+        ).toBe(true);
+        expect(
+            needsLlmSuggest(grocery, false, {
+                autoBind: true,
+                boundToCurrent: false,
+                extractStatus: 'failed',
+                totalsDisagree: false,
+            }),
+        ).toBe(true);
+        expect(
+            needsLlmSuggest(grocery, false, {
+                autoBind: true,
+                boundToCurrent: false,
+                extractStatus: 'gated',
+                totalsDisagree: true,
+            }),
+        ).toBe(true);
+        expect(
+            needsLlmSuggest(grocery, false, {
+                autoBind: false,
+                boundToCurrent: false,
+                extractStatus: 'gated',
+                totalsDisagree: false,
+            }),
+        ).toBe(true);
+    });
+
+    it('skips llm-suggest for a card-bound ready extract without matcher auto-bind', () => {
+        const grocery = item({ confidence: 0.4, suggestedCategory: 'Groceries' });
+        expect(
+            needsLlmSuggest(grocery, false, {
+                autoBind: false,
+                boundToCurrent: true,
+                extractStatus: 'ungated',
+                totalsDisagree: false,
+            }),
+        ).toBe(false);
+    });
+
+    it('builds llm skip only when matcher auto-bind or a card bind exists', () => {
+        expect(
+            buildReceiptLlmSkip({
+                autoBind: false,
+                boundToCurrent: false,
+                extractStatus: 'gated',
+                totalsDisagree: false,
+            }),
+        ).toBeNull();
+        expect(
+            buildReceiptLlmSkip({
+                autoBind: true,
+                boundToCurrent: false,
+                extractStatus: 'gated',
+                totalsDisagree: false,
+            }),
+        ).toEqual({
+            autoBind: true,
+            boundToCurrent: false,
+            extractStatus: 'gated',
+            totalsDisagree: false,
+        });
+        const skip = buildReceiptLlmSkip({
+            autoBind: true,
+            boundToCurrent: false,
+            extractStatus: 'gated',
+            totalsDisagree: false,
+        });
+        expect(receiptSkipsLlmSuggest(skip)).toBe(true);
     });
 });
 
@@ -83,6 +184,21 @@ describe('selectAmazonPrefetchNeighbors', () => {
             previous,
             next,
         });
+    });
+});
+
+describe('selectReceiptPrefetchNeighbors', () => {
+    it('returns non-Amazon neighbors and skips Amazon payees', () => {
+        const previous = item({ id: 'a', confidence: 0.2, suggestedCategory: null });
+        const amazon = amazonItem('amz');
+        const current = item({ id: 'c', confidence: 0.4, suggestedCategory: 'Groceries' });
+        const next = item({ id: 'd', confidence: 0.3, suggestedCategory: 'Gas' });
+        expect(selectReceiptPrefetchNeighbors([previous, amazon, current, next], 'c')).toEqual({
+            previous,
+            next,
+        });
+        expect(needsReceiptLookup(current, false)).toBe(true);
+        expect(canCaptureReceipt(current)).toBe(true);
     });
 });
 
