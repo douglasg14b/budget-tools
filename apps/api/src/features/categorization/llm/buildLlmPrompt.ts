@@ -1,3 +1,4 @@
+import type { ReceiptExtractStatus } from '../../receipts/data/receiptsSchema';
 import type { CategorizationProposalDto, TransactionDetailDto } from '../categorizationDtos';
 import type { RankedSimilarTransaction } from '../pickSimilarTransactions';
 import type { NearbyCategorySet } from './nearbyCategories';
@@ -6,6 +7,17 @@ export type LlmPrompt = {
     readonly system: string;
     readonly user: string;
 };
+
+export type LlmReceiptContext = {
+    readonly vendor: string | null;
+    readonly purchaseDate: string | null;
+    readonly printedMilliunits: number | null;
+    readonly extractStatus: ReceiptExtractStatus;
+    readonly totalsDisagree: boolean;
+    readonly rawText: string | null;
+};
+
+const RECEIPT_RAW_TEXT_LIMIT = 4_000;
 
 function dollars(amountMilliunits: number): string {
     const value = amountMilliunits / 1000;
@@ -46,6 +58,7 @@ export function buildLlmPrompt(input: {
     readonly proposal: CategorizationProposalDto;
     readonly similar: readonly RankedSimilarTransaction[];
     readonly nearby: NearbyCategorySet;
+    readonly receipt?: LlmReceiptContext | null;
 }): LlmPrompt {
     const system = [
         "You categorize personal budget transactions into this household's YNAB categories.",
@@ -58,6 +71,7 @@ export function buildLlmPrompt(input: {
         'payeeName is a short canonical merchant name, or null if the current payee is already clean.',
         'Do not echo the raw bank import string as the payee.',
         ...(input.proposal.travelWindow ? [travelSystemNote(input.proposal.travelWindow)] : []),
+        ...(input.receipt ? [receiptSystemNote(input.receipt)] : []),
     ].join(' ');
 
     const lines: string[] = [];
@@ -121,6 +135,11 @@ export function buildLlmPrompt(input: {
         }
     }
 
+    if (input.receipt) {
+        lines.push('');
+        lines.push(receiptUserBlock(input.receipt));
+    }
+
     lines.push('');
     lines.push('Similar finalized transactions (newest first):');
     if (input.similar.length === 0) {
@@ -162,6 +181,43 @@ export function buildLlmPrompt(input: {
     }
 
     return { system, user: lines.join('\n') };
+}
+
+function receiptSystemNote(receipt: LlmReceiptContext): string {
+    const gate = receiptGateLabel(receipt);
+    return `A paper receipt is bound to this charge. Line amounts marked ${gate}. Ungated prices must not be treated as YNAB cents.`;
+}
+
+function receiptUserBlock(receipt: LlmReceiptContext): string {
+    const gate = receiptGateLabel(receipt);
+    const rows = [
+        `Receipt context (${gate}):`,
+        `- Vendor: ${receipt.vendor?.trim() || '(unknown)'}`,
+        `- Purchase date: ${receipt.purchaseDate ?? '(unknown)'}`,
+        `- Printed total: ${receipt.printedMilliunits == null ? '(unknown)' : dollars(receipt.printedMilliunits)}`,
+        `- Extract status: ${receipt.extractStatus}${receipt.totalsDisagree ? ' (printed totals disagree)' : ''}`,
+    ];
+    const raw = truncateReceiptRaw(receipt.rawText);
+    if (raw) {
+        rows.push('- Raw text:');
+        rows.push(raw);
+    }
+    return rows.join('\n');
+}
+
+function receiptGateLabel(receipt: LlmReceiptContext): string {
+    return receipt.extractStatus === 'gated' && !receipt.totalsDisagree ? 'gated' : 'unverified';
+}
+
+function truncateReceiptRaw(rawText: string | null): string | null {
+    const trimmed = rawText?.trim();
+    if (!trimmed) {
+        return null;
+    }
+    if (trimmed.length <= RECEIPT_RAW_TEXT_LIMIT) {
+        return trimmed;
+    }
+    return `${trimmed.slice(0, RECEIPT_RAW_TEXT_LIMIT)}\n…(truncated)`;
 }
 
 function travelSystemNote(window: NonNullable<CategorizationProposalDto['travelWindow']>): string {

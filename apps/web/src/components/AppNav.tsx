@@ -19,6 +19,9 @@ export function AppNav() {
             >
                 Table
             </NavLink>
+            <NavLink className={navClassName} to={{ pathname: '/receipts', search: location.search }}>
+                Receipts
+            </NavLink>
             <NavLink className={navClassName} to="/trips">
                 Trips
             </NavLink>

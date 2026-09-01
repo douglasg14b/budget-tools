@@ -46,5 +46,15 @@ export function toMatchPreviewReceipt(receipt: PracticeReceipt): MatchPreviewRec
         purchaseDate: receipt.purchaseDate,
         printedMilliunits: receipt.printedMilliunits,
         totalsDisagree: receipt.totalsDisagree,
+        extractStatus: receipt.extractStatus,
+        extractJson: receipt.extractJson,
     };
+}
+
+export function bindPracticeReceipt(
+    receipts: readonly PracticeReceipt[],
+    receiptId: string,
+    transactionId: string | null,
+): PracticeReceipt[] {
+    return receipts.map((receipt) => (receipt.id === receiptId ? { ...receipt, transactionId } : receipt));
 }

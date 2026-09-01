@@ -8,9 +8,11 @@ import { AppNav } from './components/AppNav';
 import { NavbarHealthBadge } from './components/NavbarHealthBadge';
 import { OperatingModeToggle } from './components/OperatingModeToggle';
 import { OutboundSyncChip } from './components/OutboundSyncChip';
+import { PracticeReceiptsProvider } from './components/review/classify/PracticeReceiptsContext';
 import { cssVariablesResolver } from './cssVariablesResolver';
 import type { OperatingMode } from './operatingMode/operatingModeCopy';
 import { ClassifyPage } from './pages/ClassifyPage';
+import { ReceiptsPage } from './pages/ReceiptsPage';
 import { ReviewQueuePage } from './pages/ReviewQueuePage';
 import { TripsPage } from './pages/TripsPage';
 import { theme } from './theme';
@@ -19,7 +21,9 @@ export function App() {
     return (
         <MantineProvider defaultColorScheme="dark" theme={theme} cssVariablesResolver={cssVariablesResolver}>
             <BrowserRouter>
-                <AppLayout />
+                <PracticeReceiptsProvider>
+                    <AppLayout />
+                </PracticeReceiptsProvider>
             </BrowserRouter>
         </MantineProvider>
     );
@@ -57,6 +61,7 @@ function AppLayout() {
                             <Route path="/" element={<ReviewQueuePage />} />
                             <Route path="/classify" element={<ClassifyPage layout="card" />} />
                             <Route path="/classify/table" element={<ClassifyPage layout="table" />} />
+                            <Route path="/receipts" element={<ReceiptsPage />} />
                             <Route path="/trips" element={<TripsPage />} />
                         </Routes>
                     </div>

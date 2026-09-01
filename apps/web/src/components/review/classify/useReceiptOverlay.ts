@@ -2,6 +2,7 @@ import type {
     CategorizationQueueItemDto,
     ReceiptDto,
     ReceiptMatchDto,
+    ReceiptSplitDraftDto,
     ReceiptsDto,
     TransactionDetailDto,
 } from '@budget-tools/web-sdk';
@@ -10,7 +11,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 
 import { getBackendErrorMessage } from '../../BackendErrorNotice';
-import { buildReceiptLlmSkip, needsReceiptLookup, overlayQueryKey, type ReceiptLlmSkip } from './applyLlmOverlay';
+import type { ReceiptLlmSkip } from './applyLlmOverlay';
+import { buildReceiptLlmSkip, needsReceiptLookup, overlayQueryKey } from './applyLlmOverlay';
 import type { PracticeReceipt } from './practiceReceipts';
 import { toMatchPreviewReceipt } from './practiceReceipts';
 
@@ -39,6 +41,7 @@ type UseReceiptOverlayResult = {
     readonly isPending: boolean;
     readonly llmSkip: ReceiptLlmSkip | null;
     readonly overlay: ReceiptOverlayModel | undefined;
+    readonly splitDraft: ReceiptSplitDraftDto | null;
 };
 
 /**
@@ -127,6 +130,7 @@ export function useReceiptOverlay({
     });
 
     const bindAttempted = useRef<string | null>(null);
+    const extractStatusSeen = useRef<ReceiptDto['extractStatus'] | null>(null);
     const bindMutation = useMutation({
         mutationFn: async () => {
             const id = match?.exactReceiptId;
@@ -146,6 +150,7 @@ export function useReceiptOverlay({
         onSuccess: async (row) => {
             queryClient.setQueryData(['receipts', 'get', row.id], row);
             await queryClient.invalidateQueries({ queryKey: ['receipts', 'list'] });
+            await queryClient.invalidateQueries({ queryKey: ['receipts', 'lookup-by-transaction'] });
         },
         onError: () => {
             bindAttempted.current = null;
@@ -155,6 +160,14 @@ export function useReceiptOverlay({
     useEffect(() => {
         bindAttempted.current = null;
     }, [transactionId]);
+
+    useEffect(() => {
+        const status = liveReceipt?.extractStatus ?? null;
+        if (extractStatusSeen.current === 'pending' && status && status !== 'pending') {
+            void queryClient.invalidateQueries({ queryKey: ['receipts', 'lookup-by-transaction'] });
+        }
+        extractStatusSeen.current = status;
+    }, [liveReceipt?.extractStatus, queryClient]);
 
     useEffect(() => {
         if (!live || !currentEnabled || !match?.autoBind || !match.exactReceiptId || !transactionId) {
@@ -169,7 +182,15 @@ export function useReceiptOverlay({
         }
         bindAttempted.current = attemptKey;
         bindMutation.mutate();
-    }, [currentEnabled, live, liveReceipt?.transactionId, match?.autoBind, match?.exactReceiptId, transactionId]);
+    }, [
+        currentEnabled,
+        live,
+        liveReceipt?.transactionId,
+        match?.autoBind,
+        match?.exactReceiptId,
+        transactionId,
+        bindMutation.mutate,
+    ]);
 
     const overlay = receipt
         ? {
@@ -204,6 +225,7 @@ export function useReceiptOverlay({
         isPending: lookupPending || extractPending,
         llmSkip,
         overlay,
+        splitDraft: match?.splitDraft ?? null,
     };
 }
 

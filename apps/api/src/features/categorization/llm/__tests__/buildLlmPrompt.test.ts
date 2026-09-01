@@ -102,6 +102,68 @@ describe('buildLlmPrompt', () => {
         expect(withoutTravel.user).not.toContain('Trip context');
     });
 
+    it('appends gated vs unverified receipt context when a receipt is bound', () => {
+        const nearby = buildNearbyCategories({
+            catalog: assignableCategories([]),
+            similar: [],
+            options: [],
+            periodicCategory: null,
+        });
+        const gated = buildLlmPrompt({
+            transaction: tx(),
+            proposal: proposal(),
+            similar: [],
+            nearby,
+            receipt: {
+                vendor: 'Save Mart',
+                purchaseDate: '2026-02-09',
+                printedMilliunits: 3990,
+                extractStatus: 'gated',
+                totalsDisagree: false,
+                rawText: 'MILK 3.99',
+            },
+        });
+        const unverified = buildLlmPrompt({
+            transaction: tx(),
+            proposal: proposal(),
+            similar: [],
+            nearby,
+            receipt: {
+                vendor: 'Save Mart',
+                purchaseDate: '2026-02-09',
+                printedMilliunits: 3990,
+                extractStatus: 'ungated',
+                totalsDisagree: false,
+                rawText: 'MILK 3.99',
+            },
+        });
+
+        expect(gated.system).toContain('Line amounts marked gated');
+        expect(gated.user).toContain('Receipt context (gated)');
+        expect(gated.user).toContain('Save Mart');
+        expect(gated.user).toContain('MILK 3.99');
+        expect(unverified.system).toContain('Line amounts marked unverified');
+        expect(unverified.user).toContain('Receipt context (unverified)');
+        expect(unverified.user).toContain('Extract status: ungated');
+        const failed = buildLlmPrompt({
+            transaction: tx(),
+            proposal: proposal(),
+            similar: [],
+            nearby,
+            receipt: {
+                vendor: null,
+                purchaseDate: null,
+                printedMilliunits: null,
+                extractStatus: 'failed',
+                totalsDisagree: false,
+                rawText: 'unreadable',
+            },
+        });
+        expect(failed.user).toContain('Receipt context (unverified)');
+        expect(failed.user).toContain('Extract status: failed');
+        expect(failed.user).toContain('unreadable');
+    });
+
     it('tells the model the trip category is allowed but not assumed on city mismatch', () => {
         const nearby = buildNearbyCategories({
             catalog: assignableCategories([]),

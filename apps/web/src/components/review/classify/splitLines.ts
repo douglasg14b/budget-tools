@@ -63,3 +63,15 @@ export function seedSingleSplitLine(amount: number, line?: Partial<SplitLine>): 
         },
     ];
 }
+
+export function splitLinesFromReceiptDraft(
+    lines: ReadonlyArray<{ readonly amountMilliunits: number; readonly memo: string | null }>,
+): SplitLine[] {
+    return lines.map((line) => ({
+        amount: line.amountMilliunits,
+        categoryId: '',
+        categoryName: '',
+        categoryGroup: '',
+        memo: line.memo,
+    }));
+}

@@ -1,5 +1,5 @@
 import type { CategorizationQueueItemDto, CategoryGroupDto } from '@budget-tools/web-sdk';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { BackendErrorNotice } from '../../BackendErrorNotice';
 import { shouldPrefetchMore, shouldPrefetchNewer } from '../shouldPrefetchMore';
@@ -15,8 +15,9 @@ import { ClassifyShortcuts } from './ClassifyShortcuts';
 import { ClassifyStage } from './ClassifyStage';
 import classes from './ClassifyWorkspace.module.css';
 import { isAmazonTransaction } from './isAmazonTransaction';
-import type { PracticeReceipt } from './practiceReceipts';
+import { usePracticeReceipts } from './PracticeReceiptsContext';
 import { remainingItems } from './sessionDecisions';
+import { splitLinesFromReceiptDraft } from './splitLines';
 import { useAmazonSplitOverlay } from './useAmazonSplitOverlay';
 import { useClassifySession } from './useClassifySession';
 import type { LiveClassification } from './useLiveClassification';
@@ -52,9 +53,10 @@ export function ClassifyWorkspace({
     requestedId,
     live,
 }: ClassifyWorkspaceProps) {
+    const { receipts: sessionReceipts, setReceipts: setSessionReceipts } = usePracticeReceipts();
     const displayedItemRef = useRef<CategorizationQueueItemDto | undefined>(undefined);
     const amazonDismissedRef = useRef(new Set<string>());
-    const [sessionReceipts, setSessionReceipts] = useState<PracticeReceipt[]>([]);
+    const receiptDismissedRef = useRef(new Set<string>());
     const classify = useClassifySession(items, categoryGroups, {
         displayedItemRef,
         live,
@@ -93,7 +95,7 @@ export function ClassifyWorkspace({
     });
     const capture = useReceiptCapture({
         live: isLive,
-        transactionId: current?.transaction.id ?? '',
+        transactionId: current?.transaction.id ?? null,
         onPracticeReceipt: (row) => {
             setSessionReceipts((previous) => [
                 ...previous.filter((existing) => existing.transactionId !== row.transactionId),
@@ -121,6 +123,24 @@ export function ClassifyWorkspace({
         }
         beginSplitRef.current(current, overlayResult.lines);
     }, [amazon.overlay, current, currentDecided, splitDraft]);
+
+    useEffect(() => {
+        const draft = receipt.splitDraft;
+        const transactionId = current?.transaction.id;
+        if (!current || !draft || draft.kind !== 'split' || !transactionId) {
+            return;
+        }
+        if (isAmazonTransaction(current.transaction)) {
+            return;
+        }
+        if (amazon.overlay?.lines.length) {
+            return;
+        }
+        if (splitDraft || currentDecided || receiptDismissedRef.current.has(transactionId)) {
+            return;
+        }
+        beginSplitRef.current(current, splitLinesFromReceiptDraft(draft.lines));
+    }, [amazon.overlay, current, currentDecided, receipt.splitDraft, splitDraft]);
 
     useEffect(() => {
         if (shouldPrefetchMore(classify.position, items.length, hasMoreOlder)) {
@@ -203,10 +223,12 @@ export function ClassifyWorkspace({
                 onAccept={classify.acceptCurrent}
                 onBeginSplit={() => {
                     amazonDismissedRef.current.delete(currentId);
+                    receiptDismissedRef.current.delete(currentId);
                     classify.beginSplit(displayItem);
                 }}
                 onCancelSplit={() => {
                     amazonDismissedRef.current.add(currentId);
+                    receiptDismissedRef.current.add(currentId);
                     classify.cancelSplit(currentId);
                 }}
                 onChangeSplit={(lines) => {

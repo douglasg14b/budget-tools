@@ -1,7 +1,8 @@
 import type { ReceiptDto } from '@budget-tools/web-sdk';
-import { Receipts } from '@budget-tools/web-sdk';
+import { listReceiptsQueryKey, Receipts } from '@budget-tools/web-sdk';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { type RefObject, useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { getBackendErrorMessage } from '../../BackendErrorNotice';
 import type { PracticeReceipt } from './practiceReceipts';
@@ -12,8 +13,9 @@ export const MAX_RECEIPT_FRAMES = 8;
 
 type UseReceiptCaptureInput = {
     readonly live: boolean;
-    readonly transactionId: string;
-    readonly onLiveCreated?: () => void;
+    readonly transactionId: string | null;
+    readonly keepCameraOnAttach?: boolean;
+    readonly onLiveCreated?: (row: ReceiptDto) => void;
     readonly onPracticeReceipt: (receipt: PracticeReceipt) => void;
 };
 
@@ -33,11 +35,13 @@ export type ReceiptCaptureState = {
 };
 
 /**
- * Card-door capture: one receipt is one frames array. Live POSTs create; Practice uses extract-preview.
+ * Card or inbox capture: one receipt is one frames array. Live POSTs create; Practice uses extract-preview.
+ * Inbox passes a null transactionId and keepCameraOnAttach so burst capture can continue.
  */
 export function useReceiptCapture({
     live,
     transactionId,
+    keepCameraOnAttach = false,
     onLiveCreated,
     onPracticeReceipt,
 }: UseReceiptCaptureInput): ReceiptCaptureState {
@@ -50,9 +54,12 @@ export function useReceiptCapture({
     const cameraSupported = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
 
     const liveCreate = useMutation({
-        mutationFn: async (input: { readonly frames: readonly string[]; readonly transactionId: string }) => {
+        mutationFn: async (input: { readonly frames: readonly string[]; readonly transactionId: string | null }) => {
             const result = await Receipts.request2({
-                body: { frames: [...input.frames], transactionId: input.transactionId },
+                body: {
+                    frames: [...input.frames],
+                    ...(input.transactionId ? { transactionId: input.transactionId } : {}),
+                },
                 throwOnError: true,
             });
             if (!result.data) {
@@ -62,14 +69,15 @@ export function useReceiptCapture({
         },
         onSuccess: async (row: ReceiptDto) => {
             queryClient.setQueryData(['receipts', 'get', row.id], row);
+            await queryClient.invalidateQueries({ queryKey: listReceiptsQueryKey() });
             await queryClient.invalidateQueries({ queryKey: ['receipts', 'list'] });
             await queryClient.invalidateQueries({ queryKey: ['receipts', 'lookup-by-transaction'] });
-            onLiveCreated?.();
+            onLiveCreated?.(row);
         },
     });
 
     const practiceExtract = useMutation({
-        mutationFn: async (input: { readonly frames: readonly string[]; readonly transactionId: string }) => {
+        mutationFn: async (input: { readonly frames: readonly string[]; readonly transactionId: string | null }) => {
             const result = await Receipts.request6({
                 body: { frames: [...input.frames] },
                 throwOnError: true,
@@ -194,14 +202,17 @@ export function useReceiptCapture({
         setError(null);
         const frames = draft;
         const attachedTo = transactionId;
+        const afterAttach = () => {
+            setDraft([]);
+            if (!keepCameraOnAttach) {
+                stopCamera();
+            }
+        };
         if (live) {
             liveCreate.mutate(
                 { frames, transactionId: attachedTo },
                 {
-                    onSuccess: () => {
-                        setDraft([]);
-                        stopCamera();
-                    },
+                    onSuccess: afterAttach,
                 },
             );
             return;
@@ -209,10 +220,7 @@ export function useReceiptCapture({
         practiceExtract.mutate(
             { frames, transactionId: attachedTo },
             {
-                onSuccess: () => {
-                    setDraft([]);
-                    stopCamera();
-                },
+                onSuccess: afterAttach,
             },
         );
     }

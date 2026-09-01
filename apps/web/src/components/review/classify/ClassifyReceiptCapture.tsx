@@ -7,9 +7,10 @@ import { MAX_RECEIPT_FRAMES } from './useReceiptCapture';
 
 type ClassifyReceiptCaptureProps = {
     capture: ReceiptCaptureState;
+    submitLabel?: string;
 };
 
-export function ClassifyReceiptCapture({ capture }: ClassifyReceiptCaptureProps) {
+export function ClassifyReceiptCapture({ capture, submitLabel = 'Attach receipt' }: ClassifyReceiptCaptureProps) {
     const fileRef = useRef<HTMLInputElement>(null);
 
     return (
@@ -67,7 +68,7 @@ export function ClassifyReceiptCapture({ capture }: ClassifyReceiptCaptureProps)
                         size="compact-sm"
                         onClick={capture.attach}
                     >
-                        Attach receipt
+                        {submitLabel}
                     </Button>
                     <Button size="compact-sm" variant="subtle" onClick={capture.discardDraft}>
                         Discard

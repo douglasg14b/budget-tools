@@ -5,6 +5,7 @@ import {
     OPENROUTER_MODEL,
 } from '../../../environment';
 import { listCategories } from '../../categories/listCategories';
+import { getReceiptByTransactionId } from '../../receipts/data/receiptsRepo';
 import { overlayFingerprint } from '../../travelWindows/travelWindowsSignature';
 import { loadTravelWindowsSignature } from '../../travelWindows/travelWindowsStore';
 import type { CategoryOptionDto, LlmSuggestOverlayDto } from '../categorizationDtos';
@@ -55,7 +56,7 @@ export async function suggestWithLlm(transactionId: string, signal?: AbortSignal
         throw new LlmSuggestError(503, 'OPENROUTER_API_KEY is not configured');
     }
 
-    const [catalogDto, similar] = await Promise.all([
+    const [catalogDto, similar, boundReceipt] = await Promise.all([
         listCategories(),
         listSimilarFinalizedTransactions({
             id: scored.transaction.id,
@@ -65,6 +66,7 @@ export async function suggestWithLlm(transactionId: string, signal?: AbortSignal
             accountId: scored.transaction.accountId,
             amount: scored.transaction.amount,
         }),
+        getReceiptByTransactionId(scored.transaction.id),
     ]);
 
     const catalog = assignableCategories(catalogDto.groups);
@@ -130,6 +132,17 @@ export async function suggestWithLlm(transactionId: string, signal?: AbortSignal
         proposal,
         similar,
         nearby,
+        receipt:
+            boundReceipt && boundReceipt.extractStatus !== 'pending'
+                ? {
+                      vendor: boundReceipt.vendor,
+                      purchaseDate: boundReceipt.purchaseDate,
+                      printedMilliunits: boundReceipt.printedMilliunits,
+                      extractStatus: boundReceipt.extractStatus,
+                      totalsDisagree: boundReceipt.totalsDisagree,
+                      rawText: boundReceipt.rawText,
+                  }
+                : null,
     });
     logLlmSuggest('prompt size', {
         systemChars: prompt.system.length,

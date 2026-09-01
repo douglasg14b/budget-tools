@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { practiceReceiptFromExtract, toMatchPreviewReceipt } from '../practiceReceipts';
+import { bindPracticeReceipt, practiceReceiptFromExtract, toMatchPreviewReceipt } from '../practiceReceipts';
 
 describe('practiceReceiptFromExtract', () => {
     it('returns null when extract dropped an Amazon vendor', () => {
@@ -50,6 +50,29 @@ describe('practiceReceiptFromExtract', () => {
             purchaseDate: '2010-10-23',
             printedMilliunits: 3990,
             totalsDisagree: false,
+            extractStatus: 'gated',
+            extractJson: '{}',
         });
+    });
+});
+
+describe('bindPracticeReceipt', () => {
+    it('sets and clears a session bind without dropping the receipt', () => {
+        const receipt = practiceReceiptFromExtract('r1', null, ['data:image/jpeg;base64,aa'], {
+            droppedAsAmazon: false,
+            extractStatus: 'gated',
+            vendor: 'Save Mart',
+            purchaseDate: '2010-10-23',
+            printedMilliunits: 3990,
+            totalsDisagree: false,
+            extractJson: '{}',
+            rawText: 'MILK',
+        });
+        if (!receipt) {
+            throw new Error('expected a practice receipt');
+        }
+        const bound = bindPracticeReceipt([receipt], 'r1', 'txn-9');
+        expect(bound[0]?.transactionId).toBe('txn-9');
+        expect(bindPracticeReceipt(bound, 'r1', null)[0]?.transactionId).toBeNull();
     });
 });

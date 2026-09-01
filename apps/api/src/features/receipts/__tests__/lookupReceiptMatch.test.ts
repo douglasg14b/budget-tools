@@ -7,9 +7,18 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AppDatabaseClient } from '../../../data-persistence/database';
 import { createAppDatabase } from '../../../data-persistence/database';
 import { migrateToLatest } from '../../../data-persistence/migrate';
+import type { TransactionDetailDto } from '../../categorization/categorizationDtos';
 import { setOperatingMode } from '../../operatingMode/data/operatingModeRepo';
 import { insertReceiptOriginal } from '../data/receiptsRepo';
 import { lookupByReceipt, lookupByTransaction, matchPreview, toReceiptMatchDto } from '../lookupReceiptMatch';
+
+const previewReceipt = {
+    id: 'rcp-1',
+    vendor: 'Starbucks',
+    purchaseDate: '2026-02-09',
+    printedMilliunits: -50000,
+    totalsDisagree: false,
+};
 
 describe('matchPreview', () => {
     it('matches ephemeral receipts and writes nothing', async () => {
@@ -37,35 +46,38 @@ describe('matchPreview', () => {
             autoBind: true,
             exactReceiptId: 'rcp-1',
             exactTransactionId: 'txn-1',
+            bindCandidates: [],
         });
     });
 
-    it('rejects empty receipts and mixed transaction sources', async () => {
+    it('matches a lone receipt toward a window of bank charges without writing', async () => {
+        const result = await matchPreview({ receipts: [previewReceipt] }, async () => [
+            windowTransaction(),
+            windowTransaction({
+                id: 'txn-other',
+                amount: -12000,
+                payeeName: 'Safeway',
+                importPayeeName: 'SAFEWAY',
+            }),
+        ]);
+        expect(toReceiptMatchDto(result)).toMatchObject({
+            autoBind: true,
+            exactReceiptId: 'rcp-1',
+            exactTransactionId: 'txn-1',
+        });
+        expect(result.bindCandidates.map((row) => row.id)).toEqual(['txn-1', 'txn-other']);
+    });
+
+    it('rejects empty receipts, mixed sources, and multi-receipt inbox preview', async () => {
         await expect(matchPreview({ receipts: [] })).rejects.toMatchObject({ statusCode: 400 });
         await expect(
             matchPreview({
-                receipts: [
-                    {
-                        id: 'rcp-1',
-                        vendor: 'Starbucks',
-                        purchaseDate: '2026-02-09',
-                        printedMilliunits: -50000,
-                        totalsDisagree: false,
-                    },
-                ],
+                receipts: [previewReceipt, { ...previewReceipt, id: 'rcp-2' }],
             }),
         ).rejects.toMatchObject({ statusCode: 400 });
         await expect(
             matchPreview({
-                receipts: [
-                    {
-                        id: 'rcp-1',
-                        vendor: 'Starbucks',
-                        purchaseDate: '2026-02-09',
-                        printedMilliunits: -50000,
-                        totalsDisagree: false,
-                    },
-                ],
+                receipts: [previewReceipt],
                 transactionId: 'txn-1',
                 transaction: {
                     id: 'txn-1',
@@ -111,5 +123,27 @@ describe('lookupByTransaction', () => {
         expect(result.autoBind).toBe(false);
         expect(result.closeMatches).toEqual([]);
         expect(result.exactTransactionId).toBeNull();
+        expect(result.bindCandidates).toEqual([]);
     });
 });
+
+function windowTransaction(overrides: Partial<TransactionDetailDto> = {}): TransactionDetailDto {
+    return {
+        id: 'txn-1',
+        date: '2026-02-10',
+        amount: -50000,
+        memo: null,
+        cleared: 'cleared',
+        approved: true,
+        accountId: 'acct',
+        accountName: 'Checking',
+        payeeId: 'payee',
+        payeeName: 'Starbucks',
+        categoryId: null,
+        categoryName: null,
+        importId: null,
+        importPayeeName: 'STARBUCKS',
+        importPayeeNameOriginal: null,
+        ...overrides,
+    };
+}

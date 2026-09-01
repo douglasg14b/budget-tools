@@ -102,6 +102,19 @@ export async function getReceiptById(id: string, db?: AppDatabaseClient): Promis
     return database.selectFrom('receipts').selectAll().where('id', '=', id).executeTakeFirst();
 }
 
+export async function getReceiptByTransactionId(
+    transactionId: string,
+    db?: AppDatabaseClient,
+): Promise<ReceiptRow | undefined> {
+    const database = db ?? (await getAppDatabase());
+    return database
+        .selectFrom('receipts')
+        .selectAll()
+        .where('transactionId', '=', transactionId)
+        .orderBy('createdAt', 'desc')
+        .executeTakeFirst();
+}
+
 export async function listReceipts(db?: AppDatabaseClient): Promise<ReceiptRow[]> {
     const database = db ?? (await getAppDatabase());
     return database.selectFrom('receipts').selectAll().orderBy('createdAt', 'desc').execute();

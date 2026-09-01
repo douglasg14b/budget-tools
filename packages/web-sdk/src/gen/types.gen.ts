@@ -86,7 +86,31 @@ export type ClosePairMatch = {
 
 export type ReceiptMatchCloseDto = ClosePairMatch;
 
+export type ReceiptBindCandidateDto = {
+    memo: string | null;
+    categoryName: string | null;
+    accountName: string;
+    importPayeeNameOriginal: string | null;
+    importPayeeName: string | null;
+    payeeName: string | null;
+    amount: number;
+    date: string;
+    id: string;
+};
+
+export type ReceiptSplitDraftLineDto = {
+    memo: string | null;
+    amountMilliunits: number;
+};
+
+export type ReceiptSplitDraftDto = {
+    lines: Array<ReceiptSplitDraftLineDto>;
+    kind: 'single' | 'split';
+};
+
 export type ReceiptMatchDto = {
+    splitDraft: ReceiptSplitDraftDto | null;
+    bindCandidates: Array<ReceiptBindCandidateDto>;
     closeMatches: Array<ClosePairMatch>;
     exactTransactionId: string | null;
     exactReceiptId: string | null;
@@ -95,6 +119,8 @@ export type ReceiptMatchDto = {
 };
 
 export type MatchPreviewReceiptDto = {
+    extractJson?: string | null;
+    extractStatus?: ReceiptExtractStatus | null;
     totalsDisagree: boolean;
     printedMilliunits: number | null;
     purchaseDate: string | null;

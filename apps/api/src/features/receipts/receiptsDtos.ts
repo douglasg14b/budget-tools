@@ -31,12 +31,36 @@ export type BindReceiptDto = {
 
 export type ReceiptMatchCloseDto = ClosePairMatch;
 
+export type ReceiptBindCandidateDto = {
+    id: string;
+    date: string;
+    amount: number;
+    payeeName: string | null;
+    importPayeeName: string | null;
+    importPayeeNameOriginal: string | null;
+    accountName: string;
+    categoryName: string | null;
+    memo: string | null;
+};
+
+export type ReceiptSplitDraftLineDto = {
+    amountMilliunits: number;
+    memo: string | null;
+};
+
+export type ReceiptSplitDraftDto = {
+    kind: 'single' | 'split';
+    lines: ReceiptSplitDraftLineDto[];
+};
+
 export type ReceiptMatchDto = {
     amazonSkipped: boolean;
     autoBind: boolean;
     exactReceiptId: string | null;
     exactTransactionId: string | null;
     closeMatches: ReceiptMatchCloseDto[];
+    bindCandidates: ReceiptBindCandidateDto[];
+    splitDraft: ReceiptSplitDraftDto | null;
 };
 
 export type ExtractPreviewDto = {
@@ -60,6 +84,8 @@ export type MatchPreviewReceiptDto = {
     purchaseDate: string | null;
     printedMilliunits: number | null;
     totalsDisagree: boolean;
+    extractStatus?: ReceiptExtractStatus | null;
+    extractJson?: string | null;
 };
 
 export type MatchPreviewTransactionDto = {

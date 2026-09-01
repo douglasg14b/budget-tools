@@ -304,8 +304,110 @@
 			"ReceiptMatchCloseDto": {
 				"$ref": "#/components/schemas/ClosePairMatch"
 			},
+			"ReceiptBindCandidateDto": {
+				"properties": {
+					"memo": {
+						"type": "string",
+						"nullable": true
+					},
+					"categoryName": {
+						"type": "string",
+						"nullable": true
+					},
+					"accountName": {
+						"type": "string"
+					},
+					"importPayeeNameOriginal": {
+						"type": "string",
+						"nullable": true
+					},
+					"importPayeeName": {
+						"type": "string",
+						"nullable": true
+					},
+					"payeeName": {
+						"type": "string",
+						"nullable": true
+					},
+					"amount": {
+						"type": "number",
+						"format": "double"
+					},
+					"date": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"memo",
+					"categoryName",
+					"accountName",
+					"importPayeeNameOriginal",
+					"importPayeeName",
+					"payeeName",
+					"amount",
+					"date",
+					"id"
+				],
+				"type": "object"
+			},
+			"ReceiptSplitDraftLineDto": {
+				"properties": {
+					"memo": {
+						"type": "string",
+						"nullable": true
+					},
+					"amountMilliunits": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"memo",
+					"amountMilliunits"
+				],
+				"type": "object"
+			},
+			"ReceiptSplitDraftDto": {
+				"properties": {
+					"lines": {
+						"items": {
+							"$ref": "#/components/schemas/ReceiptSplitDraftLineDto"
+						},
+						"type": "array"
+					},
+					"kind": {
+						"type": "string",
+						"enum": [
+							"single",
+							"split"
+						]
+					}
+				},
+				"required": [
+					"lines",
+					"kind"
+				],
+				"type": "object"
+			},
 			"ReceiptMatchDto": {
 				"properties": {
+					"splitDraft": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/ReceiptSplitDraftDto"
+							}
+						],
+						"nullable": true
+					},
+					"bindCandidates": {
+						"items": {
+							"$ref": "#/components/schemas/ReceiptBindCandidateDto"
+						},
+						"type": "array"
+					},
 					"closeMatches": {
 						"items": {
 							"$ref": "#/components/schemas/ReceiptMatchCloseDto"
@@ -328,6 +430,8 @@
 					}
 				},
 				"required": [
+					"splitDraft",
+					"bindCandidates",
 					"closeMatches",
 					"exactTransactionId",
 					"exactReceiptId",
@@ -338,6 +442,18 @@
 			},
 			"MatchPreviewReceiptDto": {
 				"properties": {
+					"extractJson": {
+						"type": "string",
+						"nullable": true
+					},
+					"extractStatus": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/ReceiptExtractStatus"
+							}
+						],
+						"nullable": true
+					},
 					"totalsDisagree": {
 						"type": "boolean"
 					},
