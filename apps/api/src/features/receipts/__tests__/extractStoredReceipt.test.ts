@@ -112,4 +112,32 @@ describe('extractStoredReceipt', () => {
         expect(row?.vendor).toBeNull();
         expect(row?.extractJson).toContain('OpenRouter request timed out');
     });
+
+    it('extracts the processed image when it is stored', async () => {
+        const processed = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x33]);
+        const created = await createReceipt(
+            {
+                frames: [jpegDataUrl(jpegBytes)],
+                processed: jpegDataUrl(processed),
+                receiptsDir: join(directory, 'files'),
+            },
+            database,
+        );
+        let seen: Buffer | undefined;
+        await extractStoredReceipt(created.id, database, async ({ frames }) => {
+            seen = frames[0];
+            return {
+                kind: 'complete',
+                extractStatus: 'ungated',
+                vendor: 'Store',
+                purchaseDate: '2026-08-01',
+                printedMilliunits: 1000,
+                totalsDisagree: false,
+                extractJson: '{}',
+                rawText: 'Store',
+            };
+        });
+        expect(seen?.equals(processed)).toBe(true);
+        expect(seen?.equals(jpegBytes)).toBe(false);
+    });
 });

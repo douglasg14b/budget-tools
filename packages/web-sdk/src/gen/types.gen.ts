@@ -50,6 +50,7 @@ export type AccountsDto = {
 export type ReceiptExtractStatus = 'pending' | 'gated' | 'ungated' | 'failed';
 
 export type ReceiptDto = {
+    hasProcessed: boolean;
     frameCount: number;
     totalsDisagree: boolean;
     contentHash: string;
@@ -70,6 +71,7 @@ export type ReceiptsDto = {
 
 export type CreateReceiptDto = {
     transactionId?: string;
+    processed?: string;
     frames: Array<string>;
 };
 
@@ -155,6 +157,7 @@ export type ExtractPreviewResultDto = {
 };
 
 export type ExtractPreviewDto = {
+    processed?: string;
     frames: Array<string>;
 };
 
@@ -818,6 +821,7 @@ export type GetReceiptImageData = {
         id: string;
     };
     query?: {
+        variant?: 'original' | 'processed';
         frame?: number;
     };
     url: '/receipts/{id}/image';

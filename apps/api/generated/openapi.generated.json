@@ -168,6 +168,9 @@
 			},
 			"ReceiptDto": {
 				"properties": {
+					"hasProcessed": {
+						"type": "boolean"
+					},
 					"frameCount": {
 						"type": "number",
 						"format": "double"
@@ -214,6 +217,7 @@
 					}
 				},
 				"required": [
+					"hasProcessed",
 					"frameCount",
 					"totalsDisagree",
 					"contentHash",
@@ -246,6 +250,9 @@
 			"CreateReceiptDto": {
 				"properties": {
 					"transactionId": {
+						"type": "string"
+					},
+					"processed": {
 						"type": "string"
 					},
 					"frames": {
@@ -590,6 +597,9 @@
 			},
 			"ExtractPreviewDto": {
 				"properties": {
+					"processed": {
+						"type": "string"
+					},
 					"frames": {
 						"items": {
 							"type": "string"
@@ -2431,6 +2441,19 @@
 						"required": true,
 						"schema": {
 							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "variant",
+						"required": false,
+						"schema": {
+							"default": "original",
+							"type": "string",
+							"enum": [
+								"original",
+								"processed"
+							]
 						}
 					},
 					{

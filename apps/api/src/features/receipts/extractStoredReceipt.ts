@@ -4,7 +4,7 @@ import type { ReceiptRow } from './data/receiptsRepo';
 import {
     deleteReceipt,
     listPendingExtractReceipts,
-    readReceiptAllFrameBytes,
+    readReceiptExtractFrameBytes,
     setReceiptExtract,
 } from './data/receiptsRepo';
 import type { ExtractFramesFn, ReceiptExtractComplete } from './extractReceipt';
@@ -19,7 +19,7 @@ export type EnqueueReceiptExtractFn = (receiptId: string) => void;
 const inFlightExtractIds = new Set<string>();
 
 /**
- * Live extract against stored originals. Amazon vendor deletes the row and files.
+ * Live extract against stored processed JPEG when present, otherwise originals. Amazon vendor deletes the row and files.
  * Failures persist extract_status failed with dumps; they do not invent match keys.
  * Amazon delete failures must not persist failed.
  */
@@ -30,7 +30,7 @@ export async function extractStoredReceipt(
     remove: DeleteReceiptFn = deleteReceipt,
 ): Promise<void> {
     try {
-        const frames = await readReceiptAllFrameBytes(id, db);
+        const frames = await readReceiptExtractFrameBytes(id, db);
         const result = await extract({ frames });
         if (result.kind === 'amazon') {
             try {

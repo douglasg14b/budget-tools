@@ -7,8 +7,9 @@ import type { ReceiptRow } from './data/receiptsRepo';
 import {
     countReceiptFrames,
     deleteReceipt as deleteReceiptRow,
+    hasReceiptProcessed,
     listReceipts as listReceiptRows,
-    readReceiptOriginalBytes,
+    readReceiptImageBytes,
     requireReceipt,
     setReceiptTransactionId,
 } from './data/receiptsRepo';
@@ -45,6 +46,7 @@ async function toReceiptDto(row: ReceiptRow): Promise<ReceiptDto> {
         contentHash: row.contentHash,
         totalsDisagree: row.totalsDisagree,
         frameCount: await countReceiptFrames(row.originalPath),
+        hasProcessed: await hasReceiptProcessed(row.originalPath),
     };
 }
 
@@ -71,6 +73,7 @@ export class ReceiptsController {
     public async createReceipt(@Body() body: CreateReceiptDto): Promise<ReceiptDto> {
         const row = await createReceipt({
             frames: body.frames,
+            processed: body.processed,
             transactionId: body.transactionId,
         });
         kickReceiptExtractIfPending(row);
@@ -127,16 +130,17 @@ export class ReceiptsController {
     public async getReceiptImage(
         @Path() id: string,
         @Request() request: ExpressRequest,
+        @Query() variant: 'original' | 'processed' = 'original',
         @Query() frame = 0,
     ): Promise<void> {
-        const original = await readReceiptOriginalBytes(id, undefined, frame);
+        const image = await readReceiptImageBytes(id, variant, frame);
         const response = request.res;
         if (!response) {
             throw new HttpError(500, 'Express response was missing on getReceiptImage');
         }
         response.status(200);
-        response.setHeader('Content-Type', original.contentType);
-        response.send(original.bytes);
+        response.setHeader('Content-Type', image.contentType);
+        response.send(image.bytes);
     }
 
     /**

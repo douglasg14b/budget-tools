@@ -16,7 +16,8 @@ export async function extractPreview(
         throw new HttpError(400, 'Receipt extract-preview requires at least one frame');
     }
     assertReceiptFrameCountWithinLimit(body.frames.length);
-    const frames = body.frames.map(decodeDataUrlFrame);
+    // Vision input is the client-prepared JPEG; frames stay originals for the request body.
+    const frames = body.processed ? [decodeDataUrlFrame(body.processed)] : body.frames.map(decodeDataUrlFrame);
     const result = await extract({ frames });
     if (result.kind === 'amazon') {
         return amazonPreviewResult();

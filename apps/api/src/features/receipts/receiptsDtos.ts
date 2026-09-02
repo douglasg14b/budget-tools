@@ -14,6 +14,7 @@ export type ReceiptDto = {
     contentHash: string;
     totalsDisagree: boolean;
     frameCount: number;
+    hasProcessed: boolean;
 };
 
 export type ReceiptsDto = {
@@ -22,6 +23,7 @@ export type ReceiptsDto = {
 
 export type CreateReceiptDto = {
     frames: string[];
+    processed?: string;
     transactionId?: string;
 };
 
@@ -65,6 +67,7 @@ export type ReceiptMatchDto = {
 
 export type ExtractPreviewDto = {
     frames: string[];
+    processed?: string;
 };
 
 export type ExtractPreviewResultDto = {

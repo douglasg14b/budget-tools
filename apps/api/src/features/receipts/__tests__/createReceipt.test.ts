@@ -9,7 +9,12 @@ import { createAppDatabase } from '../../../data-persistence/database';
 import { migrateToLatest } from '../../../data-persistence/migrate';
 import { setOperatingMode } from '../../operatingMode/data/operatingModeRepo';
 import { createReceipt, decodeDataUrlFrame } from '../createReceipt';
-import { findReceiptByContentHash, readReceiptOriginalBytes } from '../data/receiptsRepo';
+import {
+    findReceiptByContentHash,
+    hasReceiptProcessed,
+    readReceiptOriginalBytes,
+    readReceiptProcessedBytes,
+} from '../data/receiptsRepo';
 import { MAX_RECEIPT_FRAMES } from '../receiptLimits';
 
 function jpegDataUrl(bytes: Buffer): string {
@@ -87,5 +92,24 @@ describe('createReceipt', () => {
             database,
         );
         expect(again.id).toBe(created.id);
+    });
+
+    it('stores processed bytes separately from originals', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = join(directory, 'files');
+        const processed = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x22]);
+        const created = await createReceipt(
+            {
+                frames: [jpegDataUrl(jpegBytes)],
+                processed: jpegDataUrl(processed),
+                receiptsDir,
+            },
+            database,
+        );
+        expect(await hasReceiptProcessed(created.originalPath)).toBe(true);
+        const original = await readReceiptOriginalBytes(created.id, database);
+        expect(original.bytes.equals(jpegBytes)).toBe(true);
+        const storedProcessed = await readReceiptProcessedBytes(created.id, database);
+        expect(storedProcessed.bytes.equals(processed)).toBe(true);
     });
 });

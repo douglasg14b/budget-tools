@@ -78,4 +78,29 @@ describe('extractPreview', () => {
         });
         expect(await listReceipts(database)).toEqual([]);
     });
+
+    it('uses processed bytes for vision input when provided', async () => {
+        const original = jpegDataUrl(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]));
+        const extra = jpegDataUrl(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x11]));
+        const processedBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x44]);
+        let seen: Buffer | undefined;
+        await extractPreview(
+            { frames: [original, extra], processed: jpegDataUrl(processedBytes) },
+            async ({ frames }) => {
+                seen = frames[0];
+                expect(frames).toHaveLength(1);
+                return {
+                    kind: 'complete',
+                    extractStatus: 'ungated',
+                    vendor: 'Store',
+                    purchaseDate: '2026-08-01',
+                    printedMilliunits: 1000,
+                    totalsDisagree: false,
+                    extractJson: '{}',
+                    rawText: 'Store',
+                };
+            },
+        );
+        expect(seen?.equals(processedBytes)).toBe(true);
+    });
 });

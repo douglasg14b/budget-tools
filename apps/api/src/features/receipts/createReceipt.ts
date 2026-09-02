@@ -7,6 +7,7 @@ import { assertReceiptFrameCountWithinLimit } from './receiptLimits';
 
 export type CreateReceiptInput = {
     readonly frames: readonly string[];
+    readonly processed?: string;
     readonly transactionId?: string | null;
     readonly receiptsDir?: string;
 };
@@ -48,6 +49,7 @@ export async function createReceipt(input: CreateReceiptInput, db?: AppDatabaseC
         {
             bytes,
             extraFrames,
+            processed: input.processed ? decodeDataUrlFrame(input.processed) : undefined,
             transactionId: input.transactionId,
             receiptsDir: input.receiptsDir,
         },

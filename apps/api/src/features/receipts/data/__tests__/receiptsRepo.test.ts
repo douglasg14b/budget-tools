@@ -11,8 +11,12 @@ import { setOperatingMode } from '../../../operatingMode/data/operatingModeRepo'
 import {
     deleteReceipt,
     findReceiptByContentHash,
+    hasReceiptProcessed,
     insertReceiptOriginal,
     listReceiptsInPurchaseDateWindow,
+    readReceiptExtractFrameBytes,
+    readReceiptImageBytes,
+    readReceiptProcessedBytes,
     setReceiptExtract,
     setReceiptTransactionId,
 } from '../receiptsRepo';
@@ -21,6 +25,7 @@ describe('receiptsRepo', () => {
     let directory: string;
     let database: AppDatabaseClient;
     const jpegBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+    const processedBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x20]);
 
     beforeEach(async () => {
         directory = await mkdtemp(join(tmpdir(), 'api-receipts-'));
@@ -134,6 +139,81 @@ describe('receiptsRepo', () => {
         await deleteReceipt(created.id, database);
         await expect(readFile(created.originalPath)).rejects.toMatchObject({ code: 'ENOENT' });
         expect(await findReceiptByContentHash(created.contentHash, database)).toBeUndefined();
+    });
+
+    it('stores processed beside the original without changing the content hash', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = join(directory, 'files');
+        const created = await insertReceiptOriginal(
+            { bytes: jpegBytes, processed: processedBytes, receiptsDir },
+            database,
+        );
+        expect(await hasReceiptProcessed(created.originalPath)).toBe(true);
+        const processed = await readReceiptProcessedBytes(created.id, database);
+        expect(processed.bytes.equals(processedBytes)).toBe(true);
+        expect(processed.contentType).toBe('image/jpeg');
+        const extractFrames = await readReceiptExtractFrameBytes(created.id, database);
+        expect(extractFrames).toHaveLength(1);
+        expect(extractFrames[0]?.equals(processedBytes)).toBe(true);
+
+        const again = await insertReceiptOriginal({ bytes: jpegBytes, receiptsDir }, database);
+        expect(again.id).toBe(created.id);
+        expect(again.contentHash).toBe(created.contentHash);
+
+        await deleteReceipt(created.id, database);
+        expect(await hasReceiptProcessed(created.originalPath)).toBe(false);
+    });
+
+    it('does not overwrite an existing processed image on duplicate originals', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = join(directory, 'files');
+        const firstProcessed = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x21]);
+        const secondProcessed = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x22]);
+        const created = await insertReceiptOriginal(
+            { bytes: jpegBytes, processed: firstProcessed, receiptsDir },
+            database,
+        );
+        const again = await insertReceiptOriginal(
+            { bytes: jpegBytes, processed: secondProcessed, receiptsDir },
+            database,
+        );
+        expect(again.id).toBe(created.id);
+        const stored = await readReceiptProcessedBytes(created.id, database);
+        expect(stored.bytes.equals(firstProcessed)).toBe(true);
+    });
+
+    it('serves processed via the image variant used by GET', async () => {
+        await setOperatingMode('live', database);
+        const created = await insertReceiptOriginal(
+            { bytes: jpegBytes, processed: processedBytes, receiptsDir: join(directory, 'files') },
+            database,
+        );
+        const processed = await readReceiptImageBytes(created.id, 'processed', 0, database);
+        expect(processed.bytes.equals(processedBytes)).toBe(true);
+        const original = await readReceiptImageBytes(created.id, 'original', 0, database);
+        expect(original.bytes.equals(jpegBytes)).toBe(true);
+        const withoutProcessed = await insertReceiptOriginal(
+            { bytes: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x30]), receiptsDir: join(directory, 'files') },
+            database,
+        );
+        await expect(readReceiptImageBytes(withoutProcessed.id, 'processed', 0, database)).rejects.toMatchObject({
+            statusCode: 404,
+        });
+    });
+
+    it('uses original frames for extract when processed is missing', async () => {
+        await setOperatingMode('live', database);
+        const extra = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x11]);
+        const created = await insertReceiptOriginal(
+            { bytes: jpegBytes, extraFrames: [extra], receiptsDir: join(directory, 'files') },
+            database,
+        );
+        expect(await hasReceiptProcessed(created.originalPath)).toBe(false);
+        await expect(readReceiptProcessedBytes(created.id, database)).rejects.toMatchObject({ statusCode: 404 });
+        const extractFrames = await readReceiptExtractFrameBytes(created.id, database);
+        expect(extractFrames).toHaveLength(2);
+        expect(extractFrames[0]?.equals(jpegBytes)).toBe(true);
+        expect(extractFrames[1]?.equals(extra)).toBe(true);
     });
 
     it('lists receipts by indexed purchase date window', async () => {

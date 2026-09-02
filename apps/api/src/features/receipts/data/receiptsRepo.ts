@@ -14,6 +14,7 @@ export type ReceiptRow = ReceiptsTable;
 export type InsertReceiptOriginalInput = {
     readonly bytes: Buffer;
     readonly extraFrames?: readonly Buffer[];
+    readonly processed?: Buffer;
     readonly transactionId?: string | null;
     readonly receiptsDir?: string;
 };
@@ -51,6 +52,7 @@ function contentHashOfFrames(frames: readonly Buffer[]): string {
 
 async function unlinkReceiptFiles(originalPath: string): Promise<void> {
     await unlinkIfPresent(originalPath);
+    await unlinkIfPresent(receiptProcessedPath(originalPath));
     let index = 1;
     while (true) {
         const extraPath = `${originalPath}.${index}`;
@@ -67,8 +69,26 @@ async function unlinkReceiptFiles(originalPath: string): Promise<void> {
     }
 }
 
+function receiptProcessedPath(originalPath: string): string {
+    return `${originalPath}.processed`;
+}
+
 function extraFramePath(originalPath: string, extraIndex: number): string {
     return `${originalPath}.${extraIndex + 1}`;
+}
+
+async function writeProcessedFile(originalPath: string, processed: Buffer | undefined): Promise<void> {
+    if (!processed) {
+        return;
+    }
+    await writeFile(receiptProcessedPath(originalPath), processed);
+}
+
+async function writeProcessedIfAbsent(originalPath: string, processed: Buffer | undefined): Promise<void> {
+    if (!processed || (await hasReceiptProcessed(originalPath))) {
+        return;
+    }
+    await writeProcessedFile(originalPath, processed);
 }
 
 function receiptFramePath(originalPath: string, frameIndex: number): string {
@@ -174,6 +194,10 @@ async function fileExists(path: string): Promise<boolean> {
     }
 }
 
+export async function hasReceiptProcessed(originalPath: string): Promise<boolean> {
+    return fileExists(receiptProcessedPath(originalPath));
+}
+
 export async function countReceiptFrames(originalPath: string): Promise<number> {
     if (!(await fileExists(originalPath))) {
         return 0;
@@ -223,6 +247,51 @@ export async function readReceiptOriginalBytes(
     }
 }
 
+export async function readReceiptProcessedBytes(
+    id: string,
+    db?: AppDatabaseClient,
+): Promise<{ readonly bytes: Buffer; readonly contentType: ReceiptImageContentType }> {
+    const row = await requireReceipt(id, db);
+    try {
+        const bytes = await readFile(receiptProcessedPath(row.originalPath));
+        return { bytes, contentType: sniffImageContentType(bytes) };
+    } catch (error) {
+        const errno = error as NodeJS.ErrnoException;
+        if (errno.code === 'ENOENT') {
+            throw new NotFoundError(`receipt processed image not found: ${id}`);
+        }
+        throw error;
+    }
+}
+
+export async function readReceiptExtractFrameBytes(id: string, db?: AppDatabaseClient): Promise<readonly Buffer[]> {
+    const row = await requireReceipt(id, db);
+    try {
+        const processed = await readFile(receiptProcessedPath(row.originalPath));
+        return [processed];
+    } catch (error) {
+        const errno = error as NodeJS.ErrnoException;
+        if (errno.code === 'ENOENT') {
+            return readReceiptAllFrameBytes(id, db);
+        }
+        throw error;
+    }
+}
+
+export type ReceiptImageVariant = 'original' | 'processed';
+
+export async function readReceiptImageBytes(
+    id: string,
+    variant: ReceiptImageVariant,
+    frameIndex = 0,
+    db?: AppDatabaseClient,
+): Promise<{ readonly bytes: Buffer; readonly contentType: ReceiptImageContentType }> {
+    if (variant === 'processed') {
+        return readReceiptProcessedBytes(id, db);
+    }
+    return readReceiptOriginalBytes(id, db, frameIndex);
+}
+
 export async function findReceiptByContentHash(
     contentHash: string,
     db?: AppDatabaseClient,
@@ -242,6 +311,7 @@ export async function insertReceiptOriginal(
     const contentHash = contentHashOfFrames([input.bytes, ...extraFrames]);
     const existing = await findReceiptByContentHash(contentHash, database);
     if (existing) {
+        await writeProcessedIfAbsent(existing.originalPath, input.processed);
         return existing;
     }
 
@@ -254,6 +324,7 @@ export async function insertReceiptOriginal(
         for (const [extraIndex, frame] of extraFrames.entries()) {
             await writeFile(extraFramePath(originalPath, extraIndex), frame);
         }
+        await writeProcessedFile(originalPath, input.processed);
     } catch (error) {
         await unlinkReceiptFiles(originalPath);
         throw error;
@@ -283,6 +354,7 @@ export async function insertReceiptOriginal(
         if (isReceiptContentHashConflict(error)) {
             const winner = await findReceiptByContentHash(contentHash, database);
             if (winner) {
+                await writeProcessedIfAbsent(winner.originalPath, input.processed);
                 return winner;
             }
         }
