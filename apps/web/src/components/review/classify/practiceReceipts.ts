@@ -4,6 +4,7 @@ export type PracticeReceipt = {
     readonly id: string;
     readonly transactionId: string | null;
     readonly frames: readonly string[];
+    readonly processedPreview: string | null;
     readonly vendor: string | null;
     readonly purchaseDate: string | null;
     readonly printedMilliunits: number | null;
@@ -13,29 +14,33 @@ export type PracticeReceipt = {
     readonly rawText: string | null;
 };
 
+export type PracticeReceiptFromExtractInput = {
+    readonly id: string;
+    readonly transactionId: string | null;
+    readonly frames: readonly string[];
+    readonly processedPreview: string | null;
+    readonly extract: ExtractPreviewResultDto;
+};
+
 /**
  * Builds a session-only receipt from extract-preview. Amazon drops are not stored.
  */
-export function practiceReceiptFromExtract(
-    id: string,
-    transactionId: string | null,
-    frames: readonly string[],
-    extract: ExtractPreviewResultDto,
-): PracticeReceipt | null {
-    if (extract.droppedAsAmazon) {
+export function practiceReceiptFromExtract(input: PracticeReceiptFromExtractInput): PracticeReceipt | null {
+    if (input.extract.droppedAsAmazon) {
         return null;
     }
     return {
-        id,
-        transactionId,
-        frames,
-        vendor: extract.vendor,
-        purchaseDate: extract.purchaseDate,
-        printedMilliunits: extract.printedMilliunits,
-        totalsDisagree: extract.totalsDisagree,
-        extractStatus: extract.extractStatus,
-        extractJson: extract.extractJson,
-        rawText: extract.rawText,
+        id: input.id,
+        transactionId: input.transactionId,
+        frames: input.frames,
+        processedPreview: input.processedPreview,
+        vendor: input.extract.vendor,
+        purchaseDate: input.extract.purchaseDate,
+        printedMilliunits: input.extract.printedMilliunits,
+        totalsDisagree: input.extract.totalsDisagree,
+        extractStatus: input.extract.extractStatus,
+        extractJson: input.extract.extractJson,
+        rawText: input.extract.rawText,
     };
 }
 

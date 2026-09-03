@@ -15,6 +15,7 @@ import { ClassifyReceiptCapture } from '../classify/ClassifyReceiptCapture';
 import { usePracticeReceipts } from '../classify/PracticeReceiptsContext';
 import type { PracticeReceipt } from '../classify/practiceReceipts';
 import { bindPracticeReceipt, toMatchPreviewReceipt } from '../classify/practiceReceipts';
+import { liveReceiptImageSrc, practiceReceiptImageSrc } from '../classify/receiptCaptureAttach';
 import { useReceiptCapture } from '../classify/useReceiptCapture';
 import { ReceiptBindPanel } from './ReceiptBindPanel';
 import type { InboxSlipModel } from './ReceiptSlip';
@@ -232,7 +233,7 @@ function slipFromDto(row: ReceiptDto): InboxSlipModel {
         extractStatus: row.extractStatus,
         totalsDisagree: row.totalsDisagree,
         transactionId: row.transactionId,
-        imageSrc: `/api/receipts/${row.id}/image`,
+        imageSrc: liveReceiptImageSrc(row),
     };
 }
 
@@ -245,7 +246,7 @@ function slipFromPractice(row: PracticeReceipt): InboxSlipModel {
         extractStatus: row.extractStatus,
         totalsDisagree: row.totalsDisagree,
         transactionId: row.transactionId,
-        imageSrc: row.frames[0] ?? null,
+        imageSrc: practiceReceiptImageSrc(row),
     };
 }
 

@@ -32,6 +32,37 @@
     box-shadow: inset 0 0 0 1px var(--app-border);
 }
 
+.still {
+    display: block;
+    width: min(100%, 18rem);
+    max-height: 18rem;
+    object-fit: contain;
+    object-position: top center;
+    background: var(--app-bg-elevated);
+    border-radius: 0.35rem;
+    box-shadow: inset 0 0 0 1px var(--app-border);
+}
+
+.cornerHost {
+    position: relative;
+    width: min(100%, 22rem);
+    min-height: 14rem;
+    background: var(--app-bg-elevated);
+    border-radius: 0.35rem;
+    box-shadow: inset 0 0 0 1px var(--app-border);
+}
+
+.cornerHost[hidden] {
+    display: none;
+}
+
+.cornerHost :global(.scanic-corner-editor) {
+    --scanic-accent: var(--app-tier-auto);
+    --scanic-mask: color-mix(in srgb, var(--app-bg-root) 55%, transparent);
+    --scanic-surface: var(--app-bg-elevated);
+    --scanic-surface-fg: var(--app-text-primary);
+}
+
 .actions {
     display: flex;
     flex-wrap: wrap;

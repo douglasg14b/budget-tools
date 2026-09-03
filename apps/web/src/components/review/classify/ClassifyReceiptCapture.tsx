@@ -2,8 +2,8 @@ import { Button } from '@mantine/core';
 import { useRef } from 'react';
 
 import classes from './ClassifyReceiptCapture.module.css';
+import type { ReceiptCaptureDraft } from './receiptCaptureDraft';
 import type { ReceiptCaptureState } from './useReceiptCapture';
-import { MAX_RECEIPT_FRAMES } from './useReceiptCapture';
 
 type ClassifyReceiptCaptureProps = {
     capture: ReceiptCaptureState;
@@ -12,6 +12,9 @@ type ClassifyReceiptCaptureProps = {
 
 export function ClassifyReceiptCapture({ capture, submitLabel = 'Attach receipt' }: ClassifyReceiptCaptureProps) {
     const fileRef = useRef<HTMLInputElement>(null);
+    const showEditor = capture.cornerEditorOpen;
+    const showProcessed = capture.draftStatus === 'ready' && !capture.cornerEditorOpen && capture.processedPreview;
+    const showOriginal = capture.draftStatus === 'preparing' && capture.originalPreview;
 
     return (
         <div className={classes.row}>
@@ -19,7 +22,6 @@ export function ClassifyReceiptCapture({ capture, submitLabel = 'Attach receipt'
                 ref={fileRef}
                 accept="image/*"
                 className={classes.file}
-                multiple
                 type="file"
                 onChange={(event) => {
                     const files = event.target.files ? [...event.target.files] : [];
@@ -59,11 +61,26 @@ export function ClassifyReceiptCapture({ capture, submitLabel = 'Attach receipt'
                     ) : null}
                 </div>
             )}
-            {capture.draftCount > 0 ? (
+            {showOriginal ? <img alt="" className={classes.still} src={capture.originalPreview ?? undefined} /> : null}
+            {showProcessed ? (
+                <img
+                    alt="Cropped receipt preview"
+                    className={classes.still}
+                    src={capture.processedPreview ?? undefined}
+                />
+            ) : null}
+            <div ref={capture.cornerHostRef} className={classes.cornerHost} hidden={!showEditor} />
+            {capture.draftStatus !== 'empty' ? (
                 <p className={classes.draft}>
-                    {capture.draftCount} of {MAX_RECEIPT_FRAMES} frames
+                    {draftStatusCopy(capture.draftStatus)}
+                    {capture.draftStatus === 'ready' && !capture.cornerEditorOpen ? (
+                        <Button size="compact-sm" variant="default" onClick={capture.adjustCorners}>
+                            Adjust corners
+                        </Button>
+                    ) : null}
                     <Button
                         className={classes.attach}
+                        disabled={!capture.canAttach}
                         loading={capture.submitting}
                         size="compact-sm"
                         onClick={capture.attach}
@@ -78,4 +95,17 @@ export function ClassifyReceiptCapture({ capture, submitLabel = 'Attach receipt'
             {capture.error ? <p className={classes.error}>{capture.error}</p> : null}
         </div>
     );
+}
+
+function draftStatusCopy(status: ReceiptCaptureDraft['status']): string {
+    switch (status) {
+        case 'preparing':
+            return 'Finding the paper edges…';
+        case 'ready':
+            return 'Cropped preview';
+        case 'needs-corners':
+            return 'Set the four corners on the paper';
+        case 'empty':
+            return '';
+    }
 }

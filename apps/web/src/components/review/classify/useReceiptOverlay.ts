@@ -15,6 +15,7 @@ import type { ReceiptLlmSkip } from './applyLlmOverlay';
 import { buildReceiptLlmSkip, needsReceiptLookup, overlayQueryKey } from './applyLlmOverlay';
 import type { PracticeReceipt } from './practiceReceipts';
 import { toMatchPreviewReceipt } from './practiceReceipts';
+import { liveReceiptImageSrc, practiceReceiptImageSrc } from './receiptCaptureAttach';
 
 type UseReceiptOverlayInput = {
     readonly current: CategorizationQueueItemDto | undefined;
@@ -201,9 +202,12 @@ export function useReceiptOverlay({
               extractStatus: receipt.extractStatus,
               totalsDisagree: receipt.totalsDisagree,
               imageSrc: live
-                  ? `/api/receipts/${receipt.id}/image`
+                  ? liveReceiptImageSrc({
+                        id: receipt.id,
+                        hasProcessed: 'hasProcessed' in receipt ? receipt.hasProcessed : false,
+                    })
                   : 'frames' in receipt
-                    ? (receipt.frames[0] ?? null)
+                    ? practiceReceiptImageSrc(receipt)
                     : null,
               closeMatchCount: match?.closeMatches.length ?? 0,
           }

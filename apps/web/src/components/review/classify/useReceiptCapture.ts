@@ -7,9 +7,28 @@ import { useEffect, useRef, useState } from 'react';
 import { getBackendErrorMessage } from '../../BackendErrorNotice';
 import type { PracticeReceipt } from './practiceReceipts';
 import { practiceReceiptFromExtract } from './practiceReceipts';
-
-/** Must match API MAX_RECEIPT_FRAMES. */
-export const MAX_RECEIPT_FRAMES = 8;
+import {
+    assertReceiptJsonBodyWithinLimit,
+    buildCreateReceiptBody,
+    buildExtractPreviewBody,
+    RECEIPT_BODY_TOO_LARGE_MESSAGE,
+} from './receiptCaptureAttach';
+import type { ReceiptCaptureDraft } from './receiptCaptureDraft';
+import {
+    canAttachReceiptDraft,
+    EMPTY_RECEIPT_CAPTURE_DRAFT,
+    receiptDraftOriginal,
+    receiptDraftProcessed,
+    reduceReceiptCaptureDraft,
+} from './receiptCaptureDraft';
+import type { ReceiptScanCorners, ReceiptScanImage } from './scanicReceiptPrep';
+import {
+    extractReceiptImage,
+    loadReceiptImageFromDataUrl,
+    mountScanicCornerEditor,
+    RECEIPT_CAPTURE_JPEG_QUALITY,
+    scanReceiptImage,
+} from './scanicReceiptPrep';
 
 type UseReceiptCaptureInput = {
     readonly live: boolean;
@@ -20,12 +39,19 @@ type UseReceiptCaptureInput = {
 };
 
 export type ReceiptCaptureState = {
+    readonly canAttach: boolean;
     readonly cameraOpen: boolean;
     readonly cameraSupported: boolean;
-    readonly draftCount: number;
+    readonly cornerEditorOpen: boolean;
+    readonly draftStatus: ReceiptCaptureDraft['status'];
+    readonly editingCorners: boolean;
     readonly error: string | null;
+    readonly originalPreview: string | null;
+    readonly processedPreview: string | null;
     readonly submitting: boolean;
+    readonly cornerHostRef: RefObject<HTMLDivElement | null>;
     readonly videoRef: RefObject<HTMLVideoElement | null>;
+    readonly adjustCorners: () => void;
     readonly attach: () => void;
     readonly closeCamera: () => void;
     readonly discardDraft: () => void;
@@ -34,8 +60,14 @@ export type ReceiptCaptureState = {
     readonly snap: () => void;
 };
 
+type AttachImages = {
+    readonly original: string;
+    readonly processed: string;
+    readonly transactionId: string | null;
+};
+
 /**
- * Card or inbox capture: one receipt is one frames array. Live POSTs create; Practice uses extract-preview.
+ * Card or inbox capture: one photo through Scanic, then Live create or Practice extract-preview.
  * Inbox passes a null transactionId and keepCameraOnAttach so burst capture can continue.
  */
 export function useReceiptCapture({
@@ -48,18 +80,27 @@ export function useReceiptCapture({
     const queryClient = useQueryClient();
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
-    const [draft, setDraft] = useState<string[]>([]);
+    const cornerHostRef = useRef<HTMLDivElement | null>(null);
+    const sourceRef = useRef<ReceiptScanImage | null>(null);
+    const cornersRef = useRef<ReceiptScanCorners | null>(null);
+    const originalRef = useRef<string | null>(null);
+    const editorRef = useRef<{ destroy: () => void } | null>(null);
+    const prepGenerationRef = useRef(0);
+    const confirmCornersRef = useRef<((corners: ReceiptScanCorners) => Promise<void>) | null>(null);
+    const [draft, setDraft] = useState<ReceiptCaptureDraft>(EMPTY_RECEIPT_CAPTURE_DRAFT);
+    const [editingCorners, setEditingCorners] = useState(false);
     const [cameraOpen, setCameraOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const cameraSupported = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
 
     const liveCreate = useMutation({
-        mutationFn: async (input: { readonly frames: readonly string[]; readonly transactionId: string | null }) => {
+        mutationFn: async (input: AttachImages) => {
             const result = await Receipts.request2({
-                body: {
-                    frames: [...input.frames],
-                    ...(input.transactionId ? { transactionId: input.transactionId } : {}),
-                },
+                body: buildCreateReceiptBody({
+                    original: input.original,
+                    processed: input.processed,
+                    transactionId: input.transactionId,
+                }),
                 throwOnError: true,
             });
             if (!result.data) {
@@ -77,9 +118,12 @@ export function useReceiptCapture({
     });
 
     const practiceExtract = useMutation({
-        mutationFn: async (input: { readonly frames: readonly string[]; readonly transactionId: string | null }) => {
+        mutationFn: async (input: AttachImages) => {
             const result = await Receipts.request6({
-                body: { frames: [...input.frames] },
+                body: buildExtractPreviewBody({
+                    original: input.original,
+                    processed: input.processed,
+                }),
                 throwOnError: true,
             });
             if (!result.data) {
@@ -88,7 +132,13 @@ export function useReceiptCapture({
             return result.data;
         },
         onSuccess: (extract, input) => {
-            const receipt = practiceReceiptFromExtract(crypto.randomUUID(), input.transactionId, input.frames, extract);
+            const receipt = practiceReceiptFromExtract({
+                id: crypto.randomUUID(),
+                transactionId: input.transactionId,
+                frames: [input.original],
+                processedPreview: input.processed,
+                extract,
+            });
             if (!receipt) {
                 setError('Amazon receipts are not captured here.');
                 return;
@@ -101,12 +151,19 @@ export function useReceiptCapture({
         return () => {
             stopStream(streamRef.current);
             streamRef.current = null;
+            destroyCornerEditor(editorRef);
         };
     }, []);
 
     useEffect(() => {
-        setDraft([]);
+        prepGenerationRef.current += 1;
+        setDraft(EMPTY_RECEIPT_CAPTURE_DRAFT);
+        setEditingCorners(false);
         setError(null);
+        sourceRef.current = null;
+        originalRef.current = null;
+        cornersRef.current = null;
+        destroyCornerEditor(editorRef);
         stopStream(streamRef.current);
         streamRef.current = null;
         if (videoRef.current) {
@@ -124,6 +181,32 @@ export function useReceiptCapture({
         video.srcObject = stream;
         void video.play();
     }, [cameraOpen]);
+
+    useEffect(() => {
+        const host = cornerHostRef.current;
+        const source = sourceRef.current;
+        const cornerEditorOpen = draft.status === 'needs-corners' || editingCorners;
+        if (!cornerEditorOpen || !host || !source) {
+            destroyCornerEditor(editorRef);
+            return;
+        }
+        const editor = mountScanicCornerEditor({
+            container: host,
+            image: source,
+            corners: cornersRef.current,
+            onConfirm: (corners) => {
+                void confirmCornersRef.current?.(corners);
+            },
+            onCancel: () => {
+                setEditingCorners(false);
+            },
+        });
+        editorRef.current = editor;
+        return () => {
+            editor.destroy();
+            editorRef.current = null;
+        };
+    }, [draft.status, editingCorners]);
 
     async function openCamera(): Promise<void> {
         setError(null);
@@ -146,10 +229,6 @@ export function useReceiptCapture({
             setError('Camera is not ready yet.');
             return;
         }
-        if (draft.length >= MAX_RECEIPT_FRAMES) {
-            setError(`A receipt can have at most ${MAX_RECEIPT_FRAMES} frames.`);
-            return;
-        }
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -159,28 +238,105 @@ export function useReceiptCapture({
             return;
         }
         context.drawImage(video, 0, 0);
-        const still = canvas.toDataURL('image/jpeg', 0.92);
-        setDraft((frames) => (frames.length >= MAX_RECEIPT_FRAMES ? frames : [...frames, still]));
+        await prepareOriginal(canvas.toDataURL('image/jpeg', RECEIPT_CAPTURE_JPEG_QUALITY), canvas);
     }
 
     async function pickFiles(files: readonly File[]): Promise<void> {
+        const file = files[0];
+        if (!file) {
+            return;
+        }
         setError(null);
         try {
-            const urls = await Promise.all(files.map(fileToDataUrl));
-            setDraft((frames) => {
-                const remaining = MAX_RECEIPT_FRAMES - frames.length;
-                if (remaining <= 0) {
-                    return frames;
-                }
-                return [...frames, ...urls.slice(0, remaining)];
-            });
+            const original = await fileToDataUrl(file);
+            const image = await loadReceiptImageFromDataUrl(original);
+            await prepareOriginal(original, image);
         } catch (caught) {
             setError(getBackendErrorMessage(caught, 'Could not read that photo.'));
         }
     }
 
+    async function prepareOriginal(original: string, source: ReceiptScanImage): Promise<void> {
+        const generation = ++prepGenerationRef.current;
+        destroyCornerEditor(editorRef);
+        sourceRef.current = source;
+        originalRef.current = original;
+        cornersRef.current = null;
+        setEditingCorners(false);
+        setError(null);
+        setDraft((current) => reduceReceiptCaptureDraft(current, { type: 'capture', original }));
+        try {
+            const result = await scanReceiptImage(source);
+            if (generation !== prepGenerationRef.current) {
+                return;
+            }
+            if (result.kind === 'extracted') {
+                cornersRef.current = result.corners;
+                setDraft((current) =>
+                    reduceReceiptCaptureDraft(current, {
+                        type: 'extracted',
+                        original,
+                        processed: result.processedDataUrl,
+                    }),
+                );
+                return;
+            }
+            setDraft((current) => reduceReceiptCaptureDraft(current, { type: 'no-quad' }));
+            setError('Could not find the receipt edges. Drag the corners onto the paper, then apply.');
+        } catch (caught) {
+            if (generation !== prepGenerationRef.current) {
+                return;
+            }
+            sourceRef.current = null;
+            originalRef.current = null;
+            cornersRef.current = null;
+            setDraft((current) => reduceReceiptCaptureDraft(current, { type: 'failed' }));
+            setError(getBackendErrorMessage(caught, 'Could not prepare that photo.'));
+        }
+    }
+
+    async function confirmCorners(corners: ReceiptScanCorners): Promise<void> {
+        const generation = prepGenerationRef.current;
+        const source = sourceRef.current;
+        const original = originalRef.current;
+        if (!source || !original) {
+            setError('Could not warp that receipt from the confirmed corners.');
+            return;
+        }
+        try {
+            const processed = await extractReceiptImage(source, corners);
+            if (generation !== prepGenerationRef.current) {
+                return;
+            }
+            cornersRef.current = corners;
+            setEditingCorners(false);
+            setError(null);
+            setDraft((current) => reduceReceiptCaptureDraft(current, { type: 'extracted', original, processed }));
+        } catch (caught) {
+            if (generation !== prepGenerationRef.current) {
+                return;
+            }
+            setError(getBackendErrorMessage(caught, 'Could not warp that receipt from the confirmed corners.'));
+        }
+    }
+    confirmCornersRef.current = confirmCorners;
+
+    function adjustCorners(): void {
+        if (draft.status === 'empty' || draft.status === 'preparing') {
+            return;
+        }
+        setError(null);
+        setEditingCorners(true);
+    }
+
     function discardDraft(): void {
-        setDraft([]);
+        prepGenerationRef.current += 1;
+        destroyCornerEditor(editorRef);
+        sourceRef.current = null;
+        originalRef.current = null;
+        cornersRef.current = null;
+        setEditingCorners(false);
+        setDraft(EMPTY_RECEIPT_CAPTURE_DRAFT);
         setError(null);
         stopCamera();
     }
@@ -195,43 +351,77 @@ export function useReceiptCapture({
     }
 
     function attach(): void {
-        if (draft.length === 0) {
+        if (editingCorners) {
+            setError('Finish editing corners first.');
+            return;
+        }
+        if (!canAttachReceiptDraft(draft)) {
+            if (draft.status === 'needs-corners') {
+                setError('Confirm the receipt corners first.');
+                return;
+            }
+            if (draft.status === 'preparing') {
+                setError('Wait until the cropped preview is ready.');
+                return;
+            }
             setError('Add a photo first.');
             return;
         }
+        const body = live
+            ? buildCreateReceiptBody({
+                  original: draft.original,
+                  processed: draft.processed,
+                  transactionId,
+              })
+            : buildExtractPreviewBody({
+                  original: draft.original,
+                  processed: draft.processed,
+              });
+        try {
+            assertReceiptJsonBodyWithinLimit(body);
+        } catch (caught) {
+            setError(caught instanceof Error ? caught.message : RECEIPT_BODY_TOO_LARGE_MESSAGE);
+            return;
+        }
         setError(null);
-        const frames = draft;
-        const attachedTo = transactionId;
+        const images: AttachImages = {
+            original: draft.original,
+            processed: draft.processed,
+            transactionId,
+        };
         const afterAttach = () => {
-            setDraft([]);
+            prepGenerationRef.current += 1;
+            destroyCornerEditor(editorRef);
+            sourceRef.current = null;
+            originalRef.current = null;
+            cornersRef.current = null;
+            setEditingCorners(false);
+            setDraft(EMPTY_RECEIPT_CAPTURE_DRAFT);
             if (!keepCameraOnAttach) {
                 stopCamera();
             }
         };
         if (live) {
-            liveCreate.mutate(
-                { frames, transactionId: attachedTo },
-                {
-                    onSuccess: afterAttach,
-                },
-            );
+            liveCreate.mutate(images, { onSuccess: afterAttach });
             return;
         }
-        practiceExtract.mutate(
-            { frames, transactionId: attachedTo },
-            {
-                onSuccess: afterAttach,
-            },
-        );
+        practiceExtract.mutate(images, { onSuccess: afterAttach });
     }
 
     return {
+        canAttach: canAttachReceiptDraft(draft) && !editingCorners,
         cameraOpen,
         cameraSupported,
-        draftCount: draft.length,
+        cornerEditorOpen: draft.status === 'needs-corners' || editingCorners,
+        draftStatus: draft.status,
+        editingCorners,
         error: error ?? formatCaptureError(liveCreate.error ?? practiceExtract.error),
+        originalPreview: receiptDraftOriginal(draft),
+        processedPreview: receiptDraftProcessed(draft),
         submitting: liveCreate.isPending || practiceExtract.isPending,
+        cornerHostRef,
         videoRef,
+        adjustCorners,
         attach,
         closeCamera: stopCamera,
         discardDraft,
@@ -239,6 +429,11 @@ export function useReceiptCapture({
         pickFiles,
         snap,
     };
+}
+
+function destroyCornerEditor(editorRef: { current: { destroy: () => void } | null }): void {
+    editorRef.current?.destroy();
+    editorRef.current = null;
 }
 
 function stopStream(stream: MediaStream | null): void {
