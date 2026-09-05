@@ -216,6 +216,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.17)
+      '@vitejs/plugin-basic-ssl':
+        specifier: ^2.3.0
+        version: 2.3.0(vite@8.1.5(@types/node@20.17.10)(jiti@2.7.0)(tsx@4.19.2)(yaml@2.9.0))
       '@vitejs/plugin-react':
         specifier: ^6.0.4
         version: 6.0.4(vite@8.1.5(@types/node@20.17.10)(jiti@2.7.0)(tsx@4.19.2)(yaml@2.9.0))
@@ -1460,6 +1463,12 @@ packages:
 
   '@ungap/structured-clone@1.2.1':
     resolution: {integrity: sha512-fEzPV3hSkSMltkw152tJKNARhOupqbH96MZWyRjNaYZOMIzbrTeQDG+MTc6Mr2pgzFQzFxAfmhGDNP5QK++2ZA==}
+
+  '@vitejs/plugin-basic-ssl@2.3.0':
+    resolution: {integrity: sha512-bdyo8rB3NnQbikdMpHaML9Z1OZPBu6fFOBo+OtxsBlvMJtysWskmBcnbIDhUqgC8tcxNv/a+BcV5U+2nQMm1OQ==}
+    engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
+    peerDependencies:
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
 
   '@vitejs/plugin-react@6.0.4':
     resolution: {integrity: sha512-XcCQz0TBpBgljhj0gMuuDj49i6Ytqh5q1osT/Gp5uAVJUCTWxyskk/l1jwYYiu2xcNHHipdMz40EGfM1VdamVg==}
@@ -4915,6 +4924,10 @@ snapshots:
       eslint-visitor-keys: 3.4.3
 
   '@ungap/structured-clone@1.2.1': {}
+
+  '@vitejs/plugin-basic-ssl@2.3.0(vite@8.1.5(@types/node@20.17.10)(jiti@2.7.0)(tsx@4.19.2)(yaml@2.9.0))':
+    dependencies:
+      vite: 8.1.5(@types/node@20.17.10)(jiti@2.7.0)(tsx@4.19.2)(yaml@2.9.0)
 
   '@vitejs/plugin-react@6.0.4(vite@8.1.5(@types/node@20.17.10)(jiti@2.7.0)(tsx@4.19.2)(yaml@2.9.0))':
     dependencies:

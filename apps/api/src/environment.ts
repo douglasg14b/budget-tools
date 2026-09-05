@@ -5,6 +5,9 @@ import env from 'env-var';
 
 export const API_PORT = env.get('API_PORT').default('4020').asPortNumber();
 
+/** IPv4 all-interfaces, same as the categorization scorer. localhost-only listen misses Vite on Windows. */
+export const API_LISTEN_HOST = env.get('API_LISTEN_HOST').default('0.0.0.0').asString();
+
 export const CATEGORIZATION_AI_WORKING_DIR = resolveFromCwd(
     env.get('CATEGORIZATION_AI_WORKING_DIR').default('apps/categorization-ai').asString(),
 );

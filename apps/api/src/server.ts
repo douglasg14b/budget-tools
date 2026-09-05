@@ -5,6 +5,7 @@ import express from 'express';
 import { ValidateError } from 'tsoa';
 import { getAppDatabase } from './data-persistence/database';
 import {
+    API_LISTEN_HOST,
     API_PORT,
     CATEGORIZATION_QUEUE_CACHE_DIR,
     getAmazonOrdersMcpEntry,
@@ -112,12 +113,13 @@ function errorHandler(error: unknown, request: Request, response: Response, _nex
 app.use(errorHandler);
 
 async function start(): Promise<void> {
+    console.log('API starting');
     await getAppDatabase();
     await clearLlmOverlayCache(CATEGORIZATION_QUEUE_CACHE_DIR);
     startOutboundSyncFlusher();
     await sweepPendingReceiptExtracts();
-    app.listen(API_PORT, () => {
-        console.log(`API listening on http://localhost:${API_PORT}`);
+    app.listen(API_PORT, API_LISTEN_HOST, () => {
+        console.log(`API listening on http://${API_LISTEN_HOST}:${API_PORT}`);
         console.log(`Amazon MCP entry ${getAmazonOrdersMcpEntry() ?? 'unset'}`);
     });
 }
