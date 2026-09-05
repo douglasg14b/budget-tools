@@ -161,6 +161,21 @@ export type ExtractPreviewDto = {
     frames: Array<string>;
 };
 
+export type PatchReceiptLineDto = {
+    quantity?: number | null;
+    amountMilliunits?: number | null;
+    name: string;
+};
+
+export type PatchReceiptDto = {
+    lines: Array<PatchReceiptLineDto>;
+    discountMilliunits: number;
+    taxMilliunits: number;
+    printedMilliunits: number | null;
+    purchaseDate: string | null;
+    vendor: string | null;
+};
+
 export type BindReceiptDto = {
     transactionId: string;
 };
@@ -896,6 +911,43 @@ export type GetReceiptResponses = {
 };
 
 export type GetReceiptResponse = GetReceiptResponses[keyof GetReceiptResponses];
+
+export type PatchReceiptData = {
+    body: PatchReceiptDto;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/receipts/{id}';
+};
+
+export type PatchReceiptErrors = {
+    /**
+     * Invalid extract edit
+     */
+    400: unknown;
+    /**
+     * Practice mode
+     */
+    403: unknown;
+    /**
+     * Not found
+     */
+    404: unknown;
+    /**
+     * Extract still pending
+     */
+    409: unknown;
+};
+
+export type PatchReceiptResponses = {
+    /**
+     * Ok
+     */
+    200: ReceiptDto;
+};
+
+export type PatchReceiptResponse = PatchReceiptResponses[keyof PatchReceiptResponses];
 
 export type DetachReceiptData = {
     body?: never;

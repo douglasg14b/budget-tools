@@ -31,6 +31,21 @@ export type BindReceiptDto = {
     transactionId: string;
 };
 
+export type PatchReceiptLineDto = {
+    name: string;
+    amountMilliunits?: number | null;
+    quantity?: number | null;
+};
+
+export type PatchReceiptDto = {
+    vendor: string | null;
+    purchaseDate: string | null;
+    printedMilliunits: number | null;
+    taxMilliunits: number;
+    discountMilliunits: number;
+    lines: PatchReceiptLineDto[];
+};
+
 export type ReceiptMatchCloseDto = ClosePairMatch;
 
 export type ReceiptBindCandidateDto = {

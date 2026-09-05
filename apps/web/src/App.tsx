@@ -12,6 +12,7 @@ import { PracticeReceiptsProvider } from './components/review/classify/PracticeR
 import { cssVariablesResolver } from './cssVariablesResolver';
 import type { OperatingMode } from './operatingMode/operatingModeCopy';
 import { ClassifyPage } from './pages/ClassifyPage';
+import { ReceiptDetailPage } from './pages/ReceiptDetailPage';
 import { ReceiptsPage } from './pages/ReceiptsPage';
 import { ReviewQueuePage } from './pages/ReviewQueuePage';
 import { TripsPage } from './pages/TripsPage';
@@ -62,6 +63,7 @@ function AppLayout() {
                             <Route path="/classify" element={<ClassifyPage layout="card" />} />
                             <Route path="/classify/table" element={<ClassifyPage layout="table" />} />
                             <Route path="/receipts" element={<ReceiptsPage />} />
+                            <Route path="/receipts/:receiptId" element={<ReceiptDetailPage />} />
                             <Route path="/trips" element={<TripsPage />} />
                         </Routes>
                     </div>

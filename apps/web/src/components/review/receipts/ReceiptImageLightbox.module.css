@@ -1,0 +1,56 @@
+.overlay {
+    background: color-mix(in srgb, var(--app-bg-root) 88%, black);
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    background: var(--app-bg-root);
+}
+
+.header {
+    flex-shrink: 0;
+    padding: 0.85rem 1.1rem;
+    background: color-mix(in srgb, var(--app-bg-root) 82%, transparent);
+    border-bottom: 1px solid var(--app-border);
+}
+
+.title {
+    font-family: var(--app-font-display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--app-text-primary);
+}
+
+.close {
+    color: var(--app-text-secondary);
+}
+
+.close:hover {
+    color: var(--app-text-primary);
+    background: var(--app-bg-hover);
+}
+
+.body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+.frame {
+    display: flex;
+    min-height: 100%;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0.75rem;
+}
+
+.image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+}

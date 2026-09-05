@@ -8,6 +8,8 @@ import { isAmazonTransaction } from '../amazonClassify/isAmazonTransaction';
 import { LlmSuggestError } from '../categorization/llm/LlmSuggestError';
 import { completeOpenRouterJson } from '../categorization/llm/openRouterClient';
 import type { ReceiptExtractStatus } from './data/receiptsSchema';
+import type { ReceiptExtractPayload } from './parseReceiptExtract';
+import { formatReceiptExtractDump } from './parseReceiptExtract';
 import type { ReceiptExtractLine } from './pipeline/arithmeticGate';
 import { arithmeticGate, printedTotalsDisagree } from './pipeline/arithmeticGate';
 import { jpegDataUrl, prepReceiptImage } from './pipeline/prepReceiptImage';
@@ -19,17 +21,7 @@ import {
     readReceiptLines,
 } from './pipeline/receiptHeaderVision';
 
-export type ReceiptExtractPayload = {
-    readonly repaired: boolean;
-    readonly gated: boolean;
-    readonly headerPrintedMilliunits: number | null;
-    /** Printed total from the line-vision call (legacy key; not local OCR). */
-    readonly ocrPrintedMilliunits: number | null;
-    readonly taxMilliunits: number;
-    readonly discountMilliunits: number;
-    readonly lines: ReceiptExtractLine[];
-    readonly error: string | null;
-};
+export type { ReceiptExtractPayload } from './parseReceiptExtract';
 
 export type ReceiptExtractComplete = {
     readonly kind: 'complete';
@@ -155,7 +147,7 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
         printedMilliunits,
         totalsDisagree,
         extractJson: JSON.stringify(payload),
-        rawText: formatLinesDump(lines, taxMilliunits, discountMilliunits),
+        rawText: formatReceiptExtractDump(lines, taxMilliunits, discountMilliunits),
     };
 }
 
@@ -211,26 +203,6 @@ function gateMatches(
         return false;
     }
     return arithmeticGate({ lines, taxMilliunits, discountMilliunits, printedMilliunits }).gated;
-}
-
-function formatLinesDump(
-    lines: readonly ReceiptExtractLine[],
-    taxMilliunits: number,
-    discountMilliunits: number,
-): string | null {
-    const rows: string[] = lines.map((line) => {
-        if (line.amountMilliunits == null) {
-            return line.name;
-        }
-        return `${line.name} ${(line.amountMilliunits / 1000).toFixed(2)}`;
-    });
-    if (taxMilliunits !== 0) {
-        rows.push(`Tax ${(taxMilliunits / 1000).toFixed(2)}`);
-    }
-    if (discountMilliunits !== 0) {
-        rows.push(`Discount ${(discountMilliunits / 1000).toFixed(2)}`);
-    }
-    return rows.length > 0 ? rows.join('\n') : null;
 }
 
 function joinErrors(left: string | null, right: string | null): string | null {

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BindReceiptData, BindReceiptErrors, BindReceiptResponses, CreateReceiptData, CreateReceiptErrors, CreateReceiptResponses, CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteClassificationDecisionData, DeleteClassificationDecisionErrors, DeleteClassificationDecisionResponses, DeleteReceiptData, DeleteReceiptErrors, DeleteReceiptResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, DetachReceiptData, DetachReceiptErrors, DetachReceiptResponses, ExtractPreviewData, ExtractPreviewErrors, ExtractPreviewResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetOperatingModeData, GetOperatingModeResponses, GetOutboundSyncData, GetOutboundSyncResponses, GetReceiptData, GetReceiptErrors, GetReceiptImageData, GetReceiptImageErrors, GetReceiptImageResponses, GetReceiptResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListReceiptsData, ListReceiptsResponses, ListTravelWindowsData, ListTravelWindowsResponses, LookupByReceiptData, LookupByReceiptErrors, LookupByReceiptResponses, LookupByTransactionData, LookupByTransactionErrors, LookupByTransactionResponses, MatchPreviewData, MatchPreviewErrors, MatchPreviewResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostClassificationDecisionsData, PostClassificationDecisionsErrors, PostClassificationDecisionsResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostOutboundSyncFlushData, PostOutboundSyncFlushErrors, PostOutboundSyncFlushResponses, PostPredictData, PostPredictResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
+import type { BindReceiptData, BindReceiptErrors, BindReceiptResponses, CreateReceiptData, CreateReceiptErrors, CreateReceiptResponses, CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteClassificationDecisionData, DeleteClassificationDecisionErrors, DeleteClassificationDecisionResponses, DeleteReceiptData, DeleteReceiptErrors, DeleteReceiptResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, DetachReceiptData, DetachReceiptErrors, DetachReceiptResponses, ExtractPreviewData, ExtractPreviewErrors, ExtractPreviewResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetOperatingModeData, GetOperatingModeResponses, GetOutboundSyncData, GetOutboundSyncResponses, GetReceiptData, GetReceiptErrors, GetReceiptImageData, GetReceiptImageErrors, GetReceiptImageResponses, GetReceiptResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListReceiptsData, ListReceiptsResponses, ListTravelWindowsData, ListTravelWindowsResponses, LookupByReceiptData, LookupByReceiptErrors, LookupByReceiptResponses, LookupByTransactionData, LookupByTransactionErrors, LookupByTransactionResponses, MatchPreviewData, MatchPreviewErrors, MatchPreviewResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchReceiptData, PatchReceiptErrors, PatchReceiptResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostClassificationDecisionsData, PostClassificationDecisionsErrors, PostClassificationDecisionsResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostOutboundSyncFlushData, PostOutboundSyncFlushErrors, PostOutboundSyncFlushResponses, PostPredictData, PostPredictResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -182,16 +182,30 @@ export class Receipts {
     }
     
     /**
+     * patchReceipt
+     */
+    public static request10<ThrowOnError extends boolean = false>(options: Options<PatchReceiptData, ThrowOnError>): RequestResult<PatchReceiptResponses, PatchReceiptErrors, ThrowOnError> {
+        return (options.client ?? client).patch<PatchReceiptResponses, PatchReceiptErrors, ThrowOnError>({
+            url: '/receipts/{id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+    }
+    
+    /**
      * detachReceipt
      */
-    public static request10<ThrowOnError extends boolean = false>(options: Options<DetachReceiptData, ThrowOnError>): RequestResult<DetachReceiptResponses, DetachReceiptErrors, ThrowOnError> {
+    public static request11<ThrowOnError extends boolean = false>(options: Options<DetachReceiptData, ThrowOnError>): RequestResult<DetachReceiptResponses, DetachReceiptErrors, ThrowOnError> {
         return (options.client ?? client).delete<DetachReceiptResponses, DetachReceiptErrors, ThrowOnError>({ url: '/receipts/{id}/bind', ...options });
     }
     
     /**
      * bindReceipt
      */
-    public static request11<ThrowOnError extends boolean = false>(options: Options<BindReceiptData, ThrowOnError>): RequestResult<BindReceiptResponses, BindReceiptErrors, ThrowOnError> {
+    public static request12<ThrowOnError extends boolean = false>(options: Options<BindReceiptData, ThrowOnError>): RequestResult<BindReceiptResponses, BindReceiptErrors, ThrowOnError> {
         return (options.client ?? client).post<BindReceiptResponses, BindReceiptErrors, ThrowOnError>({
             url: '/receipts/{id}/bind',
             ...options,

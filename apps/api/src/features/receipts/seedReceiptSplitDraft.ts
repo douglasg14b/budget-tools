@@ -1,6 +1,7 @@
 import { alignAmountToBank } from '../amazonClassify/alignAmountToBank';
 import type { ReceiptExtractStatus } from './data/receiptsSchema';
 import { equalShareBankMilliunits } from './equalShareBankMilliunits';
+import { parseReceiptExtract } from './parseReceiptExtract';
 import type { ReceiptExtractLine } from './pipeline/arithmeticGate';
 import type { ReceiptSplitDraftDto } from './receiptsDtos';
 
@@ -28,7 +29,7 @@ export function seedReceiptSplitDraft(input: SeedReceiptSplitDraftInput): Receip
     if (input.totalsDisagree) {
         return null;
     }
-    const parsed = parseExtractPayload(input.extractJson);
+    const parsed = parseReceiptExtract(input.extractJson);
     if (!parsed) {
         return null;
     }
@@ -82,48 +83,4 @@ function gatedSplitLines(
         return null;
     }
     return rows;
-}
-
-function parseExtractPayload(extractJson: string | null): ParsedExtract | null {
-    if (!extractJson) {
-        return null;
-    }
-    try {
-        const parsed: unknown = JSON.parse(extractJson);
-        if (!parsed || typeof parsed !== 'object') {
-            return null;
-        }
-        const record = parsed as {
-            taxMilliunits?: unknown;
-            discountMilliunits?: unknown;
-            lines?: unknown;
-        };
-        if (!Array.isArray(record.lines)) {
-            return null;
-        }
-        const lines: ReceiptExtractLine[] = [];
-        for (const row of record.lines) {
-            if (!row || typeof row !== 'object') {
-                return null;
-            }
-            const line = row as { name?: unknown; amountMilliunits?: unknown; quantity?: unknown };
-            if (typeof line.name !== 'string') {
-                return null;
-            }
-            lines.push({
-                name: line.name,
-                amountMilliunits: typeof line.amountMilliunits === 'number' ? line.amountMilliunits : null,
-                quantity: typeof line.quantity === 'number' ? line.quantity : null,
-            });
-        }
-        return {
-            taxMilliunits: typeof record.taxMilliunits === 'number' ? record.taxMilliunits : 0,
-            discountMilliunits: typeof record.discountMilliunits === 'number' ? record.discountMilliunits : 0,
-            lines,
-        };
-    } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.warn('receipt extract JSON could not be parsed for split draft', message);
-        return null;
-    }
 }

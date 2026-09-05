@@ -1,9 +1,11 @@
 import type { ReceiptExtractStatus } from '@budget-tools/web-sdk';
+import { Link, useLocation } from 'react-router-dom';
 
 import { formatTransactionDate } from '../formatTransactionDate';
 import { formatYnabAmount } from '../formatYnabAmount';
 import classes from './ReceiptSlip.module.css';
 import { receiptExtractCopy } from './receiptExtractCopy';
+import { RECEIPTS_INBOX_FROM_STATE } from './receiptsInboxBack';
 
 export type InboxSlipModel = {
     readonly id: string;
@@ -17,22 +19,16 @@ export type InboxSlipModel = {
 };
 
 type ReceiptSlipProps = {
-    readonly selected: boolean;
     readonly slip: InboxSlipModel;
-    readonly boundLabel: string | null;
-    readonly onSelect: (id: string) => void;
 };
 
-export function ReceiptSlip({ selected, slip, boundLabel, onSelect }: ReceiptSlipProps) {
+export function ReceiptSlip({ slip }: ReceiptSlipProps) {
+    const location = useLocation();
     return (
-        <button
-            type="button"
+        <Link
             className={classes.slip}
-            data-selected={selected || undefined}
-            aria-pressed={selected}
-            onClick={() => {
-                onSelect(slip.id);
-            }}
+            to={{ pathname: `/receipts/${slip.id}`, search: location.search }}
+            state={RECEIPTS_INBOX_FROM_STATE}
         >
             {slip.imageSrc ? (
                 <img alt="" className={classes.thumb} src={slip.imageSrc} />
@@ -51,12 +47,12 @@ export function ReceiptSlip({ selected, slip, boundLabel, onSelect }: ReceiptSli
                     ) : null}
                 </span>
                 <span className={classes.status}>{receiptExtractCopy(slip)}</span>
-                {boundLabel ? (
-                    <span className={classes.bound}>Bound · {boundLabel}</span>
+                {slip.transactionId ? (
+                    <span className={classes.bound}>Bound</span>
                 ) : (
                     <span className={classes.unbound}>Unbound</span>
                 )}
             </span>
-        </button>
+        </Link>
     );
 }

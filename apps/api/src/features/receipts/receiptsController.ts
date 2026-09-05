@@ -1,5 +1,19 @@
 import type { Request as ExpressRequest } from 'express';
-import { Body, Delete, Get, Path, Post, Produces, Query, Request, Response, Route, SuccessResponse, Tags } from 'tsoa';
+import {
+    Body,
+    Delete,
+    Get,
+    Patch,
+    Path,
+    Post,
+    Produces,
+    Query,
+    Request,
+    Response,
+    Route,
+    SuccessResponse,
+    Tags,
+} from 'tsoa';
 
 import { HttpError } from '../travelWindows/HttpError';
 import { createReceipt } from './createReceipt';
@@ -21,12 +35,14 @@ import {
     matchPreview as previewReceiptMatch,
     toReceiptMatchDto,
 } from './lookupReceiptMatch';
+import { patchReceipt as patchReceiptRow } from './patchReceipt';
 import type {
     BindReceiptDto,
     CreateReceiptDto,
     ExtractPreviewDto,
     ExtractPreviewResultDto,
     MatchPreviewDto,
+    PatchReceiptDto,
     ReceiptDto,
     ReceiptMatchDto,
     ReceiptsDto,
@@ -150,6 +166,18 @@ export class ReceiptsController {
     @Get('{id}')
     public async getReceipt(@Path() id: string): Promise<ReceiptDto> {
         return toReceiptDto(await requireReceipt(id));
+    }
+
+    /**
+     * @summary patchReceipt
+     */
+    @Response(400, 'Invalid extract edit')
+    @Response(403, 'Practice mode')
+    @Response(404, 'Not found')
+    @Response(409, 'Extract still pending')
+    @Patch('{id}')
+    public async patchReceipt(@Path() id: string, @Body() body: PatchReceiptDto): Promise<ReceiptDto> {
+        return toReceiptDto(await patchReceiptRow(id, body));
     }
 
     /**
