@@ -1,4 +1,4 @@
-import type { CornerEditor, CornerPoints } from 'scanic';
+import type { CornerEditor, CornerEditorOptions, CornerPoints } from 'scanic';
 import { createCornerEditor, extractDocument, initialize, scanDocument } from 'scanic';
 
 export const SCANIC_WASM_MISSING_MESSAGE =
@@ -6,12 +6,17 @@ export const SCANIC_WASM_MISSING_MESSAGE =
 
 export const RECEIPT_CAPTURE_JPEG_QUALITY = 0.92;
 
+/** Detection downscale for any classical pass. The ML detector resizes to 224 internally. */
+export const RECEIPT_DETECT_MAX_DIMENSION = 1280;
+
+export const RECEIPT_DETECT_DETECTOR = 'ml' as const;
+
 export type ReceiptScanImage = HTMLImageElement | HTMLCanvasElement | ImageData;
 
 export type ReceiptScanCorners = CornerPoints;
 
 export type ReceiptScanResult =
-    | { readonly kind: 'extracted'; readonly processedDataUrl: string; readonly corners: ReceiptScanCorners }
+    | { readonly kind: 'detected'; readonly corners: ReceiptScanCorners }
     | { readonly kind: 'no-quad'; readonly message: string };
 
 export type ScanicEngine = {
@@ -32,6 +37,14 @@ function defaultScanicEngine(): ScanicEngine {
     };
 }
 
+function receiptDetectOptions() {
+    return {
+        mode: 'detect' as const,
+        detector: RECEIPT_DETECT_DETECTOR,
+        maxProcessingDimension: RECEIPT_DETECT_MAX_DIMENSION,
+    };
+}
+
 /**
  * Refuse Scanic's silent JS fallback. `initialize()` returns null when WASM cannot run.
  */
@@ -43,24 +56,34 @@ export async function ensureScanicWasm(engine: ScanicEngine = defaultScanicEngin
 }
 
 /**
- * Detect and warp one still. A miss is a typed `no-quad`, not the uncropped original.
+ * Fetch and compile the ML corner model so the first snap is not a 2 MB stall.
+ * A blank canvas is enough: Scanic throws on CDN/runtime failure and returns no-quad otherwise.
+ */
+export async function warmupReceiptMlDetector(engine: ScanicEngine = defaultScanicEngine()): Promise<void> {
+    await ensureScanicWasm(engine);
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    await engine.scanDocument(canvas, receiptDetectOptions());
+}
+
+/**
+ * Detect paper corners with Scanic's DocCornerNet model. Warp waits until the reviewer confirms.
  */
 export async function scanReceiptImage(
     image: ReceiptScanImage,
     engine: ScanicEngine = defaultScanicEngine(),
 ): Promise<ReceiptScanResult> {
     await ensureScanicWasm(engine);
-    const result = await engine.scanDocument(image, { mode: 'extract', output: 'canvas' });
-    const processedDataUrl = jpegDataUrlFromScanicOutput(result.output);
-    if (!result.success || !result.corners || !processedDataUrl) {
+    const result = await engine.scanDocument(image, receiptDetectOptions());
+    if (!result.success || !result.corners) {
         return {
             kind: 'no-quad',
             message: result.message || 'No document detected',
         };
     }
     return {
-        kind: 'extracted',
-        processedDataUrl,
+        kind: 'detected',
         corners: result.corners,
     };
 }
@@ -94,13 +117,18 @@ export type MountScanicCornerEditorInput = {
  * Mount Scanic's corner editor into a host element. Caller must `destroy()` on unmount.
  */
 export function mountScanicCornerEditor(input: MountScanicCornerEditorInput): CornerEditor {
-    return createCornerEditor({
+    const options: CornerEditorOptions = {
         container: input.container,
         image: input.image,
-        ...(input.corners ? { corners: input.corners } : {}),
+        toolbar: { enabled: false },
+        handleHitArea: 48,
         onConfirm: input.onConfirm,
         onCancel: input.onCancel,
-    });
+    };
+    if (input.corners) {
+        options.corners = input.corners;
+    }
+    return createCornerEditor(options);
 }
 
 /**

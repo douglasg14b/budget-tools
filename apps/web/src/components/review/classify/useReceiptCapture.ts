@@ -5,8 +5,11 @@ import type { RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
 
 import { getBackendErrorMessage } from '../../BackendErrorNotice';
+import type { LiveReceiptOutline } from './liveReceiptOutline';
+import { LIVE_RECEIPT_OUTLINE_MS } from './liveReceiptOutline';
 import type { PracticeReceipt } from './practiceReceipts';
 import { practiceReceiptFromExtract } from './practiceReceipts';
+import { openReceiptCameraStream } from './receiptCamera';
 import {
     assertReceiptJsonBodyWithinLimit,
     buildCreateReceiptBody,
@@ -21,6 +24,7 @@ import {
     receiptDraftProcessed,
     reduceReceiptCaptureDraft,
 } from './receiptCaptureDraft';
+import { decodeReceiptStill, takeReceiptStillBlob } from './receiptStillCapture';
 import type { ReceiptScanCorners, ReceiptScanImage } from './scanicReceiptPrep';
 import {
     extractReceiptImage,
@@ -28,7 +32,9 @@ import {
     mountScanicCornerEditor,
     RECEIPT_CAPTURE_JPEG_QUALITY,
     scanReceiptImage,
+    warmupReceiptMlDetector,
 } from './scanicReceiptPrep';
+import { drawCoverFrame, drawVideoCoverFrame } from './videoCoverCrop';
 
 type UseReceiptCaptureInput = {
     readonly live: boolean;
@@ -38,25 +44,33 @@ type UseReceiptCaptureInput = {
     readonly onPracticeReceipt: (receipt: PracticeReceipt) => void;
 };
 
+export type ReceiptCaptureSession = 'idle' | 'camera' | 'review';
+
 export type ReceiptCaptureState = {
     readonly canAttach: boolean;
-    readonly cameraOpen: boolean;
     readonly cameraSupported: boolean;
+    readonly cameraReady: boolean;
+    readonly snapping: boolean;
+    readonly confirming: boolean;
     readonly cornerEditorOpen: boolean;
     readonly draftStatus: ReceiptCaptureDraft['status'];
     readonly editingCorners: boolean;
     readonly error: string | null;
+    readonly liveOutline: LiveReceiptOutline | null;
     readonly originalPreview: string | null;
     readonly processedPreview: string | null;
+    readonly session: ReceiptCaptureSession;
     readonly submitting: boolean;
     readonly cornerHostRef: RefObject<HTMLDivElement | null>;
     readonly videoRef: RefObject<HTMLVideoElement | null>;
     readonly adjustCorners: () => void;
     readonly attach: () => void;
-    readonly closeCamera: () => void;
+    readonly cancelSession: () => void;
+    readonly confirmReview: () => void;
     readonly discardDraft: () => void;
     readonly openCamera: () => void;
     readonly pickFiles: (files: readonly File[]) => void;
+    readonly retake: () => void;
     readonly snap: () => void;
 };
 
@@ -84,14 +98,22 @@ export function useReceiptCapture({
     const sourceRef = useRef<ReceiptScanImage | null>(null);
     const cornersRef = useRef<ReceiptScanCorners | null>(null);
     const originalRef = useRef<string | null>(null);
-    const editorRef = useRef<{ destroy: () => void } | null>(null);
+    const editorRef = useRef<{ confirm: () => ReceiptScanCorners; destroy: () => void } | null>(null);
     const prepGenerationRef = useRef(0);
+    const cameraGenerationRef = useRef(0);
     const confirmCornersRef = useRef<((corners: ReceiptScanCorners) => Promise<void>) | null>(null);
+    const cancelSessionRef = useRef<(() => void) | null>(null);
     const [draft, setDraft] = useState<ReceiptCaptureDraft>(EMPTY_RECEIPT_CAPTURE_DRAFT);
     const [editingCorners, setEditingCorners] = useState(false);
-    const [cameraOpen, setCameraOpen] = useState(false);
+    const [session, setSession] = useState<ReceiptCaptureSession>('idle');
+    const [cameraNonce, setCameraNonce] = useState(0);
+    const [cameraReady, setCameraReady] = useState(false);
+    const [liveOutline, setLiveOutline] = useState<LiveReceiptOutline | null>(null);
+    const [snapping, setSnapping] = useState(false);
+    const [confirming, setConfirming] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const cameraSupported = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
+    const cameraSupported =
+        typeof navigator !== 'undefined' && window.isSecureContext && Boolean(navigator.mediaDevices?.getUserMedia);
 
     const liveCreate = useMutation({
         mutationFn: async (input: AttachImages) => {
@@ -159,34 +181,90 @@ export function useReceiptCapture({
         prepGenerationRef.current += 1;
         setDraft(EMPTY_RECEIPT_CAPTURE_DRAFT);
         setEditingCorners(false);
+        setConfirming(false);
         setError(null);
         sourceRef.current = null;
         originalRef.current = null;
         cornersRef.current = null;
         destroyCornerEditor(editorRef);
+        cameraGenerationRef.current += 1;
         stopStream(streamRef.current);
         streamRef.current = null;
         if (videoRef.current) {
             videoRef.current.srcObject = null;
         }
-        setCameraOpen(false);
+        setCameraReady(false);
+        setSession('idle');
     }, [transactionId]);
 
     useEffect(() => {
         const video = videoRef.current;
         const stream = streamRef.current;
-        if (!cameraOpen || !video || !stream) {
+        if (session !== 'camera' || !video || !stream) {
             return;
         }
         video.srcObject = stream;
         void video.play();
-    }, [cameraOpen]);
+    }, [session, cameraNonce]);
+
+    useEffect(() => {
+        if (session !== 'camera' || !cameraReady) {
+            setLiveOutline(null);
+            return;
+        }
+        const canvas = document.createElement('canvas');
+        let cancelled = false;
+        let inflight = false;
+        let liveFailed = false;
+        async function detectLiveOutline(): Promise<void> {
+            const video = videoRef.current;
+            if (cancelled || inflight || liveFailed || !video) {
+                return;
+            }
+            inflight = true;
+            try {
+                if (!drawVideoCoverFrame(video, canvas)) {
+                    return;
+                }
+                const result = await scanReceiptImage(canvas);
+                if (cancelled) {
+                    return;
+                }
+                if (result.kind === 'detected') {
+                    setLiveOutline({
+                        corners: result.corners,
+                        height: canvas.height,
+                        width: canvas.width,
+                    });
+                    return;
+                }
+                setLiveOutline(null);
+            } catch (caught) {
+                liveFailed = true;
+                if (cancelled) {
+                    return;
+                }
+                setLiveOutline(null);
+                setError(getBackendErrorMessage(caught, 'Could not load the receipt corner detector.'));
+            } finally {
+                inflight = false;
+            }
+        }
+        void detectLiveOutline();
+        const timer = window.setInterval(() => {
+            void detectLiveOutline();
+        }, LIVE_RECEIPT_OUTLINE_MS);
+        return () => {
+            cancelled = true;
+            window.clearInterval(timer);
+        };
+    }, [cameraReady, session]);
 
     useEffect(() => {
         const host = cornerHostRef.current;
         const source = sourceRef.current;
         const cornerEditorOpen = draft.status === 'needs-corners' || editingCorners;
-        if (!cornerEditorOpen || !host || !source) {
+        if (session !== 'review' || !cornerEditorOpen || !host || !source) {
             destroyCornerEditor(editorRef);
             return;
         }
@@ -198,7 +276,7 @@ export function useReceiptCapture({
                 void confirmCornersRef.current?.(corners);
             },
             onCancel: () => {
-                setEditingCorners(false);
+                cancelSessionRef.current?.();
             },
         });
         editorRef.current = editor;
@@ -206,39 +284,86 @@ export function useReceiptCapture({
             editor.destroy();
             editorRef.current = null;
         };
-    }, [draft.status, editingCorners]);
+    }, [draft.status, editingCorners, session]);
 
     async function openCamera(): Promise<void> {
         setError(null);
+        stopStream(streamRef.current);
+        streamRef.current = null;
+        setCameraReady(false);
+        setSession('camera');
+        const generation = ++cameraGenerationRef.current;
+        void warmupReceiptMlDetector().catch((caught: unknown) => {
+            if (generation !== cameraGenerationRef.current) {
+                return;
+            }
+            setError(getBackendErrorMessage(caught, 'Could not load the receipt corner detector.'));
+        });
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { ideal: 'environment' } },
-                audio: false,
-            });
+            const stream = await openReceiptCameraStream();
+            if (generation !== cameraGenerationRef.current) {
+                stopStream(stream);
+                return;
+            }
             streamRef.current = stream;
-            setCameraOpen(true);
+            setCameraReady(true);
+            setCameraNonce((current) => current + 1);
         } catch (caught) {
+            if (generation !== cameraGenerationRef.current) {
+                return;
+            }
             setError(cameraPermissionMessage(caught));
-            setCameraOpen(false);
+            setSession('idle');
         }
     }
 
     async function snap(): Promise<void> {
         const video = videoRef.current;
-        if (!video || video.videoWidth === 0) {
-            setError('Camera is not ready yet.');
+        const track = streamRef.current?.getVideoTracks()[0];
+        if (!video || !track || snapping) {
+            if (!video || !track) {
+                setError('Camera is not ready yet.');
+            }
             return;
         }
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const context = canvas.getContext('2d');
-        if (!context) {
-            setError('Could not capture a still from the camera.');
-            return;
+        setSnapping(true);
+        setError(null);
+        const generation = cameraGenerationRef.current;
+        const displayWidth = video.clientWidth;
+        const displayHeight = video.clientHeight;
+        try {
+            const blob = await takeReceiptStillBlob(track);
+            if (generation !== cameraGenerationRef.current) {
+                return;
+            }
+            const bitmap = await decodeReceiptStill(blob);
+            if (generation !== cameraGenerationRef.current) {
+                bitmap.close();
+                return;
+            }
+            const canvas = document.createElement('canvas');
+            const cropped = drawCoverFrame(bitmap, bitmap.width, bitmap.height, canvas, displayWidth, displayHeight);
+            bitmap.close();
+            if (generation !== cameraGenerationRef.current) {
+                return;
+            }
+            if (!cropped) {
+                setError('Could not read that still photo.');
+                return;
+            }
+            stopCamera();
+            setSession('review');
+            await prepareOriginal(canvas.toDataURL('image/jpeg', RECEIPT_CAPTURE_JPEG_QUALITY), canvas);
+        } catch (caught) {
+            if (generation !== cameraGenerationRef.current) {
+                return;
+            }
+            setError(getBackendErrorMessage(caught, 'Could not take a still photo.'));
+        } finally {
+            if (generation === cameraGenerationRef.current) {
+                setSnapping(false);
+            }
         }
-        context.drawImage(video, 0, 0);
-        await prepareOriginal(canvas.toDataURL('image/jpeg', RECEIPT_CAPTURE_JPEG_QUALITY), canvas);
     }
 
     async function pickFiles(files: readonly File[]): Promise<void> {
@@ -250,9 +375,11 @@ export function useReceiptCapture({
         try {
             const original = await fileToDataUrl(file);
             const image = await loadReceiptImageFromDataUrl(original);
+            setSession('review');
             await prepareOriginal(original, image);
         } catch (caught) {
             setError(getBackendErrorMessage(caught, 'Could not read that photo.'));
+            setSession('idle');
         }
     }
 
@@ -263,26 +390,22 @@ export function useReceiptCapture({
         originalRef.current = original;
         cornersRef.current = null;
         setEditingCorners(false);
+        setConfirming(false);
         setError(null);
+        setSession('review');
         setDraft((current) => reduceReceiptCaptureDraft(current, { type: 'capture', original }));
         try {
             const result = await scanReceiptImage(source);
             if (generation !== prepGenerationRef.current) {
                 return;
             }
-            if (result.kind === 'extracted') {
+            if (result.kind === 'detected') {
                 cornersRef.current = result.corners;
-                setDraft((current) =>
-                    reduceReceiptCaptureDraft(current, {
-                        type: 'extracted',
-                        original,
-                        processed: result.processedDataUrl,
-                    }),
-                );
-                return;
+            } else {
+                cornersRef.current = null;
+                setError('Could not find the receipt edges. Drag the corners onto the paper, then submit.');
             }
-            setDraft((current) => reduceReceiptCaptureDraft(current, { type: 'no-quad' }));
-            setError('Could not find the receipt edges. Drag the corners onto the paper, then apply.');
+            setDraft((current) => reduceReceiptCaptureDraft(current, { type: 'review' }));
         } catch (caught) {
             if (generation !== prepGenerationRef.current) {
                 return;
@@ -292,6 +415,7 @@ export function useReceiptCapture({
             cornersRef.current = null;
             setDraft((current) => reduceReceiptCaptureDraft(current, { type: 'failed' }));
             setError(getBackendErrorMessage(caught, 'Could not prepare that photo.'));
+            setSession('idle');
         }
     }
 
@@ -303,6 +427,7 @@ export function useReceiptCapture({
             setError('Could not warp that receipt from the confirmed corners.');
             return;
         }
+        setConfirming(true);
         try {
             const processed = await extractReceiptImage(source, corners);
             if (generation !== prepGenerationRef.current) {
@@ -312,14 +437,33 @@ export function useReceiptCapture({
             setEditingCorners(false);
             setError(null);
             setDraft((current) => reduceReceiptCaptureDraft(current, { type: 'extracted', original, processed }));
+            submitReadyImages({ original, processed });
         } catch (caught) {
             if (generation !== prepGenerationRef.current) {
                 return;
             }
             setError(getBackendErrorMessage(caught, 'Could not warp that receipt from the confirmed corners.'));
+        } finally {
+            if (generation === prepGenerationRef.current) {
+                setConfirming(false);
+            }
         }
     }
     confirmCornersRef.current = confirmCorners;
+
+    function confirmReview(): void {
+        const editor = editorRef.current;
+        if (editor) {
+            editor.confirm();
+            return;
+        }
+        const corners = cornersRef.current;
+        if (corners) {
+            void confirmCorners(corners);
+            return;
+        }
+        setError('Set the four corners on the paper, then submit.');
+    }
 
     function adjustCorners(): void {
         if (draft.status === 'empty' || draft.status === 'preparing') {
@@ -327,31 +471,62 @@ export function useReceiptCapture({
         }
         setError(null);
         setEditingCorners(true);
+        setSession('review');
     }
 
-    function discardDraft(): void {
+    function resetDraft(): void {
         prepGenerationRef.current += 1;
         destroyCornerEditor(editorRef);
         sourceRef.current = null;
         originalRef.current = null;
         cornersRef.current = null;
         setEditingCorners(false);
+        setConfirming(false);
         setDraft(EMPTY_RECEIPT_CAPTURE_DRAFT);
         setError(null);
         stopCamera();
     }
 
+    function discardDraft(): void {
+        resetDraft();
+        setSession('idle');
+    }
+
+    function cancelSession(): void {
+        if (editingCorners && draft.status === 'ready') {
+            setEditingCorners(false);
+            setError(null);
+            setSession('idle');
+            return;
+        }
+        if (session === 'camera') {
+            stopCamera();
+            setSession('idle');
+            return;
+        }
+        discardDraft();
+    }
+    cancelSessionRef.current = cancelSession;
+
+    function retake(): void {
+        resetDraft();
+        void openCamera();
+    }
+
     function stopCamera(): void {
+        cameraGenerationRef.current += 1;
         stopStream(streamRef.current);
         streamRef.current = null;
         if (videoRef.current) {
             videoRef.current.srcObject = null;
         }
-        setCameraOpen(false);
+        setCameraReady(false);
+        setLiveOutline(null);
+        setSnapping(false);
     }
 
     function attach(): void {
-        if (editingCorners) {
+        if (editingCorners || session === 'review') {
             setError('Finish editing corners first.');
             return;
         }
@@ -367,15 +542,19 @@ export function useReceiptCapture({
             setError('Add a photo first.');
             return;
         }
+        submitReadyImages({ original: draft.original, processed: draft.processed });
+    }
+
+    function submitReadyImages(images: { readonly original: string; readonly processed: string }): void {
         const body = live
             ? buildCreateReceiptBody({
-                  original: draft.original,
-                  processed: draft.processed,
+                  original: images.original,
+                  processed: images.processed,
                   transactionId,
               })
             : buildExtractPreviewBody({
-                  original: draft.original,
-                  processed: draft.processed,
+                  original: images.original,
+                  processed: images.processed,
               });
         try {
             assertReceiptJsonBodyWithinLimit(body);
@@ -384,49 +563,51 @@ export function useReceiptCapture({
             return;
         }
         setError(null);
-        const images: AttachImages = {
-            original: draft.original,
-            processed: draft.processed,
+        const payload: AttachImages = {
+            original: images.original,
+            processed: images.processed,
             transactionId,
         };
         const afterAttach = () => {
-            prepGenerationRef.current += 1;
-            destroyCornerEditor(editorRef);
-            sourceRef.current = null;
-            originalRef.current = null;
-            cornersRef.current = null;
-            setEditingCorners(false);
-            setDraft(EMPTY_RECEIPT_CAPTURE_DRAFT);
-            if (!keepCameraOnAttach) {
-                stopCamera();
+            resetDraft();
+            if (keepCameraOnAttach) {
+                void openCamera();
+                return;
             }
+            setSession('idle');
         };
         if (live) {
-            liveCreate.mutate(images, { onSuccess: afterAttach });
+            liveCreate.mutate(payload, { onSuccess: afterAttach });
             return;
         }
-        practiceExtract.mutate(images, { onSuccess: afterAttach });
+        practiceExtract.mutate(payload, { onSuccess: afterAttach });
     }
 
     return {
-        canAttach: canAttachReceiptDraft(draft) && !editingCorners,
-        cameraOpen,
+        canAttach: canAttachReceiptDraft(draft) && !editingCorners && session === 'idle',
         cameraSupported,
-        cornerEditorOpen: draft.status === 'needs-corners' || editingCorners,
+        cameraReady,
+        snapping,
+        confirming,
+        cornerEditorOpen: (draft.status === 'needs-corners' || editingCorners) && session === 'review',
         draftStatus: draft.status,
         editingCorners,
         error: error ?? formatCaptureError(liveCreate.error ?? practiceExtract.error),
+        liveOutline,
         originalPreview: receiptDraftOriginal(draft),
         processedPreview: receiptDraftProcessed(draft),
+        session,
         submitting: liveCreate.isPending || practiceExtract.isPending,
         cornerHostRef,
         videoRef,
         adjustCorners,
         attach,
-        closeCamera: stopCamera,
+        cancelSession,
+        confirmReview,
         discardDraft,
         openCamera,
         pickFiles,
+        retake,
         snap,
     };
 }
@@ -449,6 +630,9 @@ function cameraPermissionMessage(error: unknown): string {
     }
     if (name === 'NotFoundError') {
         return 'No camera was found on this device.';
+    }
+    if (name === 'SecurityError' || name === 'NotSupportedError') {
+        return 'Camera needs HTTPS. Open the Network URL that starts with https://';
     }
     return getBackendErrorMessage(error, 'Could not open the camera.');
 }

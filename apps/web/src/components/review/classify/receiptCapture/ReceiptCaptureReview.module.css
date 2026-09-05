@@ -1,0 +1,40 @@
+.still {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: var(--app-bg-root);
+}
+
+.cornerHost {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--app-bg-root);
+}
+
+.cornerHost[hidden] {
+    display: none;
+}
+
+.cornerHost :global(.scanic-corner-editor) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    --scanic-accent: var(--app-tier-auto);
+    --scanic-mask: color-mix(in srgb, var(--app-bg-root) 55%, transparent);
+    --scanic-surface: var(--app-bg-elevated);
+    --scanic-surface-fg: var(--app-text-primary);
+    --scanic-handle-size: 22px;
+    --scanic-handle-hit: 48px;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.65rem;
+}

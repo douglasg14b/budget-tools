@@ -1,0 +1,15 @@
+.overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.quad {
+    fill: color-mix(in srgb, var(--app-tier-auto) 18%, transparent);
+    stroke: var(--app-tier-auto);
+    stroke-linejoin: round;
+    stroke-width: 2.5;
+    vector-effect: non-scaling-stroke;
+}

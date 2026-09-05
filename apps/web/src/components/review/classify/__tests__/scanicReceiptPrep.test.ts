@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ScanicEngine } from '../scanicReceiptPrep';
 import {
     ensureScanicWasm,
     extractReceiptImage,
+    RECEIPT_DETECT_DETECTOR,
+    RECEIPT_DETECT_MAX_DIMENSION,
     SCANIC_WASM_MISSING_MESSAGE,
     scanReceiptImage,
+    warmupReceiptMlDetector,
 } from '../scanicReceiptPrep';
 
 vi.mock('scanic', () => ({
@@ -68,11 +71,28 @@ describe('ensureScanicWasm', () => {
 });
 
 describe('scanReceiptImage', () => {
-    it('returns a JPEG data URL and corners on a successful warp', async () => {
-        const result = await scanReceiptImage({} as HTMLCanvasElement, engine());
+    it('detects corners with the ML detector and does not warp yet', async () => {
+        const source = { width: 100, height: 200 } as HTMLCanvasElement;
+        const scanDocument = vi.fn(async () => ({
+            success: true,
+            message: 'Document detected (ml)',
+            corners,
+            output: null,
+            contour: null,
+            debug: null,
+            timings: [],
+        }));
+        const result = await scanReceiptImage(source, engine({ scanDocument }));
+        expect(scanDocument).toHaveBeenCalledWith(
+            source,
+            expect.objectContaining({
+                mode: 'detect',
+                detector: RECEIPT_DETECT_DETECTOR,
+                maxProcessingDimension: RECEIPT_DETECT_MAX_DIMENSION,
+            }),
+        );
         expect(result).toEqual({
-            kind: 'extracted',
-            processedDataUrl: 'data:image/jpeg;base64,processed',
+            kind: 'detected',
             corners,
         });
     });
@@ -83,7 +103,7 @@ describe('scanReceiptImage', () => {
             engine({
                 scanDocument: async () => ({
                     success: false,
-                    message: 'No document detected',
+                    message: 'No confident document (ml)',
                     corners: null,
                     output: null,
                     contour: null,
@@ -92,25 +112,32 @@ describe('scanReceiptImage', () => {
                 }),
             }),
         );
-        expect(result).toEqual({ kind: 'no-quad', message: 'No document detected' });
+        expect(result).toEqual({ kind: 'no-quad', message: 'No confident document (ml)' });
+    });
+});
+
+describe('warmupReceiptMlDetector', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
     });
 
-    it('treats a successful detect without a canvas warp as a no-quad miss', async () => {
-        const result = await scanReceiptImage(
-            {} as HTMLCanvasElement,
-            engine({
-                scanDocument: async () => ({
-                    success: true,
-                    message: 'ok',
-                    corners,
-                    output: null,
-                    contour: null,
-                    debug: null,
-                    timings: [],
-                }),
-            }),
+    it('loads the ML detector on a blank canvas and surfaces fetch failures', async () => {
+        vi.stubGlobal('document', {
+            createElement: (tag: string) => {
+                expect(tag).toBe('canvas');
+                return { width: 0, height: 0 };
+            },
+        });
+        const scanDocument = vi.fn(async () => {
+            throw new Error(
+                'scanic: failed to fetch the ML model from https://cdn.jsdelivr.net/npm/scanic-ml@0.2.0/dist/',
+            );
+        });
+        await expect(warmupReceiptMlDetector(engine({ scanDocument }))).rejects.toThrow('failed to fetch the ML model');
+        expect(scanDocument).toHaveBeenCalledWith(
+            { width: 32, height: 32 },
+            expect.objectContaining({ detector: RECEIPT_DETECT_DETECTOR }),
         );
-        expect(result.kind).toBe('no-quad');
     });
 });
 

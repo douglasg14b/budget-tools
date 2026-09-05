@@ -9,7 +9,7 @@ export const EMPTY_RECEIPT_CAPTURE_DRAFT: ReceiptCaptureDraft = { status: 'empty
 export type ReceiptCaptureDraftEvent =
     | { readonly type: 'capture'; readonly original: string }
     | { readonly type: 'extracted'; readonly original: string; readonly processed: string }
-    | { readonly type: 'no-quad' }
+    | { readonly type: 'review' }
     | { readonly type: 'failed' }
     | { readonly type: 'discard' };
 
@@ -28,7 +28,7 @@ export function reduceReceiptCaptureDraft(
                 return state;
             }
             return { status: 'ready', original: state.original, processed: event.processed };
-        case 'no-quad':
+        case 'review':
             if (state.status === 'empty') {
                 return state;
             }

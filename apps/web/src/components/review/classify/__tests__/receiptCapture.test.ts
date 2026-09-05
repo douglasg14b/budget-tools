@@ -24,13 +24,13 @@ describe('reduceReceiptCaptureDraft', () => {
         });
     });
 
-    it('blocks attach until a warp exists, including after a no-quad miss', () => {
+    it('blocks attach until a warp exists, including after a corner review', () => {
         const preparing = reduceReceiptCaptureDraft(EMPTY_RECEIPT_CAPTURE_DRAFT, {
             type: 'capture',
             original: 'orig-1',
         });
         expect(canAttachReceiptDraft(preparing)).toBe(false);
-        const missed = reduceReceiptCaptureDraft(preparing, { type: 'no-quad' });
+        const missed = reduceReceiptCaptureDraft(preparing, { type: 'review' });
         expect(missed).toEqual({ status: 'needs-corners', original: 'orig-1' });
         expect(canAttachReceiptDraft(missed)).toBe(false);
         const confirmed = reduceReceiptCaptureDraft(missed, {
