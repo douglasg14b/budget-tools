@@ -12,5 +12,6 @@ export type ReceiptsTable = {
     originalPath: string;
     transactionId: string | null;
     contentHash: string;
+    perceptualHash: string | null;
     totalsDisagree: boolean;
 };

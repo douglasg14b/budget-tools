@@ -39,6 +39,7 @@ function receiptRow(extractStatus: ReceiptExtractStatus, id = 'receipt-1'): Rece
         originalPath: '/tmp/receipt-1',
         transactionId: null,
         contentHash: 'abc',
+        perceptualHash: null,
         totalsDisagree: false,
     };
 }

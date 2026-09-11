@@ -27,6 +27,7 @@
     "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
     "sharp": "^0.35.4",
+    "sharp-phash": "^2.2.0",
     "talisman": "^1.1.4",
     "tsoa": "7.0.0-alpha.0",
     "ynab": "^2.6.0"

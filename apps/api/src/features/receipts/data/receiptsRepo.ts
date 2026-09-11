@@ -346,6 +346,7 @@ export async function insertReceiptOriginal(
                 originalPath,
                 transactionId: input.transactionId ?? null,
                 contentHash,
+                perceptualHash: null,
                 totalsDisagree: false,
             })
             .execute();

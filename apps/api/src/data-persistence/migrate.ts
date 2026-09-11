@@ -9,6 +9,7 @@ import * as amazonSplitOverlays from './migrations/2026-08-26-Amazon_Split_Overl
 import * as operatingMode from './migrations/2026-08-27-Operating_Mode';
 import * as classificationSync from './migrations/2026-08-28-Classification_Sync';
 import * as receiptTables from './migrations/2026-08-29-Receipt_Tables';
+import * as receiptPerceptualHash from './migrations/2026-09-10-Receipt_Perceptual_Hash';
 
 /**
  * Explicit migration registry. Dynamic filesystem imports break on Windows paths
@@ -23,6 +24,7 @@ export const MIGRATIONS: Record<string, Migration> = {
     '2026-08-27-Operating_Mode': operatingMode,
     '2026-08-28-Classification_Sync': classificationSync,
     '2026-08-29-Receipt_Tables': receiptTables,
+    '2026-09-10-Receipt_Perceptual_Hash': receiptPerceptualHash,
 };
 
 class StaticMigrationProvider implements MigrationProvider {
