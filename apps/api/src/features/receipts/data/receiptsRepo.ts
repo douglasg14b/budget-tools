@@ -7,6 +7,8 @@ import { getAppDatabase } from '../../../data-persistence/database';
 import { getReceiptsDir } from '../../../environment';
 import { HttpError, NotFoundError } from '../../travelWindows/HttpError';
 import { assertReceiptWritesAllowed } from '../assertReceiptWritesAllowed';
+import type { PerceptualNeighbor } from '../perceptualHash';
+import { findNearestPerceptualMatch, perceptualHashOf } from '../perceptualHash';
 import type { ReceiptExtractStatus, ReceiptsTable } from './receiptsSchema';
 
 export type ReceiptRow = ReceiptsTable;
@@ -300,6 +302,54 @@ export async function findReceiptByContentHash(
     return database.selectFrom('receipts').selectAll().where('contentHash', '=', contentHash).executeTakeFirst();
 }
 
+async function hashBytesForInsert(input: InsertReceiptOriginalInput): Promise<string | null> {
+    try {
+        return await perceptualHashOf(input.processed ?? input.bytes);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('receipt perceptual hash skipped', { message });
+        return null;
+    }
+}
+
+async function readHashSourceBytes(originalPath: string): Promise<Buffer> {
+    if (await hasReceiptProcessed(originalPath)) {
+        return readFile(receiptProcessedPath(originalPath));
+    }
+    return readFile(originalPath);
+}
+
+async function persistPerceptualHash(id: string, perceptualHash: string, database: AppDatabaseClient): Promise<void> {
+    await database.updateTable('receipts').set({ perceptualHash }).where('id', '=', id).execute();
+}
+
+/**
+ * Linear scan is intentional at household volume. Null hashes are backfilled here so older rows can still match.
+ */
+async function findPerceptualDuplicate(hash: string, database: AppDatabaseClient): Promise<ReceiptRow | undefined> {
+    const rows = await database.selectFrom('receipts').selectAll().execute();
+    const neighbors: PerceptualNeighbor[] = [];
+    const byId = new Map<string, ReceiptRow>();
+    for (const row of rows) {
+        byId.set(row.id, row);
+        let stored = row.perceptualHash;
+        if (!stored) {
+            try {
+                stored = await perceptualHashOf(await readHashSourceBytes(row.originalPath));
+                await persistPerceptualHash(row.id, stored, database);
+                byId.set(row.id, { ...row, perceptualHash: stored });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                console.error('receipt perceptual backfill skipped', { id: row.id, message });
+                continue;
+            }
+        }
+        neighbors.push({ id: row.id, createdAt: row.createdAt, perceptualHash: stored });
+    }
+    const match = findNearestPerceptualMatch(hash, neighbors);
+    return match ? byId.get(match.id) : undefined;
+}
+
 export async function insertReceiptOriginal(
     input: InsertReceiptOriginalInput,
     db?: AppDatabaseClient,
@@ -313,6 +363,15 @@ export async function insertReceiptOriginal(
     if (existing) {
         await writeProcessedIfAbsent(existing.originalPath, input.processed);
         return existing;
+    }
+
+    const incomingHash = await hashBytesForInsert(input);
+    if (incomingHash) {
+        const duplicate = await findPerceptualDuplicate(incomingHash, database);
+        if (duplicate) {
+            await writeProcessedIfAbsent(duplicate.originalPath, input.processed);
+            return duplicate;
+        }
     }
 
     const id = randomUUID();
@@ -346,7 +405,7 @@ export async function insertReceiptOriginal(
                 originalPath,
                 transactionId: input.transactionId ?? null,
                 contentHash,
-                perceptualHash: null,
+                perceptualHash: incomingHash,
                 totalsDisagree: false,
             })
             .execute();

@@ -35,3 +35,38 @@ export function isWithinPerceptualTau(distance: number): boolean {
     }
     return distance <= PERCEPTUAL_HASH_TAU;
 }
+
+export type PerceptualNeighbor = {
+    readonly id: string;
+    readonly createdAt: string;
+    readonly perceptualHash: string;
+};
+
+/**
+ * Oldest createdAt, then lowest id, among neighbors within PERCEPTUAL_HASH_TAU.
+ * Hamming distance is only a gate, not a rank.
+ */
+export function findNearestPerceptualMatch(
+    hash: string,
+    neighbors: readonly PerceptualNeighbor[],
+): PerceptualNeighbor | null {
+    assertPerceptualHashFormat(hash);
+    let winner: PerceptualNeighbor | null = null;
+    for (const neighbor of neighbors) {
+        try {
+            if (!isWithinPerceptualTau(hammingDistance(hash, neighbor.perceptualHash))) {
+                continue;
+            }
+        } catch {
+            continue;
+        }
+        if (
+            !winner ||
+            neighbor.createdAt < winner.createdAt ||
+            (neighbor.createdAt === winner.createdAt && neighbor.id < winner.id)
+        ) {
+            winner = neighbor;
+        }
+    }
+    return winner;
+}

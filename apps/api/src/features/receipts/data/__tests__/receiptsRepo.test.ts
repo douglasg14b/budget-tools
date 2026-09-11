@@ -1,7 +1,9 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+import sharp from 'sharp';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { AppDatabaseClient } from '../../../../data-persistence/database';
@@ -253,4 +255,197 @@ describe('receiptsRepo', () => {
         const listed = await listReceiptsInPurchaseDateWindow('2026-02-05', '2026-02-11', database);
         expect(listed.map((row) => row.id)).toEqual([inWindow.id]);
     });
+
+    it('does not merge two undecodable JPEG stubs', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = join(directory, 'files');
+        const first = await insertReceiptOriginal({ bytes: jpegBytes, receiptsDir }, database);
+        const second = await insertReceiptOriginal(
+            { bytes: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x11]), receiptsDir },
+            database,
+        );
+        expect(first.perceptualHash).toBeNull();
+        expect(second.perceptualHash).toBeNull();
+        expect(second.id).not.toBe(first.id);
+    });
+
+    it('reuses a row when originals differ but processed JPEGs match', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = join(directory, 'files');
+        const processed = await solidJpeg({ r: 80, g: 80, b: 80 });
+        const first = await insertReceiptOriginal(
+            {
+                bytes: await solidJpeg({ r: 10, g: 10, b: 10 }),
+                processed,
+                receiptsDir,
+            },
+            database,
+        );
+        const again = await insertReceiptOriginal(
+            {
+                bytes: await solidJpeg({ r: 240, g: 240, b: 240 }),
+                processed,
+                transactionId: 'txn-card',
+                receiptsDir,
+            },
+            database,
+        );
+        expect(again.id).toBe(first.id);
+        expect(again.transactionId).toBeNull();
+        expect(first.perceptualHash).toHaveLength(64);
+        expect(again.perceptualHash).toBe(first.perceptualHash);
+    });
+
+    it('hashes the original when processed is absent and ignores extra frames', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = join(directory, 'files');
+        const original = await solidJpeg({ r: 40, g: 40, b: 40 });
+        const extra = await solidJpeg({ r: 200, g: 10, b: 10 });
+        const first = await insertReceiptOriginal({ bytes: original, receiptsDir }, database);
+        const again = await insertReceiptOriginal({ bytes: original, extraFrames: [extra], receiptsDir }, database);
+        expect(again.id).toBe(first.id);
+    });
+
+    it('inserts a second row when processed crops are far apart', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = join(directory, 'files');
+        const first = await insertReceiptOriginal(
+            {
+                bytes: await solidJpeg({ r: 10, g: 10, b: 10 }),
+                processed: await solidJpeg({ r: 10, g: 10, b: 10 }),
+                receiptsDir,
+            },
+            database,
+        );
+        const second = await insertReceiptOriginal(
+            {
+                bytes: await solidJpeg({ r: 240, g: 240, b: 240 }),
+                processed: await solidJpeg({ r: 240, g: 240, b: 240 }),
+                receiptsDir,
+            },
+            database,
+        );
+        expect(second.id).not.toBe(first.id);
+    });
+
+    it('reuses the oldest in-tau neighbor', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = join(directory, 'files');
+        const processed = await solidJpeg({ r: 80, g: 80, b: 80 });
+        const older = await insertReceiptOriginal(
+            {
+                bytes: await solidJpeg({ r: 10, g: 10, b: 10 }),
+                processed,
+                receiptsDir,
+            },
+            database,
+        );
+        const newer = await insertReceiptOriginal(
+            {
+                bytes: await solidJpeg({ r: 240, g: 240, b: 240 }),
+                processed: await solidJpeg({ r: 240, g: 240, b: 240 }),
+                receiptsDir,
+            },
+            database,
+        );
+        await database
+            .updateTable('receipts')
+            .set({ perceptualHash: older.perceptualHash })
+            .where('id', '=', newer.id)
+            .execute();
+        const again = await insertReceiptOriginal(
+            {
+                bytes: await solidJpeg({ r: 30, g: 30, b: 30 }),
+                processed,
+                receiptsDir,
+            },
+            database,
+        );
+        expect(again.id).toBe(older.id);
+    });
+
+    it('does not re-pending a gated row on perceptual reuse', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = join(directory, 'files');
+        const processed = await solidJpeg({ r: 80, g: 80, b: 80 });
+        const created = await insertReceiptOriginal(
+            {
+                bytes: await solidJpeg({ r: 10, g: 10, b: 10 }),
+                processed,
+                receiptsDir,
+            },
+            database,
+        );
+        await setReceiptExtract(
+            created.id,
+            {
+                extractStatus: 'gated',
+                extractJson: '{"vendor":"Store"}',
+                rawText: 'Store',
+                vendor: 'Store',
+                purchaseDate: '2026-08-29',
+                printedMilliunits: 1234,
+                totalsDisagree: false,
+            },
+            database,
+        );
+        const again = await insertReceiptOriginal(
+            {
+                bytes: await solidJpeg({ r: 240, g: 240, b: 240 }),
+                processed,
+                receiptsDir,
+            },
+            database,
+        );
+        expect(again.id).toBe(created.id);
+        expect(again.extractStatus).toBe('gated');
+    });
+
+    it('backfills a null perceptual hash and reuses that row', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = join(directory, 'files');
+        const processed = await solidJpeg({ r: 80, g: 80, b: 80 });
+        const created = await insertReceiptOriginal(
+            {
+                bytes: await solidJpeg({ r: 10, g: 10, b: 10 }),
+                processed,
+                receiptsDir,
+            },
+            database,
+        );
+        await database.updateTable('receipts').set({ perceptualHash: null }).where('id', '=', created.id).execute();
+        const again = await insertReceiptOriginal(
+            {
+                bytes: await solidJpeg({ r: 240, g: 240, b: 240 }),
+                processed,
+                receiptsDir,
+            },
+            database,
+        );
+        expect(again.id).toBe(created.id);
+        expect(again.perceptualHash).toEqual(created.perceptualHash);
+    });
+
+    it('does not merge distinct receipt fixture photos', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = join(directory, 'files');
+        const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), '../../__tests__/fixtures');
+        const walmart = await insertReceiptOriginal(
+            { bytes: await readFile(join(fixturesDir, 'walmart.jpg')), receiptsDir },
+            database,
+        );
+        const saveMart = await insertReceiptOriginal(
+            { bytes: await readFile(join(fixturesDir, 'save-mart.jpg')), receiptsDir },
+            database,
+        );
+        expect(saveMart.id).not.toBe(walmart.id);
+    });
 });
+
+async function solidJpeg(color: { r: number; g: number; b: number }): Promise<Buffer> {
+    return sharp({
+        create: { width: 32, height: 32, channels: 3, background: color },
+    })
+        .jpeg()
+        .toBuffer();
+}
