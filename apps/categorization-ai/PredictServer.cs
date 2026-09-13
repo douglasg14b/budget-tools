@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
+using YnabCategoryAi.ML;
 
 namespace YnabCategoryAi;
 
@@ -35,6 +36,12 @@ public static class PredictServer
         ?? new Configuration.ServerSettings();
 
       bool forceRetrain = args.Contains("--force", StringComparer.OrdinalIgnoreCase);
+
+      // Must run before CreateAsync: the models are gitignored, so a container built from a git
+      // clone has none on disk, and Train() would otherwise retrain from scratch on every boot.
+      // No-ops unless ModelStorage__Enabled is set (the local development path).
+      await Configuration.ModelStorageBootstrap.EnsureModelsAsync(config);
+
       Log.Information("Warming scoring session...");
       ScoringSession session = await ScoringSession.CreateAsync(config, forceRetrain, Console.Out);
       Log.Information("Scoring session ready (model signature {Signature})", session.ModelSignature);
@@ -90,6 +97,22 @@ public static class PredictServer
         catch (Exception exception)
         {
           Log.Error(exception, "Reload request failed");
+          return Results.Problem(
+            detail: exception.Message,
+            statusCode: StatusCodes.Status500InternalServerError);
+        }
+      });
+
+      app.MapGet("/periodic-series", async (ScoringSession scoringSession) =>
+      {
+        try
+        {
+          PeriodicSeriesListPayload payload = await scoringSession.ListPeriodicSeriesAsync();
+          return Results.Json(payload, JsonOptions);
+        }
+        catch (Exception exception)
+        {
+          Log.Error(exception, "Periodic series list failed");
           return Results.Problem(
             detail: exception.Message,
             statusCode: StatusCodes.Status500InternalServerError);
