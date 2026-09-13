@@ -1,11 +1,15 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { existsSync } from 'node:fs';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:fs', () => ({
     existsSync: vi.fn(() => true),
 }));
 
 import { parsePredictJsonEnvelope } from '../parsePredictJson';
-import { runPredictJson } from '../predictJson';
+import { assertCategorizationModelsExist, runPredictJson } from '../predictJson';
+
+const existsSyncMock = vi.mocked(existsSync);
 
 const validEnvelope = {
     summary: {
@@ -99,5 +103,44 @@ describe('runPredictJson warm scorer', () => {
         );
 
         await expect(runPredictJson(baseInput)).rejects.toThrow('warm scorer POST /predict failed (500): boom');
+    });
+});
+
+describe('assertCategorizationModelsExist', () => {
+    beforeEach(() => {
+        existsSyncMock.mockClear();
+    });
+
+    afterEach(() => {
+        existsSyncMock.mockReturnValue(true);
+        vi.unstubAllGlobals();
+        delete process.env.CATEGORIZATION_SCORER_URL;
+    });
+
+    it('fails loud when a model file is missing and this process would spawn the scorer', () => {
+        existsSyncMock.mockReturnValue(false);
+
+        expect(() => assertCategorizationModelsExist('models')).toThrow(/Missing model file at/);
+    });
+
+    it('skips the check when scoring is delegated to the warm scorer', () => {
+        // The scorer container owns the model files; requiring them in the API container too
+        // would block an otherwise healthy deployment.
+        existsSyncMock.mockReturnValue(false);
+        process.env.CATEGORIZATION_SCORER_URL = 'http://scorer:4021';
+
+        expect(() => assertCategorizationModelsExist('models')).not.toThrow();
+        expect(existsSyncMock).not.toHaveBeenCalled();
+    });
+
+    it('scores via the warm scorer even when no model files are present locally', async () => {
+        existsSyncMock.mockReturnValue(false);
+        process.env.CATEGORIZATION_SCORER_URL = 'http://scorer:4021';
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify(validEnvelope) }),
+        );
+
+        await expect(runPredictJson(baseInput)).resolves.toEqual(parsePredictJsonEnvelope(validEnvelope));
     });
 });

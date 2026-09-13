@@ -14,7 +14,6 @@ export type RunPredictJsonInput = {
     readonly workingDir: string;
     readonly modelsDir: string;
     readonly connectionString: string;
-    readonly sqliteDbPath: string;
     readonly timeoutMs: number;
     readonly llm: boolean;
     readonly transactionIds: readonly string[];
@@ -38,7 +37,17 @@ export async function runPredictJson(input: RunPredictJsonInput): Promise<Predic
     return spawnPredictJson(input);
 }
 
+/**
+ * Fails loud when the trained models are missing — but only when this process is the one that
+ * will read them. With `CATEGORIZATION_SCORER_URL` set the API delegates scoring over HTTP and
+ * never touches the model files; they live in the scorer container instead, so requiring them
+ * here would block a perfectly healthy deployment.
+ */
 export function assertCategorizationModelsExist(modelsDir: string): void {
+    if (getCategorizationScorerUrl()) {
+        return;
+    }
+
     for (const fileName of MODEL_FILES) {
         const modelPath = join(modelsDir, fileName);
         if (!existsSync(modelPath)) {
@@ -129,7 +138,6 @@ function spawnDotnet(args: string[], input: RunPredictJsonInput): Promise<string
             env: {
                 ...process.env,
                 DB_CONNECTION_STRING: input.connectionString,
-                SQLITE_DB_PATH: input.sqliteDbPath,
                 ML__CategoryModelPath: join(input.modelsDir, 'category-model.zip'),
                 ML__GroupModelPath: join(input.modelsDir, 'group-model.zip'),
                 ML__PayeeModelPath: join(input.modelsDir, 'payee-model.zip'),
