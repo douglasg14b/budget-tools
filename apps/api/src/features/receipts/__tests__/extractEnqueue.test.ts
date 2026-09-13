@@ -5,8 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AppDatabaseClient } from '../../../data-persistence/database';
-import { createAppDatabase } from '../../../data-persistence/database';
-import { migrateToLatest } from '../../../data-persistence/migrate';
+import { createTestAppDatabase } from '../../../data-persistence/testDatabase';
 import { setOperatingMode } from '../../operatingMode/data/operatingModeRepo';
 import { createReceipt } from '../createReceipt';
 import type { ReceiptRow } from '../data/receiptsRepo';
@@ -89,17 +88,18 @@ describe('kickReceiptExtractIfPending', () => {
 
 describe('sweepPendingReceiptExtracts', () => {
     let directory: string;
+    let appDb: Awaited<ReturnType<typeof createTestAppDatabase>>;
     let database: AppDatabaseClient;
     const jpegBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
 
     beforeEach(async () => {
         directory = await mkdtemp(join(tmpdir(), 'api-receipt-sweep-'));
-        database = createAppDatabase(join(directory, 'app.sqlite'));
-        await migrateToLatest(database);
+        appDb = await createTestAppDatabase();
+        database = appDb.db;
     });
 
     afterEach(async () => {
-        await database.destroy();
+        await appDb.close();
         await rm(directory, { recursive: true, force: true });
     });
 
@@ -129,16 +129,17 @@ describe('sweepPendingReceiptExtracts', () => {
 
 describe('MAX_RECEIPT_FRAMES', () => {
     let directory: string;
+    let appDb: Awaited<ReturnType<typeof createTestAppDatabase>>;
     let database: AppDatabaseClient;
 
     beforeEach(async () => {
         directory = await mkdtemp(join(tmpdir(), 'api-receipt-frames-'));
-        database = createAppDatabase(join(directory, 'app.sqlite'));
-        await migrateToLatest(database);
+        appDb = await createTestAppDatabase();
+        database = appDb.db;
     });
 
     afterEach(async () => {
-        await database.destroy();
+        await appDb.close();
         await rm(directory, { recursive: true, force: true });
     });
 

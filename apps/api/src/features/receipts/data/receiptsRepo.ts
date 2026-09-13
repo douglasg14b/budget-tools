@@ -1,14 +1,15 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { access, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 
 import type { AppDatabaseClient } from '../../../data-persistence/database';
 import { getAppDatabase } from '../../../data-persistence/database';
-import { getReceiptsDir } from '../../../environment';
 import { HttpError, NotFoundError } from '../../travelWindows/HttpError';
 import { assertReceiptWritesAllowed } from '../assertReceiptWritesAllowed';
 import type { PerceptualNeighbor } from '../perceptualHash';
 import { findNearestPerceptualMatch, perceptualHashOf } from '../perceptualHash';
+import { FilesystemReceiptStorage } from '../storage/filesystemReceiptStorage';
+import { getReceiptStorage } from '../storage/getReceiptStorage';
+import type { ReceiptStorage } from '../storage/receiptStorage';
+import { originalRef, processedRef } from '../storage/receiptStorage';
 import type { ReceiptExtractStatus, ReceiptsTable } from './receiptsSchema';
 
 export type ReceiptRow = ReceiptsTable;
@@ -18,22 +19,14 @@ export type InsertReceiptOriginalInput = {
     readonly extraFrames?: readonly Buffer[];
     readonly processed?: Buffer;
     readonly transactionId?: string | null;
+    /** Test/legacy convenience: store to a filesystem provider rooted at this dir. */
     readonly receiptsDir?: string;
+    /** Explicit storage provider override (takes precedence over `receiptsDir`). */
+    readonly storage?: ReceiptStorage;
 };
 
 function contentHashOf(bytes: Buffer): string {
     return createHash('sha256').update(bytes).digest('hex');
-}
-
-async function unlinkIfPresent(path: string): Promise<void> {
-    try {
-        await unlink(path);
-    } catch (error) {
-        const errno = error as NodeJS.ErrnoException;
-        if (errno.code !== 'ENOENT') {
-            throw error;
-        }
-    }
 }
 
 function contentHashOfFrames(frames: readonly Buffer[]): string {
@@ -52,49 +45,26 @@ function contentHashOfFrames(frames: readonly Buffer[]): string {
     return hash.digest('hex');
 }
 
-async function unlinkReceiptFiles(originalPath: string): Promise<void> {
-    await unlinkIfPresent(originalPath);
-    await unlinkIfPresent(receiptProcessedPath(originalPath));
-    let index = 1;
-    while (true) {
-        const extraPath = `${originalPath}.${index}`;
-        try {
-            await unlink(extraPath);
-        } catch (error) {
-            const errno = error as NodeJS.ErrnoException;
-            if (errno.code === 'ENOENT') {
-                return;
-            }
-            throw error;
-        }
-        index += 1;
+/** Resolves the storage provider for a write, honouring the test/legacy overrides. */
+function resolveStorage(input: Pick<InsertReceiptOriginalInput, 'storage' | 'receiptsDir'>): ReceiptStorage {
+    if (input.storage) {
+        return input.storage;
     }
+    if (input.receiptsDir) {
+        return new FilesystemReceiptStorage(input.receiptsDir);
+    }
+    return getReceiptStorage();
 }
 
-function receiptProcessedPath(originalPath: string): string {
-    return `${originalPath}.processed`;
-}
-
-function extraFramePath(originalPath: string, extraIndex: number): string {
-    return `${originalPath}.${extraIndex + 1}`;
-}
-
-async function writeProcessedFile(originalPath: string, processed: Buffer | undefined): Promise<void> {
-    if (!processed) {
+async function writeProcessedIfAbsent(
+    storage: ReceiptStorage,
+    receiptId: string,
+    processed: Buffer | undefined,
+): Promise<void> {
+    if (!processed || (await storage.exists(processedRef(receiptId)))) {
         return;
     }
-    await writeFile(receiptProcessedPath(originalPath), processed);
-}
-
-async function writeProcessedIfAbsent(originalPath: string, processed: Buffer | undefined): Promise<void> {
-    if (!processed || (await hasReceiptProcessed(originalPath))) {
-        return;
-    }
-    await writeProcessedFile(originalPath, processed);
-}
-
-function receiptFramePath(originalPath: string, frameIndex: number): string {
-    return frameIndex === 0 ? originalPath : extraFramePath(originalPath, frameIndex - 1);
+    await storage.put(processedRef(receiptId), processed);
 }
 
 export type ReceiptImageContentType = 'image/jpeg' | 'image/png' | 'application/octet-stream';
@@ -115,8 +85,12 @@ function isReceiptContentHashConflict(error: unknown): boolean {
     }
     const code = 'code' in error && typeof error.code === 'string' ? error.code : '';
     const message = 'message' in error && typeof error.message === 'string' ? error.message : String(error);
-    const uniqueConstraint = code.startsWith('SQLITE_CONSTRAINT') || /UNIQUE constraint failed/i.test(message);
-    return uniqueConstraint && (message.includes('content_hash') || message.includes('contentHash'));
+    // Postgres unique_violation is SQLSTATE 23505; pg exposes the offending constraint name.
+    const constraintName = 'constraint' in error && typeof error.constraint === 'string' ? error.constraint : '';
+    const uniqueConstraint = code === '23505' || /duplicate key value|UNIQUE constraint failed/i.test(message);
+    const targetsContentHash =
+        constraintName.includes('content_hash') || message.includes('content_hash') || message.includes('contentHash');
+    return uniqueConstraint && targetsContentHash;
 }
 
 export async function getReceiptById(id: string, db?: AppDatabaseClient): Promise<ReceiptRow | undefined> {
@@ -183,46 +157,37 @@ export async function requireReceipt(id: string, db?: AppDatabaseClient): Promis
     return row;
 }
 
-async function fileExists(path: string): Promise<boolean> {
-    try {
-        await access(path);
-        return true;
-    } catch (error) {
-        const errno = error as NodeJS.ErrnoException;
-        if (errno.code === 'ENOENT') {
-            return false;
-        }
-        throw error;
-    }
+export async function hasReceiptProcessed(
+    receiptId: string,
+    storage: ReceiptStorage = getReceiptStorage(),
+): Promise<boolean> {
+    return storage.exists(processedRef(receiptId));
 }
 
-export async function hasReceiptProcessed(originalPath: string): Promise<boolean> {
-    return fileExists(receiptProcessedPath(originalPath));
-}
-
-export async function countReceiptFrames(originalPath: string): Promise<number> {
-    if (!(await fileExists(originalPath))) {
-        return 0;
-    }
-    let count = 1;
-    while (await fileExists(`${originalPath}.${count}`)) {
-        count += 1;
-    }
-    return count;
+export async function countReceiptFrames(
+    receiptId: string,
+    storage: ReceiptStorage = getReceiptStorage(),
+): Promise<number> {
+    return storage.countFrames(receiptId);
 }
 
 /**
  * Original frame bytes in capture order. Processed extract must not use these; prep first.
  */
 export async function readReceiptAllFrameBytes(id: string, db?: AppDatabaseClient): Promise<readonly Buffer[]> {
-    const row = await requireReceipt(id, db);
-    const count = await countReceiptFrames(row.originalPath);
+    await requireReceipt(id, db);
+    const storage = getReceiptStorage();
+    const count = await storage.countFrames(id);
     if (count === 0) {
         throw new NotFoundError(`receipt frames not found: ${id}`);
     }
     const frames: Buffer[] = [];
     for (let frameIndex = 0; frameIndex < count; frameIndex += 1) {
-        frames.push(await readFile(receiptFramePath(row.originalPath, frameIndex)));
+        const bytes = await storage.get(originalRef(id, frameIndex));
+        if (!bytes) {
+            throw new NotFoundError(`receipt frame not found: ${id} frame ${frameIndex}`);
+        }
+        frames.push(bytes);
     }
     return frames;
 }
@@ -232,52 +197,36 @@ export async function readReceiptOriginalBytes(
     db?: AppDatabaseClient,
     frameIndex = 0,
 ): Promise<{ readonly bytes: Buffer; readonly contentType: ReceiptImageContentType }> {
-    const row = await requireReceipt(id, db);
+    await requireReceipt(id, db);
     if (!Number.isInteger(frameIndex) || frameIndex < 0) {
         throw new HttpError(400, `receipt frame index is invalid: ${frameIndex}`);
     }
-    const framePath = receiptFramePath(row.originalPath, frameIndex);
-    try {
-        const bytes = await readFile(framePath);
-        return { bytes, contentType: sniffImageContentType(bytes) };
-    } catch (error) {
-        const errno = error as NodeJS.ErrnoException;
-        if (errno.code === 'ENOENT') {
-            throw new NotFoundError(`receipt frame not found: ${id} frame ${frameIndex}`);
-        }
-        throw error;
+    const bytes = await getReceiptStorage().get(originalRef(id, frameIndex));
+    if (!bytes) {
+        throw new NotFoundError(`receipt frame not found: ${id} frame ${frameIndex}`);
     }
+    return { bytes, contentType: sniffImageContentType(bytes) };
 }
 
 export async function readReceiptProcessedBytes(
     id: string,
     db?: AppDatabaseClient,
 ): Promise<{ readonly bytes: Buffer; readonly contentType: ReceiptImageContentType }> {
-    const row = await requireReceipt(id, db);
-    try {
-        const bytes = await readFile(receiptProcessedPath(row.originalPath));
-        return { bytes, contentType: sniffImageContentType(bytes) };
-    } catch (error) {
-        const errno = error as NodeJS.ErrnoException;
-        if (errno.code === 'ENOENT') {
-            throw new NotFoundError(`receipt processed image not found: ${id}`);
-        }
-        throw error;
+    await requireReceipt(id, db);
+    const bytes = await getReceiptStorage().get(processedRef(id));
+    if (!bytes) {
+        throw new NotFoundError(`receipt processed image not found: ${id}`);
     }
+    return { bytes, contentType: sniffImageContentType(bytes) };
 }
 
 export async function readReceiptExtractFrameBytes(id: string, db?: AppDatabaseClient): Promise<readonly Buffer[]> {
-    const row = await requireReceipt(id, db);
-    try {
-        const processed = await readFile(receiptProcessedPath(row.originalPath));
+    await requireReceipt(id, db);
+    const processed = await getReceiptStorage().get(processedRef(id));
+    if (processed) {
         return [processed];
-    } catch (error) {
-        const errno = error as NodeJS.ErrnoException;
-        if (errno.code === 'ENOENT') {
-            return readReceiptAllFrameBytes(id, db);
-        }
-        throw error;
     }
+    return readReceiptAllFrameBytes(id, db);
 }
 
 export type ReceiptImageVariant = 'original' | 'processed';
@@ -312,11 +261,16 @@ async function hashBytesForInsert(input: InsertReceiptOriginalInput): Promise<st
     }
 }
 
-async function readHashSourceBytes(originalPath: string): Promise<Buffer> {
-    if (await hasReceiptProcessed(originalPath)) {
-        return readFile(receiptProcessedPath(originalPath));
+async function readHashSourceBytes(receiptId: string, storage: ReceiptStorage): Promise<Buffer> {
+    const processed = await storage.get(processedRef(receiptId));
+    if (processed) {
+        return processed;
     }
-    return readFile(originalPath);
+    const original = await storage.get(originalRef(receiptId, 0));
+    if (!original) {
+        throw new NotFoundError(`receipt frame not found: ${receiptId} frame 0`);
+    }
+    return original;
 }
 
 async function persistPerceptualHash(id: string, perceptualHash: string, database: AppDatabaseClient): Promise<void> {
@@ -326,7 +280,11 @@ async function persistPerceptualHash(id: string, perceptualHash: string, databas
 /**
  * Linear scan is intentional at household volume. Null hashes are backfilled here so older rows can still match.
  */
-async function findPerceptualDuplicate(hash: string, database: AppDatabaseClient): Promise<ReceiptRow | undefined> {
+async function findPerceptualDuplicate(
+    hash: string,
+    database: AppDatabaseClient,
+    storage: ReceiptStorage,
+): Promise<ReceiptRow | undefined> {
     const rows = await database.selectFrom('receipts').selectAll().execute();
     const neighbors: PerceptualNeighbor[] = [];
     const byId = new Map<string, ReceiptRow>();
@@ -335,7 +293,7 @@ async function findPerceptualDuplicate(hash: string, database: AppDatabaseClient
         let stored = row.perceptualHash;
         if (!stored) {
             try {
-                stored = await perceptualHashOf(await readHashSourceBytes(row.originalPath));
+                stored = await perceptualHashOf(await readHashSourceBytes(row.id, storage));
                 await persistPerceptualHash(row.id, stored, database);
                 byId.set(row.id, { ...row, perceptualHash: stored });
             } catch (error) {
@@ -356,36 +314,39 @@ export async function insertReceiptOriginal(
 ): Promise<ReceiptRow> {
     const database = db ?? (await getAppDatabase());
     await assertReceiptWritesAllowed(database);
+    const storage = resolveStorage(input);
 
     const extraFrames = input.extraFrames ?? [];
     const contentHash = contentHashOfFrames([input.bytes, ...extraFrames]);
     const existing = await findReceiptByContentHash(contentHash, database);
     if (existing) {
-        await writeProcessedIfAbsent(existing.originalPath, input.processed);
+        await writeProcessedIfAbsent(storage, existing.id, input.processed);
         return existing;
     }
 
     const incomingHash = await hashBytesForInsert(input);
     if (incomingHash) {
-        const duplicate = await findPerceptualDuplicate(incomingHash, database);
+        const duplicate = await findPerceptualDuplicate(incomingHash, database, storage);
         if (duplicate) {
-            await writeProcessedIfAbsent(duplicate.originalPath, input.processed);
+            await writeProcessedIfAbsent(storage, duplicate.id, input.processed);
             return duplicate;
         }
     }
 
     const id = randomUUID();
-    const receiptsDir = input.receiptsDir ?? getReceiptsDir();
-    await mkdir(receiptsDir, { recursive: true });
-    const originalPath = join(receiptsDir, id);
-    await writeFile(originalPath, input.bytes);
+    // `original_path` is retained (NOT NULL) as the receipt's logical storage key; the provider
+    // derives physical object locations from the receipt id, so the key is just the id.
+    const originalPath = id;
+    await storage.put(originalRef(id, 0), input.bytes);
     try {
         for (const [extraIndex, frame] of extraFrames.entries()) {
-            await writeFile(extraFramePath(originalPath, extraIndex), frame);
+            await storage.put(originalRef(id, extraIndex + 1), frame);
         }
-        await writeProcessedFile(originalPath, input.processed);
+        if (input.processed) {
+            await storage.put(processedRef(id), input.processed);
+        }
     } catch (error) {
-        await unlinkReceiptFiles(originalPath);
+        await storage.deleteAll(id);
         throw error;
     }
 
@@ -410,11 +371,11 @@ export async function insertReceiptOriginal(
             })
             .execute();
     } catch (error) {
-        await unlinkReceiptFiles(originalPath);
+        await storage.deleteAll(id);
         if (isReceiptContentHashConflict(error)) {
             const winner = await findReceiptByContentHash(contentHash, database);
             if (winner) {
-                await writeProcessedIfAbsent(winner.originalPath, input.processed);
+                await writeProcessedIfAbsent(storage, winner.id, input.processed);
                 return winner;
             }
         }
@@ -423,7 +384,7 @@ export async function insertReceiptOriginal(
 
     const row = await getReceiptById(id, database);
     if (!row) {
-        await unlinkReceiptFiles(originalPath);
+        await storage.deleteAll(id);
         throw new Error(`receipt insert vanished: ${id}`);
     }
     return row;
@@ -487,5 +448,5 @@ export async function deleteReceipt(id: string, db?: AppDatabaseClient): Promise
         return;
     }
     await database.deleteFrom('receipts').where('id', '=', id).execute();
-    await unlinkReceiptFiles(row.originalPath);
+    await getReceiptStorage().deleteAll(id);
 }

@@ -5,8 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { AppDatabaseClient } from '../../../data-persistence/database';
-import { createAppDatabase } from '../../../data-persistence/database';
-import { migrateToLatest } from '../../../data-persistence/migrate';
+import { createTestAppDatabase } from '../../../data-persistence/testDatabase';
 import type { TransactionDetailDto } from '../../categorization/categorizationDtos';
 import { setOperatingMode } from '../../operatingMode/data/operatingModeRepo';
 import { insertReceiptOriginal } from '../data/receiptsRepo';
@@ -94,16 +93,17 @@ describe('matchPreview', () => {
 
 describe('lookupByTransaction', () => {
     let directory: string;
+    let appDb: Awaited<ReturnType<typeof createTestAppDatabase>>;
     let database: AppDatabaseClient;
 
     beforeEach(async () => {
         directory = await mkdtemp(join(tmpdir(), 'api-receipts-lookup-'));
-        database = createAppDatabase(join(directory, 'app.sqlite'));
-        await migrateToLatest(database);
+        appDb = await createTestAppDatabase();
+        database = appDb.db;
     });
 
     afterEach(async () => {
-        await database.destroy();
+        await appDb.close();
         await rm(directory, { recursive: true, force: true });
     });
 

@@ -61,8 +61,8 @@ async function toReceiptDto(row: ReceiptRow): Promise<ReceiptDto> {
         transactionId: row.transactionId,
         contentHash: row.contentHash,
         totalsDisagree: row.totalsDisagree,
-        frameCount: await countReceiptFrames(row.originalPath),
-        hasProcessed: await hasReceiptProcessed(row.originalPath),
+        frameCount: await countReceiptFrames(row.id),
+        hasProcessed: await hasReceiptProcessed(row.id),
     };
 }
 

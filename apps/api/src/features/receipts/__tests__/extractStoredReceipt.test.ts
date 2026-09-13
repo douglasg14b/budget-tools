@@ -1,38 +1,32 @@
-import { access, mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AppDatabaseClient } from '../../../data-persistence/database';
-import { createAppDatabase } from '../../../data-persistence/database';
-import { migrateToLatest } from '../../../data-persistence/migrate';
+import { createTestAppDatabase } from '../../../data-persistence/testDatabase';
 import { setOperatingMode } from '../../operatingMode/data/operatingModeRepo';
 import { createReceipt } from '../createReceipt';
 import { getReceiptById } from '../data/receiptsRepo';
 import { extractStoredReceipt } from '../extractStoredReceipt';
 import { jpegDataUrl } from '../pipeline/prepReceiptImage';
+import { originalRef } from '../storage/receiptStorage';
 
 describe('extractStoredReceipt', () => {
-    let directory: string;
+    let appDb: Awaited<ReturnType<typeof createTestAppDatabase>>;
     let database: AppDatabaseClient;
     const jpegBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
 
     beforeEach(async () => {
-        directory = await mkdtemp(join(tmpdir(), 'api-receipt-extract-'));
-        database = createAppDatabase(join(directory, 'app.sqlite'));
-        await migrateToLatest(database);
+        appDb = await createTestAppDatabase();
+        database = appDb.db;
         await setOperatingMode('live', database);
     });
 
     afterEach(async () => {
-        await database.destroy();
-        await rm(directory, { recursive: true, force: true });
+        await appDb.close();
     });
 
     it('persists gated extract keys on the Live row', async () => {
         const created = await createReceipt(
-            { frames: [jpegDataUrl(jpegBytes)], receiptsDir: join(directory, 'files') },
+            { frames: [jpegDataUrl(jpegBytes)], receiptsDir: appDb.receiptsDir },
             database,
         );
         await extractStoredReceipt(created.id, database, async () => ({
@@ -54,7 +48,7 @@ describe('extractStoredReceipt', () => {
             totalsDisagree: false,
             rawText: 'Cafe Rio',
         });
-        await access(created.originalPath);
+        expect(await appDb.storage.exists(originalRef(created.id, 0))).toBe(true);
     });
 
     it('deletes the file and row when extract identifies Amazon', async () => {
@@ -62,18 +56,18 @@ describe('extractStoredReceipt', () => {
             {
                 frames: [jpegDataUrl(jpegBytes)],
                 transactionId: 'txn-amazon',
-                receiptsDir: join(directory, 'files'),
+                receiptsDir: appDb.receiptsDir,
             },
             database,
         );
         await extractStoredReceipt(created.id, database, async () => ({ kind: 'amazon' }));
         expect(await getReceiptById(created.id, database)).toBeUndefined();
-        await expect(access(created.originalPath)).rejects.toMatchObject({ code: 'ENOENT' });
+        expect(await appDb.storage.exists(originalRef(created.id, 0))).toBe(false);
     });
 
     it('does not persist failed when Amazon delete fails', async () => {
         const created = await createReceipt(
-            { frames: [jpegDataUrl(jpegBytes)], receiptsDir: join(directory, 'files') },
+            { frames: [jpegDataUrl(jpegBytes)], receiptsDir: appDb.receiptsDir },
             database,
         );
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -89,7 +83,7 @@ describe('extractStoredReceipt', () => {
             const row = await getReceiptById(created.id, database);
             expect(row).toBeDefined();
             expect(row?.extractStatus).toBe('pending');
-            await access(created.originalPath);
+            expect(await appDb.storage.exists(originalRef(created.id, 0))).toBe(true);
             const logged = errorSpy.mock.calls.map((call) => JSON.stringify(call)).join(' ');
             expect(logged).toContain(created.id);
             expect(logged).toContain('receipt amazon delete failed');
@@ -101,7 +95,7 @@ describe('extractStoredReceipt', () => {
 
     it('persists failed status with the error dump when extract throws', async () => {
         const created = await createReceipt(
-            { frames: [jpegDataUrl(jpegBytes)], receiptsDir: join(directory, 'files') },
+            { frames: [jpegDataUrl(jpegBytes)], receiptsDir: appDb.receiptsDir },
             database,
         );
         await extractStoredReceipt(created.id, database, async () => {
@@ -119,7 +113,7 @@ describe('extractStoredReceipt', () => {
             {
                 frames: [jpegDataUrl(jpegBytes)],
                 processed: jpegDataUrl(processed),
-                receiptsDir: join(directory, 'files'),
+                receiptsDir: appDb.receiptsDir,
             },
             database,
         );

@@ -1,12 +1,7 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { AppDatabaseClient } from '../../../data-persistence/database';
-import { createAppDatabase } from '../../../data-persistence/database';
-import { migrateToLatest } from '../../../data-persistence/migrate';
+import { createTestAppDatabase } from '../../../data-persistence/testDatabase';
 import { setOperatingMode } from '../../operatingMode/data/operatingModeRepo';
 import { createReceipt, decodeDataUrlFrame } from '../createReceipt';
 import {
@@ -16,26 +11,25 @@ import {
     readReceiptProcessedBytes,
 } from '../data/receiptsRepo';
 import { MAX_RECEIPT_FRAMES } from '../receiptLimits';
+import { originalRef } from '../storage/receiptStorage';
 
 function jpegDataUrl(bytes: Buffer): string {
     return `data:image/jpeg;base64,${bytes.toString('base64')}`;
 }
 
 describe('createReceipt', () => {
-    let directory: string;
+    let appDb: Awaited<ReturnType<typeof createTestAppDatabase>>;
     let database: AppDatabaseClient;
     const jpegBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
     const secondFrame = Buffer.from([0xff, 0xd8, 0xff, 0xe1, 0x00, 0x11]);
 
     beforeEach(async () => {
-        directory = await mkdtemp(join(tmpdir(), 'api-receipts-http-'));
-        database = createAppDatabase(join(directory, 'app.sqlite'));
-        await migrateToLatest(database);
+        appDb = await createTestAppDatabase();
+        database = appDb.db;
     });
 
     afterEach(async () => {
-        await database.destroy();
-        await rm(directory, { recursive: true, force: true });
+        await appDb.close();
     });
 
     it('rejects non-data-URL frames', () => {
@@ -49,7 +43,7 @@ describe('createReceipt', () => {
     it('rejects more than MAX_RECEIPT_FRAMES frames', async () => {
         await setOperatingMode('live', database);
         const frames = Array.from({ length: MAX_RECEIPT_FRAMES + 1 }, () => jpegDataUrl(jpegBytes));
-        await expect(createReceipt({ frames, receiptsDir: join(directory, 'files') }, database)).rejects.toMatchObject({
+        await expect(createReceipt({ frames, receiptsDir: appDb.receiptsDir }, database)).rejects.toMatchObject({
             statusCode: 400,
         });
     });
@@ -57,13 +51,13 @@ describe('createReceipt', () => {
     it('refuses Practice creates', async () => {
         await setOperatingMode('practice', database);
         await expect(
-            createReceipt({ frames: [jpegDataUrl(jpegBytes)], receiptsDir: join(directory, 'files') }, database),
+            createReceipt({ frames: [jpegDataUrl(jpegBytes)], receiptsDir: appDb.receiptsDir }, database),
         ).rejects.toMatchObject({ statusCode: 403 });
     });
 
     it('stores Live frames as one row and serves the first original', async () => {
         await setOperatingMode('live', database);
-        const receiptsDir = join(directory, 'files');
+        const receiptsDir = appDb.receiptsDir;
         const created = await createReceipt(
             {
                 frames: [jpegDataUrl(jpegBytes), jpegDataUrl(secondFrame)],
@@ -76,8 +70,8 @@ describe('createReceipt', () => {
         expect(created.extractStatus).toBe('pending');
         const listed = await findReceiptByContentHash(created.contentHash, database);
         expect(listed?.id).toBe(created.id);
-        const extra = await readFile(`${created.originalPath}.1`);
-        expect(extra.equals(secondFrame)).toBe(true);
+        const extra = await appDb.storage.get(originalRef(created.id, 1));
+        expect(extra?.equals(secondFrame)).toBe(true);
         const original = await readReceiptOriginalBytes(created.id, database);
         expect(original.contentType).toBe('image/jpeg');
         expect(original.bytes.equals(jpegBytes)).toBe(true);
@@ -96,7 +90,7 @@ describe('createReceipt', () => {
 
     it('stores processed bytes separately from originals', async () => {
         await setOperatingMode('live', database);
-        const receiptsDir = join(directory, 'files');
+        const receiptsDir = appDb.receiptsDir;
         const processed = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x22]);
         const created = await createReceipt(
             {
@@ -106,7 +100,7 @@ describe('createReceipt', () => {
             },
             database,
         );
-        expect(await hasReceiptProcessed(created.originalPath)).toBe(true);
+        expect(await hasReceiptProcessed(created.id)).toBe(true);
         const original = await readReceiptOriginalBytes(created.id, database);
         expect(original.bytes.equals(jpegBytes)).toBe(true);
         const storedProcessed = await readReceiptProcessedBytes(created.id, database);
