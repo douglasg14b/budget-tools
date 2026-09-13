@@ -1,31 +1,24 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { AppDatabaseClient } from '../../../../data-persistence/database';
-import { createAppDatabase } from '../../../../data-persistence/database';
-import { migrateToLatest } from '../../../../data-persistence/migrate';
+import { createTestAppDatabase } from '../../../../data-persistence/testDatabase';
 import { enqueueClassificationDecision, getClassificationSync } from '../../data/classificationSyncRepo';
 import { flushOutboundSync, resetOutboundFlushClockForTests } from '../flushOutboundSync';
 import { YnabRateLimitError } from '../ynabRateLimit';
 import type { YnabTransactionsWriter } from '../ynabWriteClient';
 
 describe('flushOutboundSync', () => {
-    let directory: string;
+    let appDb: Awaited<ReturnType<typeof createTestAppDatabase>>;
     let database: AppDatabaseClient;
 
     beforeEach(async () => {
-        directory = await mkdtemp(join(tmpdir(), 'api-sqlite-'));
-        database = createAppDatabase(join(directory, 'app.sqlite'));
-        await migrateToLatest(database);
+        appDb = await createTestAppDatabase();
+        database = appDb.db;
         resetOutboundFlushClockForTests();
     });
 
     afterEach(async () => {
-        await database.destroy();
-        await rm(directory, { recursive: true, force: true });
+        await appDb.close();
     });
 
     it('patches a pending batch and marks it synced', async () => {

@@ -147,6 +147,23 @@ public sealed class ScoringSession : IAsyncDisposable
     }
   }
 
+  public async Task<PeriodicSeriesListPayload> ListPeriodicSeriesAsync()
+  {
+    ObjectDisposedException.ThrowIf(_disposed, this);
+    await _predictLock.WaitAsync();
+    try
+    {
+      return new PeriodicSeriesListPayload
+      {
+        Series = _pipeline.PeriodicIndex.ListSeries(),
+      };
+    }
+    finally
+    {
+      _predictLock.Release();
+    }
+  }
+
   public async Task ReloadAsync(bool forceRetrain = false, TextWriter? diagnostics = null)
   {
     ObjectDisposedException.ThrowIf(_disposed, this);
@@ -211,7 +228,7 @@ public sealed class ScoringSession : IAsyncDisposable
   private static void ConfigureTravelBias(CategorizationPipeline pipeline)
   {
     (bool enabled, IReadOnlyList<TravelWindowRecord> windows) =
-      TravelSqliteStore.Load(Environment.GetEnvironmentVariable("SQLITE_DB_PATH"));
+      TravelPostgresStore.Load(Environment.GetEnvironmentVariable("DB_CONNECTION_STRING"));
     pipeline.ConfigureTravelBias(enabled, windows);
   }
 

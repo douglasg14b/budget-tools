@@ -13,8 +13,10 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- Fetches the trained models from S3 at startup; they are gitignored, so a container
+             built from a git clone cannot bake them in. See Data/ModelDownloader.cs. -->
+        <PackageReference Include="AWSSDK.S3" Version="3.7.404.4" />
         <PackageReference Include="CsvHelper" Version="31.0.0" />
-        <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0">
             <PrivateAssets>all</PrivateAssets>

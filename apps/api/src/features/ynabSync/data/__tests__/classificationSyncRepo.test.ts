@@ -1,12 +1,7 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { AppDatabaseClient } from '../../../../data-persistence/database';
-import { createAppDatabase } from '../../../../data-persistence/database';
-import { migrateToLatest } from '../../../../data-persistence/migrate';
+import { createTestAppDatabase } from '../../../../data-persistence/testDatabase';
 import { ConflictError } from '../../../travelWindows/HttpError';
 import type { ClassificationDecision } from '../../classificationDecision';
 import {
@@ -24,18 +19,16 @@ import {
 } from '../classificationSyncRepo';
 
 describe('classificationSyncRepo', () => {
-    let directory: string;
+    let appDb: Awaited<ReturnType<typeof createTestAppDatabase>>;
     let database: AppDatabaseClient;
 
     beforeEach(async () => {
-        directory = await mkdtemp(join(tmpdir(), 'api-sqlite-'));
-        database = createAppDatabase(join(directory, 'app.sqlite'));
-        await migrateToLatest(database);
+        appDb = await createTestAppDatabase();
+        database = appDb.db;
     });
 
     afterEach(async () => {
-        await database.destroy();
-        await rm(directory, { recursive: true, force: true });
+        await appDb.close();
     });
 
     it('enqueues a decision and replaces pending or failed rows', async () => {

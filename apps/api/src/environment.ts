@@ -62,13 +62,6 @@ export function getDbConnectionString(): string {
 }
 
 /**
- * API-owned SQLite file for app config (travel windows, Amazon order cache). Not the Budget Tools Postgres schema.
- */
-export function getSqliteDbPath(): string {
-    return resolveFromCwd(env.get('SQLITE_DB_PATH').default('apps/api/data/app.sqlite').asString());
-}
-
-/**
  * Directory for Live receipt originals. Gitignored with apps/api/data/.
  * Relative RECEIPTS_DIR is resolved from the repo root (same as AMAZON_ORDERS_MCP_ENTRY), not
  * process.cwd(), so Vitest in apps/api does not write to apps/api/apps/api/data.
@@ -82,6 +75,51 @@ export const RECEIPTS_JSON_BODY_LIMIT = env
     .get('RECEIPTS_JSON_BODY_LIMIT')
     .default(String(15 * 1024 * 1024))
     .asIntPositive();
+
+/**
+ * Receipt image storage backend. `fs` (default) stores originals under `RECEIPTS_DIR`; `s3`
+ * stores them in an S3-compatible bucket (the on-network rust-fs server in production).
+ */
+export const RECEIPTS_STORAGE = env.get('RECEIPTS_STORAGE').default('fs').asEnum(['fs', 's3']);
+
+/** S3-compatible endpoint URL for receipt storage (rust-fs), e.g. `https://s3.home.lan`. */
+export function getReceiptsS3Endpoint(): string | undefined {
+    const value = env.get('RECEIPTS_S3_ENDPOINT').default('').asString().trim();
+    return value || undefined;
+}
+
+/** S3 region. rust-fs ignores it, but the AWS SDK requires a value; defaults to `us-east-1`. */
+export const RECEIPTS_S3_REGION = env.get('RECEIPTS_S3_REGION').default('us-east-1').asString();
+
+/** Bucket that holds receipt image objects. Required when `RECEIPTS_STORAGE=s3`. */
+export function getReceiptsS3Bucket(): string | undefined {
+    const value = env.get('RECEIPTS_S3_BUCKET').default('').asString().trim();
+    return value || undefined;
+}
+
+/** Optional key prefix inside the bucket, e.g. `receipts/`. */
+export function getReceiptsS3Prefix(): string | undefined {
+    const value = env.get('RECEIPTS_S3_PREFIX').default('').asString().trim();
+    return value || undefined;
+}
+
+/** Access key id for the receipt-storage user. Required when `RECEIPTS_STORAGE=s3`. Secret. */
+export function getReceiptsS3AccessKeyId(): string | undefined {
+    const value = env.get('RECEIPTS_S3_ACCESS_KEY_ID').default('').asString().trim();
+    return value || undefined;
+}
+
+/** Secret access key for the receipt-storage user. Required when `RECEIPTS_STORAGE=s3`. Secret. */
+export function getReceiptsS3SecretAccessKey(): string | undefined {
+    const value = env.get('RECEIPTS_S3_SECRET_ACCESS_KEY').default('').asString().trim();
+    return value || undefined;
+}
+
+/**
+ * Whether to use path-style bucket addressing (`{endpoint}/{bucket}/{key}`) instead of
+ * virtual-host style. rust-fs and most self-hosted S3 servers need path style; default true.
+ */
+export const RECEIPTS_S3_FORCE_PATH_STYLE = env.get('RECEIPTS_S3_FORCE_PATH_STYLE').default('true').asBool();
 
 /**
  * Path to the Amazon order-history MCP `dist/index.js`.

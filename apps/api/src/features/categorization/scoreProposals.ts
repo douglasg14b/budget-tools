@@ -3,7 +3,6 @@ import {
     CATEGORIZATION_MODELS_DIR,
     CATEGORIZATION_PREDICT_TIMEOUT_MS,
     getDbConnectionString,
-    getSqliteDbPath,
 } from '../../environment';
 import { isCacheUsable, writeProposalCache } from './cache/proposalCache';
 import type { CachedProposalEntry, ProposalCacheFile } from './cache/types';
@@ -50,7 +49,6 @@ export async function scoreMissingIds(input: ScoreMissingInput): Promise<ScoreMi
             workingDir: CATEGORIZATION_AI_WORKING_DIR,
             modelsDir: CATEGORIZATION_MODELS_DIR,
             connectionString: getDbConnectionString(),
-            sqliteDbPath: getSqliteDbPath(),
             timeoutMs: CATEGORIZATION_PREDICT_TIMEOUT_MS,
             llm: false,
             transactionIds: input.idsToScore,

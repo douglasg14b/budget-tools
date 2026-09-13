@@ -684,7 +684,7 @@ public static class PipelineRunner
     private static void ConfigureTravelBias(CategorizationPipeline pipeline)
     {
         (bool enabled, IReadOnlyList<TravelWindowRecord> windows) =
-            TravelSqliteStore.Load(Environment.GetEnvironmentVariable("SQLITE_DB_PATH"));
+            TravelPostgresStore.Load(Environment.GetEnvironmentVariable("DB_CONNECTION_STRING"));
         pipeline.ConfigureTravelBias(enabled, windows);
     }
 

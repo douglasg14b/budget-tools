@@ -1,19 +1,16 @@
 import { createAppDatabase } from '../../data-persistence/database';
-import { migrateToLatest } from '../../data-persistence/migrate';
-import { getSqliteDbPath } from '../../environment';
+import { getDbConnectionString } from '../../environment';
 import { deleteAllAmazonSplitOverlays } from '../amazonClassify/data/amazonSplitOverlayRepo';
 import { countAmazonCache, deleteAllAmazonOrders } from './data/amazonOrdersRepo';
 
 async function main(): Promise<void> {
-    const sqlitePath = getSqliteDbPath();
-    const database = createAppDatabase(sqlitePath);
+    const database = createAppDatabase(getDbConnectionString());
     try {
-        await migrateToLatest(database);
         const before = await countAmazonCache(database);
         const overlays = await deleteAllAmazonSplitOverlays(database);
         const deleted = await deleteAllAmazonOrders(database);
         const after = await countAmazonCache(database);
-        console.log(`Cleared Amazon order cache at ${sqlitePath}`);
+        console.log('Cleared Amazon order cache in Postgres');
         console.log(
             `Removed ${deleted.orders} orders, ${deleted.items} items, ${overlays} split overlays (was ${before.orders} orders).`,
         );

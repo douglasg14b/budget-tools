@@ -6,7 +6,8 @@
   "scripts": {
     "predev": "pnpm tsoa",
     "dev": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx watch apps/api/src/server.ts",
-    "migrate": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx apps/api/src/data-persistence/runMigrations.ts",
+    "migrate": "pnpm --filter @budget-tools/db migrate",
+    "migrate:data": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx apps/api/src/scripts/migrateSqliteToPostgres.ts",
     "clear:amazon-cache": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx apps/api/src/features/amazonOrders/clearAmazonOrderCache.ts",
     "prebuild": "pnpm tsoa",
     "build": "tsc -p tsconfig.json --noEmit",
@@ -17,10 +18,10 @@
     "tsoa": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- tsoa spec-and-routes"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.700.0",
     "@budget-tools/db": "workspace:^",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@tsoa/runtime": "7.0.0-alpha.0",
-    "better-sqlite3": "^13.0.3",
     "env-var": "^7.5.0",
     "express": "^5.2.1",
     "kysely": "^0.27.5",
@@ -30,14 +31,16 @@
     "sharp-phash": "^2.2.0",
     "talisman": "^1.1.4",
     "tsoa": "7.0.0-alpha.0",
+    "tsx": "^4.11.2",
     "ynab": "^2.6.0"
   },
   "devDependencies": {
     "@budget-tools/config-typescript": "workspace:^",
     "@dotenvx/dotenvx": "^1.31.0",
-    "@types/better-sqlite3": "^9.6.0",
+    "@electric-sql/pglite": "^0.4.0",
     "@types/express": "^5.0.6",
     "@types/pg": "^8.11.10",
+    "kysely-pglite-dialect": "^1.3.1",
     "vitest": "^2.1.1"
   }
 }

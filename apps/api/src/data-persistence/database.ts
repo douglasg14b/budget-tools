@@ -1,10 +1,8 @@
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import type { Dialect } from 'kysely';
+import { CamelCasePlugin, Kysely, PostgresDialect } from 'kysely';
+import pg from 'pg';
 
-import SqliteDatabase from 'better-sqlite3';
-import { CamelCasePlugin, Kysely, SqliteDialect } from 'kysely';
-
-import { getSqliteDbPath } from '../environment';
+import { getDbConnectionString } from '../environment';
 import type { AmazonSplitOverlaysTable } from '../features/amazonClassify/data/amazonSplitOverlaySchema';
 import type {
     AmazonOrderItemsTable,
@@ -17,13 +15,17 @@ import type { ReceiptsTable } from '../features/receipts/data/receiptsSchema';
 import type { TravelBiasConfigTable } from '../features/travelWindows/data/travelBiasConfigSchema';
 import type { TravelWindowAccountsTable, TravelWindowsTable } from '../features/travelWindows/data/travelWindowsSchema';
 import type { ClassificationSyncTable } from '../features/ynabSync/data/classificationSyncSchema';
-import { migrateToLatest } from './migrate';
-import { SqlDatePlugin } from './plugins/sqlDatePlugin';
-import { SqliteBindingPlugin } from './plugins/sqliteBindingPlugin';
+
+const { Pool } = pg;
 
 /**
- * API SQLite schema. Feature tables are declared next to their features and composed here.
- * Budget Tools YNAB data stays on Postgres via `getDatabase()`.
+ * API-owned application tables. These live in the shared Budget Tools Postgres alongside the
+ * YNAB core schema; their DDL is owned by the `@budget-tools/db` migrator (one migrator, one DB).
+ * Feature tables are declared next to their features and composed here.
+ *
+ * The YNAB core tables (`transactions`, `categories`, …) are queried through the separate
+ * `getDatabase()` client (`../data/database`) typed as `@budget-tools/db`'s `Database`. Both
+ * clients point at the same Postgres; the split is only a typing convenience.
  */
 export type AppDatabase = {
     travel_windows: TravelWindowsTable;
@@ -41,44 +43,37 @@ export type AppDatabase = {
 
 export type AppDatabaseClient = Kysely<AppDatabase>;
 
-let opening: Promise<AppDatabaseClient> | undefined;
+let cached: AppDatabaseClient | undefined;
 
-export function createAppDatabase(filePath: string): AppDatabaseClient {
-    if (filePath !== ':memory:') {
-        mkdirSync(dirname(filePath), { recursive: true });
-    }
-
+/**
+ * Builds an API app-tables client over the given Kysely dialect. Tests pass a PGlite-backed
+ * dialect (see `data-persistence/testDatabase.ts`); production uses a pg `Pool`. The
+ * `CamelCasePlugin` bridges the snake_case Postgres columns to the camelCase schema types.
+ */
+export function createAppDatabaseFromDialect(dialect: Dialect): AppDatabaseClient {
     return new Kysely<AppDatabase>({
-        dialect: new SqliteDialect({
-            database: new SqliteDatabase(filePath),
-        }),
-        plugins: [
-            new SqliteBindingPlugin<AppDatabase>({
-                travel_bias_config: ['enabled'],
-                amazon_payments: ['isRefund'],
-                amazon_sync_state: ['lastAuthenticated'],
-                receipts: ['totalsDisagree'],
-            }),
-            new CamelCasePlugin(),
-            new SqlDatePlugin<AppDatabase>({
-                travel_windows: ['createdAt', 'updatedAt'],
-            }),
-        ],
+        dialect,
+        plugins: [new CamelCasePlugin()],
     });
 }
 
-/**
- * Lazily opens the API SQLite file and migrates it. Safe to call from request handlers.
- */
-export function getAppDatabase(): Promise<AppDatabaseClient> {
-    if (!opening) {
-        opening = openAppDatabase();
-    }
-    return opening;
+/** Production client: a pg pool against the shared Postgres connection string. */
+export function createAppDatabase(connectionString: string): AppDatabaseClient {
+    return createAppDatabaseFromDialect(
+        new PostgresDialect({
+            pool: new Pool({ connectionString, max: 10 }),
+        }),
+    );
 }
 
-async function openAppDatabase(): Promise<AppDatabaseClient> {
-    const database = createAppDatabase(getSqliteDbPath());
-    await migrateToLatest(database);
-    return database;
+/**
+ * Lazily opens the API app-tables client. Unlike the retired SQLite path, this does NOT migrate
+ * on open — the shared `@budget-tools/db` migrator owns schema and runs as a one-shot step
+ * before the API starts. Safe to call from request handlers.
+ */
+export async function getAppDatabase(): Promise<AppDatabaseClient> {
+    if (!cached) {
+        cached = createAppDatabase(getDbConnectionString());
+    }
+    return cached;
 }

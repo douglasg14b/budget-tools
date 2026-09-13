@@ -1,30 +1,23 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { AppDatabaseClient } from '../../../data-persistence/database';
-import { createAppDatabase } from '../../../data-persistence/database';
-import { migrateToLatest } from '../../../data-persistence/migrate';
+import { createTestAppDatabase } from '../../../data-persistence/testDatabase';
 import { HttpError } from '../../travelWindows/HttpError';
 import { getClassificationSync } from '../data/classificationSyncRepo';
 import { recordDecisions } from '../recordDecisions';
 import { retractDecision } from '../retractDecision';
 
 describe('recordDecisions', () => {
-    let directory: string;
+    let appDb: Awaited<ReturnType<typeof createTestAppDatabase>>;
     let database: AppDatabaseClient;
 
     beforeEach(async () => {
-        directory = await mkdtemp(join(tmpdir(), 'api-sqlite-'));
-        database = createAppDatabase(join(directory, 'app.sqlite'));
-        await migrateToLatest(database);
+        appDb = await createTestAppDatabase();
+        database = appDb.db;
     });
 
     afterEach(async () => {
-        await database.destroy();
-        await rm(directory, { recursive: true, force: true });
+        await appDb.close();
     });
 
     it('refuses practice mode without writing rows', async () => {
@@ -69,18 +62,16 @@ describe('recordDecisions', () => {
 });
 
 describe('retractDecision', () => {
-    let directory: string;
+    let appDb: Awaited<ReturnType<typeof createTestAppDatabase>>;
     let database: AppDatabaseClient;
 
     beforeEach(async () => {
-        directory = await mkdtemp(join(tmpdir(), 'api-sqlite-'));
-        database = createAppDatabase(join(directory, 'app.sqlite'));
-        await migrateToLatest(database);
+        appDb = await createTestAppDatabase();
+        database = appDb.db;
     });
 
     afterEach(async () => {
-        await database.destroy();
-        await rm(directory, { recursive: true, force: true });
+        await appDb.close();
     });
 
     it('deletes a pending live row', async () => {
