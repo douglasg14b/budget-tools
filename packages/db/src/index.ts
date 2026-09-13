@@ -1,4 +1,5 @@
 export { createDatabase, type DatabaseClient } from './createDatabase';
+export { MIGRATIONS, migrateToLatest } from './migrate';
 export type {
     CategorizationFeedback,
     Category,
