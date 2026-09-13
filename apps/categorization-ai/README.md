@@ -98,6 +98,7 @@ Endpoints:
 | `GET` | `/health` | Ready check + model signature |
 | `POST` | `/predict` | Body `{ "transactionIds": ["id"], "llm": false }` → same envelope as `predict-json` |
 | `POST` | `/reload` | Rebuild lookups/models after `dotnet run train` |
+| `GET` | `/periodic-series` | Catalog of detected repeating series from the in-memory index |
 
 `appsettings.json`:
 

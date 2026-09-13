@@ -11,6 +11,9 @@ export const RECEIPT_DETECT_MAX_DIMENSION = 1280;
 
 export const RECEIPT_DETECT_DETECTOR = 'ml' as const;
 
+/** Same-origin folder the Vite plugin copies from the scanic-ml package. */
+export const SCANIC_ML_ASSET_BASE_URL = '/scanic-ml/';
+
 export type ReceiptScanImage = HTMLImageElement | HTMLCanvasElement | ImageData;
 
 export type ReceiptScanCorners = CornerPoints;
@@ -42,6 +45,7 @@ function receiptDetectOptions() {
         mode: 'detect' as const,
         detector: RECEIPT_DETECT_DETECTOR,
         maxProcessingDimension: RECEIPT_DETECT_MAX_DIMENSION,
+        ml: { assetBaseUrl: SCANIC_ML_ASSET_BASE_URL },
     };
 }
 
@@ -57,7 +61,7 @@ export async function ensureScanicWasm(engine: ScanicEngine = defaultScanicEngin
 
 /**
  * Fetch and compile the ML corner model so the first snap is not a 2 MB stall.
- * A blank canvas is enough: Scanic throws on CDN/runtime failure and returns no-quad otherwise.
+ * A blank canvas is enough: Scanic throws if the same-origin model or runtime fails to load.
  */
 export async function warmupReceiptMlDetector(engine: ScanicEngine = defaultScanicEngine()): Promise<void> {
     await ensureScanicWasm(engine);

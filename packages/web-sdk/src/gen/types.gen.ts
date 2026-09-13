@@ -180,21 +180,7 @@ export type BindReceiptDto = {
     transactionId: string;
 };
 
-export type OperatingModeDto = {
-    mode: 'practice' | 'live';
-};
-
-export type HealthDto = {
-    ok: true;
-};
-
-export type QueueSummaryDto = {
-    blocked: number;
-    review: number;
-    suggested: number;
-    autoApply: number;
-    total: number;
-};
+export type PeriodicCadence = 'Weekly' | 'Biweekly' | 'Monthly' | 'Quarterly' | 'Yearly';
 
 /**
  * YNAB `cleared` field. Uncleared transactions are excluded from the review queue.
@@ -217,6 +203,45 @@ export type TransactionDetailDto = {
     amount: number;
     date: string;
     id: string;
+};
+
+export type PeriodicSeriesDto = {
+    relatedTransactions: Array<TransactionDetailDto>;
+    relatedTransactionIds: Array<string>;
+    cadenceFit: number;
+    categoryStable: boolean;
+    categoryVoteShare: number;
+    /**
+     * Majority historical category, or null when the series has no usable labels.
+     */
+    category: string | null;
+    expectedNextDate: string;
+    lastDate: string;
+    medianAmount: number;
+    occurrenceCount: number;
+    cadence: PeriodicCadence;
+    payeeName: string;
+    id: string;
+};
+
+export type PeriodicSeriesListDto = {
+    series: Array<PeriodicSeriesDto>;
+};
+
+export type OperatingModeDto = {
+    mode: 'practice' | 'live';
+};
+
+export type HealthDto = {
+    ok: true;
+};
+
+export type QueueSummaryDto = {
+    blocked: number;
+    review: number;
+    suggested: number;
+    autoApply: number;
+    total: number;
 };
 
 export type ApprovalTier = 'AutoApply' | 'Suggested' | 'Review' | 'Blocked';
@@ -267,8 +292,6 @@ export type PayeeSuggestionDto = {
     method: PayeeResolutionMethod;
     name: string;
 };
-
-export type PeriodicCadence = 'Weekly' | 'Biweekly' | 'Monthly' | 'Quarterly' | 'Yearly';
 
 export type PeriodicMatchDto = {
     cadenceFit: number;
@@ -1006,6 +1029,29 @@ export type BindReceiptResponses = {
 };
 
 export type BindReceiptResponse = BindReceiptResponses[keyof BindReceiptResponses];
+
+export type ListPeriodicSeriesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/periodic-series';
+};
+
+export type ListPeriodicSeriesErrors = {
+    /**
+     * Warm scorer unavailable
+     */
+    503: unknown;
+};
+
+export type ListPeriodicSeriesResponses = {
+    /**
+     * Ok
+     */
+    200: PeriodicSeriesListDto;
+};
+
+export type ListPeriodicSeriesResponse = ListPeriodicSeriesResponses[keyof ListPeriodicSeriesResponses];
 
 export type GetOperatingModeData = {
     body?: never;

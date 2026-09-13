@@ -12,6 +12,8 @@ import { AccountsController } from './../features/travelWindows/accountsControll
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { ReceiptsController } from './../features/receipts/receiptsController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { PeriodicSeriesController } from './../features/periodicSeries/periodicSeriesController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { OperatingModeController } from './../features/operatingMode/operatingModeController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { HealthController } from './../features/health/healthController';
@@ -163,6 +165,31 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"transactionId":{"dataType":"string","required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "PeriodicCadence": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["Weekly"]},{"dataType":"enum","enums":["Biweekly"]},{"dataType":"enum","enums":["Monthly"]},{"dataType":"enum","enums":["Quarterly"]},{"dataType":"enum","enums":["Yearly"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "TransactionClearedStatus": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["uncleared"]},{"dataType":"enum","enums":["cleared"]},{"dataType":"enum","enums":["reconciled"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "TransactionDetailDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"importPayeeNameOriginal":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"importPayeeName":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"importId":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"categoryName":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"categoryId":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"payeeName":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"payeeId":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"accountName":{"dataType":"string","required":true},"accountId":{"dataType":"string","required":true},"approved":{"dataType":"boolean","required":true},"cleared":{"ref":"TransactionClearedStatus","required":true},"memo":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"amount":{"dataType":"double","required":true},"date":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "PeriodicSeriesDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"relatedTransactions":{"dataType":"array","array":{"dataType":"refAlias","ref":"TransactionDetailDto"},"required":true},"relatedTransactionIds":{"dataType":"array","array":{"dataType":"string"},"required":true},"cadenceFit":{"dataType":"double","required":true},"categoryStable":{"dataType":"boolean","required":true},"categoryVoteShare":{"dataType":"double","required":true},"category":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"expectedNextDate":{"dataType":"string","required":true},"lastDate":{"dataType":"string","required":true},"medianAmount":{"dataType":"double","required":true},"occurrenceCount":{"dataType":"double","required":true},"cadence":{"ref":"PeriodicCadence","required":true},"payeeName":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "PeriodicSeriesListDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"series":{"dataType":"array","array":{"dataType":"refAlias","ref":"PeriodicSeriesDto"},"required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "OperatingModeDto": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"mode":{"dataType":"union","subSchemas":[{"dataType":"enum","enums":["practice"]},{"dataType":"enum","enums":["live"]}],"required":true}},"validators":{}},
@@ -176,16 +203,6 @@ const models: TsoaRoute.Models = {
     "QueueSummaryDto": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"blocked":{"dataType":"double","required":true},"review":{"dataType":"double","required":true},"suggested":{"dataType":"double","required":true},"autoApply":{"dataType":"double","required":true},"total":{"dataType":"double","required":true}},"validators":{}},
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "TransactionClearedStatus": {
-        "dataType": "refAlias",
-        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["uncleared"]},{"dataType":"enum","enums":["cleared"]},{"dataType":"enum","enums":["reconciled"]}],"validators":{}},
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "TransactionDetailDto": {
-        "dataType": "refAlias",
-        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"importPayeeNameOriginal":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"importPayeeName":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"importId":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"categoryName":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"categoryId":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"payeeName":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"payeeId":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"accountName":{"dataType":"string","required":true},"accountId":{"dataType":"string","required":true},"approved":{"dataType":"boolean","required":true},"cleared":{"ref":"TransactionClearedStatus","required":true},"memo":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"amount":{"dataType":"double","required":true},"date":{"dataType":"string","required":true},"id":{"dataType":"string","required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ApprovalTier": {
@@ -236,11 +253,6 @@ const models: TsoaRoute.Models = {
     "PayeeSuggestionDto": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"needsRename":{"dataType":"boolean","required":true},"confidence":{"dataType":"double","required":true},"method":{"ref":"PayeeResolutionMethod","required":true},"name":{"dataType":"string","required":true}},"validators":{}},
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "PeriodicCadence": {
-        "dataType": "refAlias",
-        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["Weekly"]},{"dataType":"enum","enums":["Biweekly"]},{"dataType":"enum","enums":["Monthly"]},{"dataType":"enum","enums":["Quarterly"]},{"dataType":"enum","enums":["Yearly"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "PeriodicMatchDto": {
@@ -976,6 +988,35 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'deleteReceipt',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsPeriodicSeriesController_listPeriodicSeries: Record<string, TsoaRoute.ParameterSchema> = {
+        };
+        app.get('/api/periodic-series',
+            ...(fetchMiddlewares<RequestHandler>(PeriodicSeriesController)),
+            ...(fetchMiddlewares<RequestHandler>(PeriodicSeriesController.prototype.listPeriodicSeries)),
+
+            async function PeriodicSeriesController_listPeriodicSeries(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsPeriodicSeriesController_listPeriodicSeries, request, response });
+
+                const controller = new PeriodicSeriesController();
+
+              await templateService.apiHandler({
+                methodName: 'listPeriodicSeries',
                 controller,
                 response,
                 next,

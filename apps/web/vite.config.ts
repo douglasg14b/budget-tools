@@ -2,9 +2,11 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+import { scanicNativeEsmPlugin } from './scanicVitePlugin';
+
 // biome-ignore lint/style/noDefaultExport: Vite expects a default export from this config file.
 export default defineConfig({
-    plugins: [react(), basicSsl()],
+    plugins: [react(), basicSsl(), scanicNativeEsmPlugin()],
     server: {
         // Listen on LAN so a phone on the same Wi-Fi can open the printed Network URL.
         // HTTPS is required for in-app getUserMedia outside localhost.

@@ -14,6 +14,7 @@ import type { OperatingMode } from './operatingMode/operatingModeCopy';
 import { ClassifyPage } from './pages/ClassifyPage';
 import { ReceiptDetailPage } from './pages/ReceiptDetailPage';
 import { ReceiptsPage } from './pages/ReceiptsPage';
+import { RepeatingPage } from './pages/RepeatingPage';
 import { ReviewQueuePage } from './pages/ReviewQueuePage';
 import { TripsPage } from './pages/TripsPage';
 import { theme } from './theme';
@@ -64,6 +65,7 @@ function AppLayout() {
                             <Route path="/classify/table" element={<ClassifyPage layout="table" />} />
                             <Route path="/receipts" element={<ReceiptsPage />} />
                             <Route path="/receipts/:receiptId" element={<ReceiptDetailPage />} />
+                            <Route path="/repeating" element={<RepeatingPage />} />
                             <Route path="/trips" element={<TripsPage />} />
                         </Routes>
                     </div>

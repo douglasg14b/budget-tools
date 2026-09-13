@@ -684,67 +684,15 @@
 				],
 				"type": "object"
 			},
-			"OperatingModeDto": {
-				"properties": {
-					"mode": {
-						"type": "string",
-						"enum": [
-							"practice",
-							"live"
-						]
-					}
-				},
-				"required": [
-					"mode"
-				],
-				"type": "object"
-			},
-			"HealthDto": {
-				"properties": {
-					"ok": {
-						"type": "boolean",
-						"enum": [
-							true
-						],
-						"nullable": false
-					}
-				},
-				"required": [
-					"ok"
-				],
-				"type": "object"
-			},
-			"QueueSummaryDto": {
-				"properties": {
-					"blocked": {
-						"type": "number",
-						"format": "double"
-					},
-					"review": {
-						"type": "number",
-						"format": "double"
-					},
-					"suggested": {
-						"type": "number",
-						"format": "double"
-					},
-					"autoApply": {
-						"type": "number",
-						"format": "double"
-					},
-					"total": {
-						"type": "number",
-						"format": "double"
-					}
-				},
-				"required": [
-					"blocked",
-					"review",
-					"suggested",
-					"autoApply",
-					"total"
-				],
-				"type": "object"
+			"PeriodicCadence": {
+				"type": "string",
+				"enum": [
+					"Weekly",
+					"Biweekly",
+					"Monthly",
+					"Quarterly",
+					"Yearly"
+				]
 			},
 			"TransactionClearedStatus": {
 				"type": "string",
@@ -828,6 +776,153 @@
 					"amount",
 					"date",
 					"id"
+				],
+				"type": "object"
+			},
+			"PeriodicSeriesDto": {
+				"properties": {
+					"relatedTransactions": {
+						"items": {
+							"$ref": "#/components/schemas/TransactionDetailDto"
+						},
+						"type": "array"
+					},
+					"relatedTransactionIds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"cadenceFit": {
+						"type": "number",
+						"format": "double"
+					},
+					"categoryStable": {
+						"type": "boolean"
+					},
+					"categoryVoteShare": {
+						"type": "number",
+						"format": "double"
+					},
+					"category": {
+						"type": "string",
+						"nullable": true,
+						"description": "Majority historical category, or null when the series has no usable labels."
+					},
+					"expectedNextDate": {
+						"type": "string"
+					},
+					"lastDate": {
+						"type": "string"
+					},
+					"medianAmount": {
+						"type": "number",
+						"format": "double"
+					},
+					"occurrenceCount": {
+						"type": "number",
+						"format": "double"
+					},
+					"cadence": {
+						"$ref": "#/components/schemas/PeriodicCadence"
+					},
+					"payeeName": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"relatedTransactions",
+					"relatedTransactionIds",
+					"cadenceFit",
+					"categoryStable",
+					"categoryVoteShare",
+					"category",
+					"expectedNextDate",
+					"lastDate",
+					"medianAmount",
+					"occurrenceCount",
+					"cadence",
+					"payeeName",
+					"id"
+				],
+				"type": "object"
+			},
+			"PeriodicSeriesListDto": {
+				"properties": {
+					"series": {
+						"items": {
+							"$ref": "#/components/schemas/PeriodicSeriesDto"
+						},
+						"type": "array"
+					}
+				},
+				"required": [
+					"series"
+				],
+				"type": "object"
+			},
+			"OperatingModeDto": {
+				"properties": {
+					"mode": {
+						"type": "string",
+						"enum": [
+							"practice",
+							"live"
+						]
+					}
+				},
+				"required": [
+					"mode"
+				],
+				"type": "object"
+			},
+			"HealthDto": {
+				"properties": {
+					"ok": {
+						"type": "boolean",
+						"enum": [
+							true
+						],
+						"nullable": false
+					}
+				},
+				"required": [
+					"ok"
+				],
+				"type": "object"
+			},
+			"QueueSummaryDto": {
+				"properties": {
+					"blocked": {
+						"type": "number",
+						"format": "double"
+					},
+					"review": {
+						"type": "number",
+						"format": "double"
+					},
+					"suggested": {
+						"type": "number",
+						"format": "double"
+					},
+					"autoApply": {
+						"type": "number",
+						"format": "double"
+					},
+					"total": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"blocked",
+					"review",
+					"suggested",
+					"autoApply",
+					"total"
 				],
 				"type": "object"
 			},
@@ -1042,16 +1137,6 @@
 					"name"
 				],
 				"type": "object"
-			},
-			"PeriodicCadence": {
-				"type": "string",
-				"enum": [
-					"Weekly",
-					"Biweekly",
-					"Monthly",
-					"Quarterly",
-					"Yearly"
-				]
 			},
 			"PeriodicMatchDto": {
 				"properties": {
@@ -2725,6 +2810,33 @@
 						}
 					}
 				]
+			}
+		},
+		"/periodic-series": {
+			"get": {
+				"operationId": "ListPeriodicSeries",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/PeriodicSeriesListDto"
+								}
+							}
+						}
+					},
+					"503": {
+						"description": "Warm scorer unavailable"
+					}
+				},
+				"description": "Catalog of repeating series detected from ledger history.",
+				"summary": "listPeriodicSeries",
+				"tags": [
+					"periodic-series"
+				],
+				"security": [],
+				"parameters": []
 			}
 		},
 		"/operating-mode": {

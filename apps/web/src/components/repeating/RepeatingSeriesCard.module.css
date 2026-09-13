@@ -1,0 +1,153 @@
+.item {
+    background: var(--app-bg-surface);
+    box-shadow: inset 0 0 0 1px var(--app-border);
+}
+
+.item[data-mixed] {
+    box-shadow:
+        inset 3px 0 0 var(--app-tier-review),
+        inset 0 0 0 1px var(--app-border);
+}
+
+.ticket {
+    display: grid;
+    grid-template-columns: 4.6rem minmax(0, 1fr);
+    min-height: 6.5rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.ticket::-webkit-details-marker {
+    display: none;
+}
+
+.ticket::marker {
+    content: "";
+}
+
+.ticket:hover {
+    background: var(--app-bg-hover);
+}
+
+.ticket:focus-visible {
+    outline: 2px solid var(--app-border-strong);
+    outline-offset: -2px;
+}
+
+.rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    background: repeating-linear-gradient(
+        -12deg,
+        transparent,
+        transparent 8px,
+        color-mix(in srgb, var(--app-text-primary) 5%, transparent) 8px,
+        color-mix(in srgb, var(--app-text-primary) 5%, transparent) 9px
+    );
+    border-right: 1px dashed var(--app-border-strong);
+}
+
+.railCadence {
+    font-family: var(--app-font-display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1;
+    color: var(--app-text-primary);
+}
+
+.railCount {
+    font-family: var(--app-font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--app-text-muted);
+}
+
+.body {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.28rem;
+    min-width: 0;
+    padding: 0.9rem 1.1rem 0.75rem;
+}
+
+.head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.35rem 0.85rem;
+}
+
+.payee {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--app-text-primary);
+}
+
+.amount {
+    margin: 0;
+    font-family: var(--app-font-mono);
+    font-size: 1.05rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--app-text-primary);
+}
+
+.amount[data-inflow] {
+    color: var(--app-amount-inflow);
+}
+
+.meta {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--app-text-secondary);
+}
+
+.overdue {
+    color: var(--app-tier-review);
+    font-weight: 700;
+}
+
+.category {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--app-text-muted);
+}
+
+.item[data-mixed] .category {
+    color: color-mix(in srgb, var(--app-tier-review) 80%, var(--app-text-secondary));
+}
+
+.members {
+    padding: 0 1.1rem 1rem 1.1rem;
+    border-top: 1px dashed var(--app-border);
+}
+
+.caption {
+    margin: 0.75rem 0 0.45rem;
+    font-size: 0.8125rem;
+    color: var(--app-text-muted);
+}
+
+.timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.empty {
+    margin: 0.75rem 0 0;
+    color: var(--app-text-muted);
+    font-size: 0.9375rem;
+}

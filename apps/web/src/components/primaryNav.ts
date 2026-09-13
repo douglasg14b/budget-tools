@@ -12,6 +12,7 @@ export const PRIMARY_NAV: readonly PrimaryNavItem[] = [
     { label: 'Classify', pathname: '/classify', end: true, keepSearch: true },
     { label: 'Table', pathname: '/classify/table', end: true, keepSearch: true },
     { label: 'Receipts', pathname: '/receipts', keepSearch: true },
+    { label: 'Repeating', pathname: '/repeating' },
     { label: 'Trips', pathname: '/trips' },
 ];
 

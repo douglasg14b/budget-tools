@@ -48,6 +48,12 @@ public sealed class PeriodicSeriesIndex
         LastTrainElapsed = stopwatch.Elapsed;
     }
 
+    public IReadOnlyList<PeriodicSeriesListItem> ListSeries()
+    {
+        int cap = Math.Max(1, _settings.CatalogRelatedTransactionIdCap);
+        return _series.Select(series => ToListItem(series, cap, _settings)).ToList();
+    }
+
     public PeriodicMatch? TryMatch(PendingTransaction transaction)
     {
         string? identity = IdentityKey(transaction);
@@ -189,6 +195,7 @@ public sealed class PeriodicSeriesIndex
 
         series = new IndexedSeries(
             identityKey,
+            DisplayPayee(ordered),
             cadence.Cadence,
             cadence.SlackDays,
             MedianAmount(ordered),
@@ -302,6 +309,62 @@ public sealed class PeriodicSeriesIndex
         };
     }
 
+    private static PeriodicSeriesListItem ToListItem(
+        IndexedSeries series,
+        int relatedIdCap,
+        PeriodicSeriesSettings settings)
+    {
+        DateOnly lastDate = series.Members.Max(member => member.Date);
+        IReadOnlyList<string> relatedIds = series.Members
+            .OrderByDescending(member => member.Date)
+            .ThenByDescending(member => member.Id, StringComparer.Ordinal)
+            .Take(relatedIdCap)
+            .Select(member => member.Id)
+            .ToList();
+
+        return new PeriodicSeriesListItem
+        {
+            Id = $"{series.IdentityKey}|{series.Cadence}|{series.MedianAmount}",
+            PayeeName = series.PayeeName,
+            Cadence = series.Cadence,
+            OccurrenceCount = series.Members.Count,
+            MedianAmount = series.MedianAmount,
+            LastDate = lastDate,
+            ExpectedNextDate = lastDate.AddDays(series.MedianIntervalDays),
+            Category = series.Category,
+            CategoryVoteShare = series.CategoryVoteShare,
+            CategoryStable = PeriodicScoring.IsStable(series.Category, series.CategoryVoteShare, settings),
+            CadenceFit = series.IntervalMatchRatio,
+            RelatedTransactionIds = relatedIds
+        };
+    }
+
+    private static string DisplayPayee(IReadOnlyList<PeriodicHistoryTransaction> members)
+    {
+        string? payee = MajorityLabel(members.Select(item => item.PayeeName));
+        if (payee != null)
+            return payee;
+
+        return MajorityLabel(members.Select(item => item.ImportPayeeNameOriginal)) ?? "Unknown payee";
+    }
+
+    private static string? MajorityLabel(IEnumerable<string?> values)
+    {
+        List<string> labeled = values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .ToList();
+        if (labeled.Count == 0)
+            return null;
+
+        return labeled
+            .GroupBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .Select(group => (Name: group.First(), Count: group.Count()))
+            .OrderByDescending(group => group.Count)
+            .First()
+            .Name;
+    }
+
     public static bool AmountFits(int leftMilliunits, int rightMilliunits, PeriodicSeriesSettings settings)
     {
         int leftSign = Math.Sign(leftMilliunits);
@@ -339,6 +402,7 @@ public sealed class PeriodicSeriesIndex
 
     private sealed record IndexedSeries(
         string IdentityKey,
+        string PayeeName,
         PeriodicCadence Cadence,
         int SlackDays,
         int MedianAmount,

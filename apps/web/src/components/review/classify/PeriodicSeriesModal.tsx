@@ -8,6 +8,7 @@ import { humanizeEnum } from '../humanizeEnum';
 import { CLASSIFY_DIALOG_ATTR } from './classifyKeys';
 import { formatPeriodicHint, formatPeriodicSeriesCaption } from './formatPeriodicHint';
 import classes from './PeriodicSeriesModal.module.css';
+import { PeriodicSeriesRow } from './PeriodicSeriesRow';
 
 type PeriodicSeriesModalProps = {
     conflict: boolean;
@@ -80,7 +81,7 @@ export function PeriodicSeriesModal({
 
             <section className={classes.section}>
                 <h3 className={classes.sectionTitle}>This charge</h3>
-                <SeriesRow current transaction={current} />
+                <PeriodicSeriesRow current transaction={current} />
             </section>
 
             <section className={classes.section}>
@@ -90,7 +91,7 @@ export function PeriodicSeriesModal({
                     <ol className={classes.timeline}>
                         {relatedTransactions.map((transaction) => (
                             <li key={transaction.id}>
-                                <SeriesRow transaction={transaction} />
+                                <PeriodicSeriesRow transaction={transaction} />
                             </li>
                         ))}
                     </ol>
@@ -99,32 +100,5 @@ export function PeriodicSeriesModal({
                 )}
             </section>
         </Modal>
-    );
-}
-
-type SeriesRowProps = {
-    current?: boolean;
-    transaction: TransactionDetailDto;
-};
-
-function SeriesRow({ current, transaction }: SeriesRowProps) {
-    const payee = transaction.payeeName || transaction.importPayeeName || '—';
-    return (
-        <article className={classes.row} data-current={current || undefined}>
-            <time className={classes.date} dateTime={transaction.date}>
-                {formatTransactionDate(transaction.date)}
-            </time>
-            <div className={classes.identity}>
-                <p className={classes.payee}>{payee}</p>
-                <p className={classes.meta}>
-                    {transaction.categoryName || 'Uncategorized'}
-                    {transaction.accountName ? ` · ${transaction.accountName}` : ''}
-                    {transaction.memo ? ` · ${transaction.memo}` : ''}
-                </p>
-            </div>
-            <p className={classes.amount} data-inflow={transaction.amount >= 0 || undefined}>
-                {formatYnabAmount(transaction.amount)}
-            </p>
-        </article>
     );
 }

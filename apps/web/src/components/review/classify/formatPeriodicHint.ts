@@ -20,7 +20,10 @@ export function formatPeriodicBadgeLabel(match: PeriodicMatchDto): string {
     return `${humanizeEnum(match.cadence)} ×${match.occurrenceCount}`;
 }
 
-export function formatPeriodicSeriesCaption(match: PeriodicMatchDto, shownCount: number): string | undefined {
+export function formatPeriodicSeriesCaption(
+    match: { readonly occurrenceCount: number },
+    shownCount: number,
+): string | undefined {
     if (shownCount >= match.occurrenceCount) {
         return undefined;
     }

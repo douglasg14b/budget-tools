@@ -5,6 +5,7 @@ import {
     extractReceiptImage,
     RECEIPT_DETECT_DETECTOR,
     RECEIPT_DETECT_MAX_DIMENSION,
+    SCANIC_ML_ASSET_BASE_URL,
     SCANIC_WASM_MISSING_MESSAGE,
     scanReceiptImage,
     warmupReceiptMlDetector,
@@ -89,6 +90,7 @@ describe('scanReceiptImage', () => {
                 mode: 'detect',
                 detector: RECEIPT_DETECT_DETECTOR,
                 maxProcessingDimension: RECEIPT_DETECT_MAX_DIMENSION,
+                ml: { assetBaseUrl: SCANIC_ML_ASSET_BASE_URL },
             }),
         );
         expect(result).toEqual({
@@ -129,14 +131,15 @@ describe('warmupReceiptMlDetector', () => {
             },
         });
         const scanDocument = vi.fn(async () => {
-            throw new Error(
-                'scanic: failed to fetch the ML model from https://cdn.jsdelivr.net/npm/scanic-ml@0.2.0/dist/',
-            );
+            throw new Error(`scanic: failed to fetch the ML model from ${SCANIC_ML_ASSET_BASE_URL}`);
         });
         await expect(warmupReceiptMlDetector(engine({ scanDocument }))).rejects.toThrow('failed to fetch the ML model');
         expect(scanDocument).toHaveBeenCalledWith(
             { width: 32, height: 32 },
-            expect.objectContaining({ detector: RECEIPT_DETECT_DETECTOR }),
+            expect.objectContaining({
+                detector: RECEIPT_DETECT_DETECTOR,
+                ml: { assetBaseUrl: SCANIC_ML_ASSET_BASE_URL },
+            }),
         );
     });
 });

@@ -15,4 +15,6 @@ public class PeriodicSeriesSettings
     public int MaxMissedPeriods { get; set; } = 2;
 
     public int RelatedTransactionIdCap { get; set; } = 8;
+
+    public int CatalogRelatedTransactionIdCap { get; set; } = 24;
 }

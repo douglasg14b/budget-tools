@@ -6,8 +6,11 @@ namespace YnabCategoryAi.ML;
 public static class PeriodicScoring
 {
     public static bool IsStable(PeriodicMatch match, PeriodicSeriesSettings settings) =>
-        !CategoryNormalizer.IsExcludedName(match.Category)
-        && match.CategoryVoteShare >= settings.StableCategoryVoteShare;
+        IsStable(match.Category, match.CategoryVoteShare, settings);
+
+    public static bool IsStable(string? category, float categoryVoteShare, PeriodicSeriesSettings settings) =>
+        !CategoryNormalizer.IsExcludedName(category)
+        && categoryVoteShare >= settings.StableCategoryVoteShare;
 
     public static bool TryCreateSignal(
         PeriodicMatch match,

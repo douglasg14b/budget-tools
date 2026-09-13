@@ -124,6 +124,58 @@ public sealed class PeriodicSeriesIndexTests
     }
 
     [Fact]
+    public void ListSeriesIncludesStableQuietAndMixedCategoryRows()
+    {
+        PeriodicSeriesIndex index = Train(Monthly("Netflix", "Streaming", count: 6, lastMonth: 6));
+        IReadOnlyList<PeriodicSeriesListItem> listed = index.ListSeries();
+
+        Assert.Single(listed);
+        PeriodicSeriesListItem series = listed[0];
+        Assert.Equal("Netflix", series.PayeeName);
+        Assert.Equal(PeriodicCadence.Monthly, series.Cadence);
+        Assert.Equal(6, series.OccurrenceCount);
+        Assert.Equal("Streaming", series.Category);
+        Assert.True(series.CategoryStable);
+        Assert.Equal(new DateOnly(2024, 6, 15), series.LastDate);
+        Assert.True(series.ExpectedNextDate > series.LastDate);
+        Assert.StartsWith("id:payee-1|Monthly|", series.Id);
+        Assert.Equal(6, series.RelatedTransactionIds.Count);
+        Assert.Equal("netflix-6", series.RelatedTransactionIds[0]);
+
+        Assert.Null(index.TryMatch(Pending(
+            "pending-quiet",
+            new DateOnly(2024, 12, 15),
+            amount: -14990)));
+        Assert.Single(index.ListSeries());
+
+        var mixed = new List<TrainingTransaction>();
+        for (int month = 1; month <= 6; month++)
+        {
+            mixed.Add(Training(
+                $"hulu-{month}",
+                new DateOnly(2024, month, 15),
+                amount: -12990,
+                category: month <= 3 ? "Streaming" : "Entertainment",
+                payeeId: "payee-hulu",
+                payeeName: "Hulu"));
+        }
+
+        PeriodicSeriesIndex mixedIndex = Train(mixed);
+        PeriodicSeriesListItem mixedSeries = Assert.Single(mixedIndex.ListSeries());
+        Assert.Equal("Hulu", mixedSeries.PayeeName);
+        Assert.False(mixedSeries.CategoryStable);
+        Assert.Equal(0.5f, mixedSeries.CategoryVoteShare);
+    }
+
+    [Fact]
+    public void ListSeriesOmitsClustersBelowOccurrenceGate()
+    {
+        PeriodicSeriesIndex index = Train(Monthly("Netflix", "Streaming", count: 2, lastMonth: 2));
+
+        Assert.Empty(index.ListSeries());
+    }
+
+    [Fact]
     public void IgnoresFewerThanThreeOccurrences()
     {
         List<TrainingTransaction> history = Monthly("Netflix", "Streaming", count: 2, lastMonth: 2);

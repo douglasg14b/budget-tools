@@ -12,13 +12,15 @@ describe('primaryNav', () => {
     it('matches Queue only at the root path', () => {
         expect(currentPrimaryNav('/').label).toBe('Queue');
         expect(currentPrimaryNav('/receipts').label).toBe('Receipts');
+        expect(currentPrimaryNav('/repeating').label).toBe('Repeating');
         expect(currentPrimaryNav('/trips').label).toBe('Trips');
     });
 
-    it('preserves search on Queue through Receipts, not Trips', () => {
+    it('preserves search on Queue through Receipts, not Repeating or Trips', () => {
         const search = '?tier=review';
         expect(navTarget(navItem('Queue'), search)).toEqual({ pathname: '/', search });
         expect(navTarget(navItem('Trips'), search)).toBe('/trips');
+        expect(navTarget(navItem('Repeating'), search)).toBe('/repeating');
     });
 
     it('treats nested receipt detail as Receipts, not Queue', () => {
