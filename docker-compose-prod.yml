@@ -1,11 +1,161 @@
 name: budget-tools
+
+# Production stack for Coolify. Every service builds from the REPO ROOT context because this is a
+# pnpm workspace with a single root lockfile.
+#
+# Startup order is enforced, not hoped for: `migrator` runs the shared Postgres migrations to
+# completion, and only then do `api` and `transactions-retrieval` start. Exactly one service owns
+# schema (see packages/db), so the apps never migrate on boot.
+#
+# Postgres itself is NOT in this stack — it is the existing external/managed database that the
+# transactions-retrieval service already uses. Point DB_CONNECTION_STRING at it.
+
 services:
+    # One-shot: applies migrations, then exits 0. Not a long-running service.
+    migrator:
+        container_name: budget-tools-migrator
+        build:
+            context: .
+            dockerfile: ./packages/db/Dockerfile
+        environment:
+            DB_CONNECTION_STRING: ${DB_CONNECTION_STRING}
+        restart: 'no'
+        networks:
+            - budget-tools
+
+    api:
+        container_name: budget-tools-api
+        build:
+            context: .
+            dockerfile: ./apps/api/Dockerfile
+        environment:
+            DB_CONNECTION_STRING: ${DB_CONNECTION_STRING}
+            API_PORT: 4020
+            API_LISTEN_HOST: 0.0.0.0
+
+            # Delegate ML scoring to the warm scorer over HTTP rather than spawning dotnet.
+            # With this set the API never reads the model files, so they stay in the scorer image.
+            CATEGORIZATION_SCORER_URL: http://scorer:4021
+            CATEGORIZATION_PREDICT_TIMEOUT_MS: ${CATEGORIZATION_PREDICT_TIMEOUT_MS:-300000}
+
+            OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+            OPENROUTER_MODEL: ${OPENROUTER_MODEL:-qwen/qwen3.7-flash}
+            OPENROUTER_RECEIPT_REPAIR_MODEL: ${OPENROUTER_RECEIPT_REPAIR_MODEL:-qwen/qwen3.7-plus}
+
+            YNAB_API_KEY: ${YNAB_API_KEY}
+            YNAB_BUDGET_NAME: ${YNAB_BUDGET_NAME}
+
+            # Receipt image storage. `s3` targets the on-network rust-fs server; provision it with
+            # `node scripts/provision-receipts-s3.mjs`. Falls back to `fs` on the mounted volume.
+            RECEIPTS_STORAGE: ${RECEIPTS_STORAGE:-s3}
+            RECEIPTS_DIR: /data/receipts
+            RECEIPTS_S3_ENDPOINT: ${RECEIPTS_S3_ENDPOINT}
+            RECEIPTS_S3_BUCKET: ${RECEIPTS_S3_BUCKET}
+            RECEIPTS_S3_ACCESS_KEY_ID: ${RECEIPTS_S3_ACCESS_KEY_ID}
+            RECEIPTS_S3_SECRET_ACCESS_KEY: ${RECEIPTS_S3_SECRET_ACCESS_KEY}
+            RECEIPTS_S3_REGION: ${RECEIPTS_S3_REGION:-us-east-1}
+            RECEIPTS_S3_PREFIX: ${RECEIPTS_S3_PREFIX:-}
+            RECEIPTS_S3_FORCE_PATH_STYLE: ${RECEIPTS_S3_FORCE_PATH_STYLE:-true}
+
+            # Amazon order sync needs a headed Chromium, which this image has no way to run.
+            # Left unset deliberately: those endpoints return 503 instead of hanging.
+        volumes:
+            # Only used when RECEIPTS_STORAGE=fs. Harmless (and empty) under s3.
+            - receipts-data:/data/receipts
+        depends_on:
+            migrator:
+                condition: service_completed_successfully
+        healthcheck:
+            test: ['CMD-SHELL', 'node -e "fetch(''http://127.0.0.1:4020/api/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"']
+            interval: 30s
+            timeout: 10s
+            retries: 5
+            start_period: 30s
+        restart: unless-stopped
+        networks:
+            - budget-tools
+
+    # Warm .NET scorer. Holds a loaded ScoringSession so the API pays model-load cost once.
+    scorer:
+        container_name: budget-tools-scorer
+        build:
+            context: .
+            dockerfile: ./apps/categorization-ai/Dockerfile
+        environment:
+            DB_CONNECTION_STRING: ${DB_CONNECTION_STRING}
+            Server__Port: 4021
+
+            # Trained models are downloaded from S3 at startup rather than baked into the image
+            # (they are gitignored, and Coolify builds from a git clone). Publish them with
+            # `pnpm upload:models`. Shares the receipts bucket under a models/ prefix, which the
+            # existing bucket-scoped service account already covers.
+            ModelStorage__Enabled: ${CATEGORIZATION_MODELS_S3_ENABLED:-true}
+            ModelStorage__Endpoint: ${RECEIPTS_S3_ENDPOINT}
+            ModelStorage__Bucket: ${RECEIPTS_S3_BUCKET}
+            ModelStorage__Prefix: ${CATEGORIZATION_MODELS_S3_PREFIX:-models/}
+            ModelStorage__AccessKeyId: ${RECEIPTS_S3_ACCESS_KEY_ID}
+            ModelStorage__SecretAccessKey: ${RECEIPTS_S3_SECRET_ACCESS_KEY}
+            ModelStorage__Region: ${RECEIPTS_S3_REGION:-us-east-1}
+            ModelStorage__ForcePathStyle: ${RECEIPTS_S3_FORCE_PATH_STYLE:-true}
+        volumes:
+            # Cache downloaded models across restarts; the hash check then skips re-downloading.
+            - scorer-models:/app/models
+        depends_on:
+            migrator:
+                condition: service_completed_successfully
+        healthcheck:
+            # /health only answers once the scoring session is warm, which is the whole point of
+            # gating on it. Model load is slow, hence the generous start_period.
+            test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:4021/health || exit 1']
+            interval: 30s
+            timeout: 10s
+            retries: 5
+            start_period: 180s
+        restart: unless-stopped
+        networks:
+            - budget-tools
+
+    web:
+        container_name: budget-tools-web
+        build:
+            context: .
+            dockerfile: ./apps/web/Dockerfile
+        # nginx serves the SPA and reverse-proxies /api to the api service. The web client's API
+        # base URL is a hardcoded relative `/api`, so this proxy is required, not optional.
+        ports:
+            - '${WEB_PORT:-8080}:8080'
+        depends_on:
+            - api
+        restart: unless-stopped
+        networks:
+            - budget-tools
+
+    # Idles; Coolify triggers the actual pull on a cron.
+    #
+    # IMPORTANT: the image now ships a pruned production tree rather than the whole workspace, so
+    # the old `pnpm --filter @budget-tools/transactions-retrieval run:prod` no longer resolves.
+    # The scheduled command must be:
+    #   docker exec transactions-retrieval ./node_modules/.bin/tsx ./src/main.ts
     transactions-retrieval:
         container_name: transactions-retrieval
+        build:
+            context: .
+            dockerfile: ./apps/transactions-retrieval/Dockerfile
         environment:
             YNAB_API_KEY: ${YNAB_API_KEY}
             YNAB_BUDGET_NAME: ${YNAB_BUDGET_NAME}
             DB_CONNECTION_STRING: ${DB_CONNECTION_STRING}
-        build:
-            context: .
-            dockerfile: ./apps/transactions-retrieval/Dockerfile
+        depends_on:
+            migrator:
+                condition: service_completed_successfully
+        restart: unless-stopped
+        networks:
+            - budget-tools
+
+volumes:
+    receipts-data:
+    scorer-models:
+
+networks:
+    budget-tools:
+        driver: bridge

@@ -78,6 +78,8 @@ web_modules/
 .env.test.local
 .env.production.local
 .env.local
+# Compose env files hold real secrets; the committed .example documents them instead.
+.env.compose.prod
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -150,3 +152,15 @@ third_party/amazon-order-history-csv-download-mcp/
 
 # Unprocessed Commons downloads; downsampled copies live in fixtures/
 apps/api/src/features/receipts/__tests__/fixtures/raw/
+
+# Generated Scanic ESM copy for Vite LAN/phone serving
+apps/web/vendor/scanic/
+
+# Locally downloaded CLI tools (e.g. the MinIO client for one-time S3 provisioning).
+.tools/
+
+# Cygwin/Git Bash crash artifacts
+*.stackdump
+
+# Local planning workspace
+nimbalyst-local/

@@ -18,6 +18,28 @@ dist
 .env
 *.env.local
 
+# Local secrets. appsettings.Local.json holds a real connection string (gitignored); baking it
+# into an image would ship a credential. Env vars take precedence over it anyway.
+apps/categorization-ai/appsettings.Local.json
+
+# Local-only data. app.sqlite is the retired API database (migrated to Postgres in Phase 3) and
+# receipts/ are the local originals — neither belongs in a production image.
+apps/api/data
+apps/api/.cache
+
+# Build/runtime droppings from local dotnet runs; the image builds from source.
+apps/categorization-ai/bin
+apps/categorization-ai/obj
+apps/categorization-ai/logs
+apps/categorization-ai/*.log
+
+# Tests and their fixtures never run in production. The receipts suite alone carries ~16MB of
+# real photo fixtures. Excluded here rather than per-Dockerfile so every image benefits.
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/vitest.config.ts
+
 # IDE and editor directories
 .idea
 .vscode

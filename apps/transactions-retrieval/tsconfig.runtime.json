@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  // Self-contained tsconfig for the production container.
+  //
+  // `tsconfig.json` extends `@budget-tools/config-typescript`, a devDependency that the
+  // `pnpm deploy --prod` prune correctly drops. A failed `extends` is silent, and the source
+  // imports through the `@/*` alias, so tsx would fail at runtime with
+  // "Cannot find package '@/data'". Inlining the options keeps the container self-contained.
+  //
+  // Typechecking still uses `tsconfig.json`; this is transform-only.
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "lib": ["esnext"],
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}
