@@ -21,8 +21,11 @@ export async function getScoredQueueItem(transactionId: string): Promise<ScoredQ
         throw new LlmSuggestError(404, `Pending transaction ${transactionId} was not found`);
     }
 
-    const signature = modelSignature(CATEGORIZATION_MODELS_DIR);
-    const travelSignature = await loadTravelWindowsSignature();
+    // Both are independent lookups and one may now be an HTTP call to the scorer, so overlap them.
+    const [signature, travelSignature] = await Promise.all([
+        modelSignature(CATEGORIZATION_MODELS_DIR),
+        loadTravelWindowsSignature(),
+    ]);
     const cache = await readProposalCache(cacheFilePath(CATEGORIZATION_QUEUE_CACHE_DIR, false));
     if (!isCacheUsable(cache, false, signature, travelSignature)) {
         throw new LlmSuggestError(404, `Transaction ${transactionId} is not in the scored queue`);

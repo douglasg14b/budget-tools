@@ -2,20 +2,67 @@ import { statSync } from 'node:fs';
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
+import { getCategorizationScorerUrl } from '../../../environment';
 import type { CachedProposalEntry, ProposalCacheFile } from './types';
 import { PROPOSAL_CACHE_VERSION } from './types';
 
 const MODEL_FILES = ['category-model.zip', 'group-model.zip', 'payee-model.zip'] as const;
 
 /**
- * Identity of the on-disk ML models. Any change invalidates every cached proposal.
+ * Identity of the ML models. Any change invalidates every cached proposal.
+ *
+ * Where the models live decides who can fingerprint them. When `CATEGORIZATION_SCORER_URL` is
+ * set the API delegates scoring over HTTP and has no copy of the model files at all — they sit
+ * in the scorer container, downloaded from S3 at startup — so stat-ing a local path throws
+ * ENOENT and takes down every categorization request. The scorer publishes the same fingerprint
+ * on `/health` (see ModelSignature.cs, whose format this deliberately matches), so ask the
+ * process that actually holds the models.
  */
-export function modelSignature(modelsDir: string): string {
+export async function modelSignature(modelsDir: string): Promise<string> {
+    const scorerUrl = getCategorizationScorerUrl();
+    if (scorerUrl) {
+        return fetchScorerModelSignature(scorerUrl);
+    }
+
     return MODEL_FILES.map((fileName) => {
         const stats = statSync(join(modelsDir, fileName));
         return `${fileName}:${stats.size}:${stats.mtimeMs}`;
     }).join('|');
 }
+
+/**
+ * Reads the loaded models' fingerprint from the warm scorer.
+ *
+ * A failure here must not be papered over with a constant: two different model sets that both
+ * fingerprint as "unknown" would serve each other's cached proposals. Throwing keeps a scorer
+ * that is down or still loading from silently poisoning the cache.
+ */
+async function fetchScorerModelSignature(baseUrl: string): Promise<string> {
+    let response: Response;
+    try {
+        response = await fetch(`${baseUrl.replace(/\/$/, '')}/health`, {
+            signal: AbortSignal.timeout(SCORER_HEALTH_TIMEOUT_MS),
+        });
+    } catch (cause) {
+        throw new Error(`Could not reach the categorization scorer at ${baseUrl} to read its model signature.`, {
+            cause,
+        });
+    }
+
+    if (!response.ok) {
+        throw new Error(`The categorization scorer at ${baseUrl} answered ${response.status} for /health.`);
+    }
+
+    const body = (await response.json()) as { readonly modelSignature?: unknown };
+    if (typeof body.modelSignature !== 'string' || body.modelSignature.length === 0) {
+        throw new Error(`The categorization scorer at ${baseUrl} returned no model signature.`);
+    }
+
+    return body.modelSignature;
+}
+
+/** The scorer answers /health from memory once warm, so this only needs to outlast a cold start. */
+const SCORER_HEALTH_TIMEOUT_MS = 10_000;
 
 export function isCacheUsable(
     cache: ProposalCacheFile | undefined,

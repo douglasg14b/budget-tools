@@ -78,8 +78,11 @@ async function predictTransactionsLocked(requestedIds: readonly string[]): Promi
     const pendingIds = new Set(pending.map((row) => row.id));
     assertAllPending(requestedIds, pendingIds);
 
-    const signature = modelSignature(CATEGORIZATION_MODELS_DIR);
-    const travelSignature = await loadTravelWindowsSignature();
+    // Both are independent lookups and one may now be an HTTP call to the scorer, so overlap them.
+    const [signature, travelSignature] = await Promise.all([
+        modelSignature(CATEGORIZATION_MODELS_DIR),
+        loadTravelWindowsSignature(),
+    ]);
     const path = cacheFilePath(CATEGORIZATION_QUEUE_CACHE_DIR, false);
     const cache = await readProposalCache(path);
     const fingerprints = new Map(pending.map((row) => [row.id, row.fingerprint]));

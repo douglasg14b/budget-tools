@@ -99,8 +99,11 @@ async function loadWindowSnapshot(windowQuery: WindowQuery, q: string | undefine
     const listed = await listPendingTransactions();
     const pending = pendingMatchingQuery(listed, q);
     const pendingIds = pending.map((row) => row.id);
-    const signature = modelSignature(CATEGORIZATION_MODELS_DIR);
-    const travelSignature = await loadTravelWindowsSignature();
+    // Both are independent lookups and one may now be an HTTP call to the scorer, so overlap them.
+    const [signature, travelSignature] = await Promise.all([
+        modelSignature(CATEGORIZATION_MODELS_DIR),
+        loadTravelWindowsSignature(),
+    ]);
     const path = cacheFilePath(CATEGORIZATION_QUEUE_CACHE_DIR, false);
     const cache = await readProposalCache(path);
     const fingerprints = new Map(pending.map((row) => [row.id, row.fingerprint]));
@@ -152,8 +155,11 @@ async function loadScoredSnapshotLocked(
     const listed = await listPendingTransactions();
     const pending = pendingMatchingQuery(listed, q);
     const pendingIds = pending.map((row) => row.id);
-    const signature = modelSignature(CATEGORIZATION_MODELS_DIR);
-    const travelSignature = await loadTravelWindowsSignature();
+    // Both are independent lookups and one may now be an HTTP call to the scorer, so overlap them.
+    const [signature, travelSignature] = await Promise.all([
+        modelSignature(CATEGORIZATION_MODELS_DIR),
+        loadTravelWindowsSignature(),
+    ]);
     const path = cacheFilePath(CATEGORIZATION_QUEUE_CACHE_DIR, false);
     const cache = await readProposalCache(path);
     const fingerprints = new Map(pending.map((row) => [row.id, row.fingerprint]));
