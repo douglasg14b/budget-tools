@@ -136,7 +136,10 @@ apps/transaction-cleaner/data/
 apps/transactions-retrieval/.env.dev
 apps/api/data/
 __data__/
-models/
+# Anchored: the trained model binaries at the repo root only. Unanchored, this also matched
+# apps/categorization-ai/ML/Models/ (gitignore matching is case-insensitive on Windows), which
+# silently kept three C# source files out of git and broke every build from a clean clone.
+/models/
 cleaning-output.json
 apps/categorization-ai/predict-output.json
 apps/categorization-ai/predict-stderr.txt

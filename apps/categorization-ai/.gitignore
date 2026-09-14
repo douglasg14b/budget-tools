@@ -3,6 +3,9 @@ obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
-models/
+# Anchored to this directory: an unanchored `models/` also matched the ML/Models/ SOURCE folder,
+# because gitignore matching is case-insensitive on Windows. That silently kept three C# files out
+# of git, so any build from a clean clone failed with "namespace 'Models' does not exist".
+/models/
 model.zip
 data.csv
