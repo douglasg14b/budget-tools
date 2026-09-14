@@ -3,6 +3,7 @@ import { Migrator } from 'kysely';
 
 import * as apiAppTables from './migrations/2026-09-11-Api_App_Tables';
 import * as coreYnabTables from './migrations/2026-09-11-Core_Ynab_Tables';
+import * as authTables from './migrations/2026-09-13-Auth_Tables';
 
 /**
  * Explicit migration registry for the shared Budget Tools Postgres schema.
@@ -14,6 +15,7 @@ import * as coreYnabTables from './migrations/2026-09-11-Core_Ynab_Tables';
 export const MIGRATIONS: Record<string, Migration> = {
     '2026-09-11-Core_Ynab_Tables': coreYnabTables,
     '2026-09-11-Api_App_Tables': apiAppTables,
+    '2026-09-13-Auth_Tables': authTables,
 };
 
 class StaticMigrationProvider implements MigrationProvider {

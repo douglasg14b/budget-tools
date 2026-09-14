@@ -530,6 +530,31 @@ export type CategoriesDto = {
     groups: Array<CategoryGroupDto>;
 };
 
+/**
+ * The signed-in principal. Deliberately carries no hash, no session id, and no token.
+ */
+export type AuthUserDto = {
+    username: string;
+    id: string;
+};
+
+export type LoginResponseDto = {
+    /**
+     * ISO instant at which the session lapses if unused. Slides forward as the app is used.
+     */
+    expiresAt: string;
+    user: AuthUserDto;
+};
+
+export type LoginRequestDto = {
+    password: string;
+    username: string;
+};
+
+export type LogoutResponseDto = {
+    ok: boolean;
+};
+
 export type AmazonOrdersDateRangeDto = {
     end: string;
     start: string;
@@ -1312,6 +1337,54 @@ export type GetCategoriesResponses = {
 };
 
 export type GetCategoriesResponse = GetCategoriesResponses[keyof GetCategoriesResponses];
+
+export type PostLoginData = {
+    body: LoginRequestDto;
+    path?: never;
+    query?: never;
+    url: '/auth/login';
+};
+
+export type PostLoginResponses = {
+    /**
+     * Ok
+     */
+    200: LoginResponseDto;
+};
+
+export type PostLoginResponse = PostLoginResponses[keyof PostLoginResponses];
+
+export type PostLogoutData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/logout';
+};
+
+export type PostLogoutResponses = {
+    /**
+     * Ok
+     */
+    200: LogoutResponseDto;
+};
+
+export type PostLogoutResponse = PostLogoutResponses[keyof PostLogoutResponses];
+
+export type GetMeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/me';
+};
+
+export type GetMeResponses = {
+    /**
+     * Ok
+     */
+    200: AuthUserDto;
+};
+
+export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
 
 export type GetAmazonOrdersStatusData = {
     body?: never;

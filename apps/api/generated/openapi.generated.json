@@ -1998,6 +1998,64 @@
 				],
 				"type": "object"
 			},
+			"AuthUserDto": {
+				"properties": {
+					"username": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"username",
+					"id"
+				],
+				"type": "object",
+				"description": "The signed-in principal. Deliberately carries no hash, no session id, and no token."
+			},
+			"LoginResponseDto": {
+				"properties": {
+					"expiresAt": {
+						"type": "string",
+						"description": "ISO instant at which the session lapses if unused. Slides forward as the app is used."
+					},
+					"user": {
+						"$ref": "#/components/schemas/AuthUserDto"
+					}
+				},
+				"required": [
+					"expiresAt",
+					"user"
+				],
+				"type": "object"
+			},
+			"LoginRequestDto": {
+				"properties": {
+					"password": {
+						"type": "string"
+					},
+					"username": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"password",
+					"username"
+				],
+				"type": "object"
+			},
+			"LogoutResponseDto": {
+				"properties": {
+					"ok": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"ok"
+				],
+				"type": "object"
+			},
 			"AmazonOrdersDateRangeDto": {
 				"properties": {
 					"end": {
@@ -3256,6 +3314,88 @@
 				},
 				"tags": [
 					"categories"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/auth/login": {
+			"post": {
+				"operationId": "PostLogin",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/LoginResponseDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Exchanges a username and password for a long-lived session cookie.",
+				"summary": "postLogin",
+				"tags": [
+					"auth"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/LoginRequestDto"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/auth/logout": {
+			"post": {
+				"operationId": "PostLogout",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/LogoutResponseDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Clears the current session. Safe to call when already signed out.",
+				"summary": "postLogout",
+				"tags": [
+					"auth"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
+		"/auth/me": {
+			"get": {
+				"operationId": "GetMe",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AuthUserDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "The signed-in user. 401s when there is no valid session — this is how the web app\ndiscovers whether it needs to show the login page.",
+				"summary": "getMe",
+				"tags": [
+					"auth"
 				],
 				"security": [],
 				"parameters": []

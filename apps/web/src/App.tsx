@@ -1,9 +1,11 @@
 import { getOperatingModeOptions } from '@budget-tools/web-sdk';
-import { AppShell, MantineProvider } from '@mantine/core';
+import { AppShell, Loader, MantineProvider } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import classes from './App.module.css';
+import { AuthProvider, useAuth } from './auth/AuthContext';
+import { AccountMenu } from './components/AccountMenu';
 import { AppNav } from './components/AppNav';
 import { NavbarHealthBadge } from './components/NavbarHealthBadge';
 import { OperatingModeToggle } from './components/OperatingModeToggle';
@@ -12,6 +14,7 @@ import { PracticeReceiptsProvider } from './components/review/classify/PracticeR
 import { cssVariablesResolver } from './cssVariablesResolver';
 import type { OperatingMode } from './operatingMode/operatingModeCopy';
 import { ClassifyPage } from './pages/ClassifyPage';
+import { LoginPage } from './pages/LoginPage';
 import { ReceiptDetailPage } from './pages/ReceiptDetailPage';
 import { ReceiptsPage } from './pages/ReceiptsPage';
 import { RepeatingPage } from './pages/RepeatingPage';
@@ -23,12 +26,42 @@ export function App() {
     return (
         <MantineProvider defaultColorScheme="dark" theme={theme} cssVariablesResolver={cssVariablesResolver}>
             <BrowserRouter>
-                <PracticeReceiptsProvider>
-                    <AppLayout />
-                </PracticeReceiptsProvider>
+                <AuthProvider>
+                    <PracticeReceiptsProvider>
+                        <AuthGate />
+                    </PracticeReceiptsProvider>
+                </AuthProvider>
             </BrowserRouter>
         </MantineProvider>
     );
+}
+
+/**
+ * Chooses between the signed-out and signed-in trees.
+ *
+ * `AppLayout` is not merely hidden while anonymous — it is not mounted at all, so the queries its
+ * children own (operating mode, health, outbound sync) never fire without a session and cannot
+ * trip the global 401 handler on their own.
+ */
+function AuthGate() {
+    const { status } = useAuth();
+
+    if (status === 'loading') {
+        // A neutral pane rather than the login card: on refresh the `getMe` round trip is short,
+        // and rendering the form first would flash a login screen at an already-signed-in user.
+        return (
+            <div className={classes.splash}>
+                <Loader color="sage" type="dots" />
+                <span className={classes.splashLabel}>Loading…</span>
+            </div>
+        );
+    }
+
+    if (status === 'anonymous') {
+        return <LoginPage />;
+    }
+
+    return <AppLayout />;
 }
 
 function AppLayout() {
@@ -53,6 +86,7 @@ function AppLayout() {
                             <OutboundSyncChip />
                             <OperatingModeToggle />
                             <NavbarHealthBadge />
+                            <AccountMenu />
                         </div>
                     </div>
                 </AppShell.Header>

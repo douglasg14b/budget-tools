@@ -1,5 +1,8 @@
 import 'reflect-metadata';
 
+import { pathToFileURL } from 'node:url';
+
+import cookieParser from 'cookie-parser';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import { ValidateError } from 'tsoa';
@@ -11,6 +14,8 @@ import {
     getAmazonOrdersMcpEntry,
     RECEIPTS_JSON_BODY_LIMIT,
 } from './environment';
+import { authMiddleware } from './features/auth/authMiddleware';
+import { deleteExpiredSessions } from './features/auth/data/authRepo';
 import { QueryValidationError } from './features/categorization/filterQueue';
 import { LlmSuggestError } from './features/categorization/llm/LlmSuggestError';
 import { clearLlmOverlayCache } from './features/categorization/llm/overlayCache';
@@ -24,7 +29,12 @@ import { getRequestId, requestContextMiddleware } from './services/requestContex
 
 export const app = express();
 app.use(requestContextMiddleware);
+app.use(cookieParser());
 app.use(express.json({ limit: RECEIPTS_JSON_BODY_LIMIT }));
+
+// Default-deny: every route registered below requires a session except the handful named in
+// `features/auth/publicRoutes.ts` (health, login, logout).
+app.use(authMiddleware);
 
 RegisterRoutes(app);
 
@@ -115,6 +125,10 @@ app.use(errorHandler);
 async function start(): Promise<void> {
     console.log('API starting');
     await getAppDatabase();
+    const sweptSessions = await deleteExpiredSessions(new Date());
+    if (sweptSessions > 0) {
+        console.log(`Swept ${sweptSessions} expired session(s)`);
+    }
     await clearLlmOverlayCache(CATEGORIZATION_QUEUE_CACHE_DIR);
     startOutboundSyncFlusher();
     await sweepPendingReceiptExtracts();
@@ -124,7 +138,16 @@ async function start(): Promise<void> {
     });
 }
 
-void start().catch((error: unknown) => {
-    console.error(error);
-    process.exit(1);
-});
+/**
+ * Only boot when run as the entrypoint. Importing this module for its `app` (the auth loop
+ * verification script does exactly that) must not bind the API port or start the background
+ * flusher and receipt sweep.
+ */
+const isEntrypoint = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isEntrypoint) {
+    void start().catch((error: unknown) => {
+        console.error(error);
+        process.exit(1);
+    });
+}

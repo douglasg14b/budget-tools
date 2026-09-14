@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { Accounts, AmazonOrders, Categories, Categorization, Health, OperatingMode, type Options, PeriodicSeries, Receipts, TravelBias, TravelWindows } from '../sdk.gen';
-import type { BindReceiptData, BindReceiptResponse, CreateReceiptData, CreateReceiptResponse, CreateTravelWindowData, CreateTravelWindowResponse, DeleteClassificationDecisionData, DeleteClassificationDecisionResponse, DeleteReceiptData, DeleteReceiptResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, DetachReceiptData, DetachReceiptResponse, ExtractPreviewData, ExtractPreviewResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetOperatingModeData, GetOperatingModeResponse, GetOutboundSyncData, GetOutboundSyncResponse, GetReceiptData, GetReceiptImageData, GetReceiptImageResponse, GetReceiptResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListPeriodicSeriesData, ListPeriodicSeriesResponse, ListReceiptsData, ListReceiptsResponse, ListTravelWindowsData, ListTravelWindowsResponse, LookupByReceiptData, LookupByReceiptResponse, LookupByTransactionData, LookupByTransactionResponse, MatchPreviewData, MatchPreviewResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchReceiptData, PatchReceiptResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostClassificationDecisionsData, PostClassificationDecisionsResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostOutboundSyncFlushData, PostOutboundSyncFlushResponse, PostPredictData, PostPredictResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
+import { Accounts, AmazonOrders, Auth, Categories, Categorization, Health, OperatingMode, type Options, PeriodicSeries, Receipts, TravelBias, TravelWindows } from '../sdk.gen';
+import type { BindReceiptData, BindReceiptResponse, CreateReceiptData, CreateReceiptResponse, CreateTravelWindowData, CreateTravelWindowResponse, DeleteClassificationDecisionData, DeleteClassificationDecisionResponse, DeleteReceiptData, DeleteReceiptResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, DetachReceiptData, DetachReceiptResponse, ExtractPreviewData, ExtractPreviewResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetMeData, GetMeResponse, GetOperatingModeData, GetOperatingModeResponse, GetOutboundSyncData, GetOutboundSyncResponse, GetReceiptData, GetReceiptImageData, GetReceiptImageResponse, GetReceiptResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListPeriodicSeriesData, ListPeriodicSeriesResponse, ListReceiptsData, ListReceiptsResponse, ListTravelWindowsData, ListTravelWindowsResponse, LookupByReceiptData, LookupByReceiptResponse, LookupByTransactionData, LookupByTransactionResponse, MatchPreviewData, MatchPreviewResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchReceiptData, PatchReceiptResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostClassificationDecisionsData, PostClassificationDecisionsResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostLoginData, PostLoginResponse, PostLogoutData, PostLogoutResponse, PostOutboundSyncFlushData, PostOutboundSyncFlushResponse, PostPredictData, PostPredictResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -608,6 +608,65 @@ export const getCategoriesOptions = (options?: Options<GetCategoriesData>) => qu
         return data;
     },
     queryKey: getCategoriesQueryKey(options)
+});
+
+/**
+ * postLogin
+ *
+ * Exchanges a username and password for a long-lived session cookie.
+ */
+export const postLoginMutation = (options?: Partial<Options<PostLoginData>>): UseMutationOptions<PostLoginResponse, DefaultError, Options<PostLoginData>> => {
+    const mutationOptions: UseMutationOptions<PostLoginResponse, DefaultError, Options<PostLoginData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await Auth.request({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * postLogout
+ *
+ * Clears the current session. Safe to call when already signed out.
+ */
+export const postLogoutMutation = (options?: Partial<Options<PostLogoutData>>): UseMutationOptions<PostLogoutResponse, DefaultError, Options<PostLogoutData>> => {
+    const mutationOptions: UseMutationOptions<PostLogoutResponse, DefaultError, Options<PostLogoutData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await Auth.request2({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getMeQueryKey = (options?: Options<GetMeData>) => createQueryKey('getMe', options);
+
+/**
+ * getMe
+ *
+ * The signed-in user. 401s when there is no valid session — this is how the web app
+ * discovers whether it needs to show the login page.
+ */
+export const getMeOptions = (options?: Options<GetMeData>) => queryOptions<GetMeResponse, DefaultError, GetMeResponse, ReturnType<typeof getMeQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await Auth.request3({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getMeQueryKey(options)
 });
 
 export const getAmazonOrdersStatusQueryKey = (options?: Options<GetAmazonOrdersStatusData>) => createQueryKey('getAmazonOrdersStatus', options);

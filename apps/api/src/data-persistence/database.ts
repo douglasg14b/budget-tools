@@ -10,6 +10,7 @@ import type {
     AmazonPaymentsTable,
     AmazonSyncStateTable,
 } from '../features/amazonOrders/data/amazonOrdersSchema';
+import type { SessionsTable, UsersTable } from '../features/auth/data/authSchema';
 import type { OperatingModeTable } from '../features/operatingMode/data/operatingModeSchema';
 import type { ReceiptsTable } from '../features/receipts/data/receiptsSchema';
 import type { TravelBiasConfigTable } from '../features/travelWindows/data/travelBiasConfigSchema';
@@ -39,6 +40,8 @@ export type AppDatabase = {
     operating_mode: OperatingModeTable;
     classification_sync: ClassificationSyncTable;
     receipts: ReceiptsTable;
+    users: UsersTable;
+    sessions: SessionsTable;
 };
 
 export type AppDatabaseClient = Kysely<AppDatabase>;
