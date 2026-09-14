@@ -2,8 +2,9 @@ import type { AuthUserDto } from '@budget-tools/web-sdk';
 import { getMeOptions, getMeQueryKey, postLoginMutation, postLogoutMutation } from '@budget-tools/web-sdk';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+import type { AuthStallState } from './authStallDiagnosis';
 import type { AuthStatus } from './authStatus';
 import { deriveAuthStatus } from './authStatus';
 import { setUnauthorizedListener } from './unauthorizedListener';
@@ -17,6 +18,10 @@ type AuthContextValue = {
     readonly logout: () => Promise<void>;
     readonly isLoggingIn: boolean;
     readonly isLoggingOut: boolean;
+    /** Raw `getMe` state, so a stalled splash can explain itself instead of spinning forever. */
+    readonly stallState: AuthStallState;
+    /** Re-runs the sign-in check. Surfaced so a stalled screen can offer a way out. */
+    readonly retry: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -93,6 +98,26 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         }
     }, [logoutMutation, resetToAnonymous]);
 
+    // Counts how many times a `getMe` fetch has started, which is what separates a slow request
+    // from one being cancelled and re-issued in a loop. Tracked in an effect rather than during
+    // render: a render-phase mutation would double-count under StrictMode's double invocation.
+    const [fetchStartCount, setFetchStartCount] = useState(0);
+    const isFetching = meQuery.fetchStatus === 'fetching';
+    useEffect(() => {
+        if (isFetching) {
+            setFetchStartCount((count) => count + 1);
+        }
+    }, [isFetching]);
+
+    // `refetch` alone cannot recover a query that was removed from the cache, so reset first:
+    // that restores it to a clean pending state from which a fetch can actually start.
+    const retry = useCallback(() => {
+        queryClient.resetQueries({ queryKey: getMeQueryKey() }).catch(() => {
+            // A failed reset leaves the existing stall on screen, which is already the state
+            // the user is looking at — nothing further to report.
+        });
+    }, [queryClient]);
+
     const value = useMemo<AuthContextValue>(() => {
         const user = meQuery.data ?? null;
         return {
@@ -106,15 +131,29 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             logout,
             isLoggingIn: loginMutation.isPending,
             isLoggingOut: logoutMutation.isPending,
+            stallState: {
+                status: meQuery.status,
+                fetchStatus: meQuery.fetchStatus,
+                failureCount: meQuery.failureCount,
+                errorMessage: (meQuery.error as Error | null)?.message ?? null,
+                startedCount: fetchStartCount,
+            },
+            retry,
         };
     }, [
         meQuery.data,
         meQuery.isPending,
         meQuery.isError,
+        meQuery.status,
+        meQuery.fetchStatus,
+        meQuery.failureCount,
+        meQuery.error,
+        fetchStartCount,
         login,
         logout,
         loginMutation.isPending,
         logoutMutation.isPending,
+        retry,
     ]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

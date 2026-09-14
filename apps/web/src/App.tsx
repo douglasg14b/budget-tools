@@ -1,10 +1,12 @@
 import { getOperatingModeOptions } from '@budget-tools/web-sdk';
-import { AppShell, Loader, MantineProvider } from '@mantine/core';
+import { Alert, AppShell, Button, Loader, MantineProvider, Stack } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import classes from './App.module.css';
 import { AuthProvider, useAuth } from './auth/AuthContext';
+import { diagnoseAuthStall } from './auth/authStallDiagnosis';
+import { useStallTimeout } from './auth/useStallTimeout';
 import { AccountMenu } from './components/AccountMenu';
 import { AppNav } from './components/AppNav';
 import { NavbarHealthBadge } from './components/NavbarHealthBadge';
@@ -44,9 +46,28 @@ export function App() {
  * trip the global 401 handler on their own.
  */
 function AuthGate() {
-    const { status } = useAuth();
+    const { status, stallState, retry } = useAuth();
+    const hasStalled = useStallTimeout(status === 'loading');
 
     if (status === 'loading') {
+        // Past the deadline the spinner has stopped being informative — it looks identical whether
+        // the server is slow or the request will never settle at all. Say which, and offer a way out.
+        if (hasStalled) {
+            const diagnosis = diagnoseAuthStall(stallState);
+            return (
+                <div className={classes.splash}>
+                    <Alert color="yellow" title={diagnosis.summary} role="alert" maw={440}>
+                        <Stack gap="sm" align="flex-start">
+                            <span>{diagnosis.detail}</span>
+                            <Button size="xs" variant="light" onClick={retry}>
+                                Try again
+                            </Button>
+                        </Stack>
+                    </Alert>
+                </div>
+            );
+        }
+
         // A neutral pane rather than the login card: on refresh the `getMe` round trip is short,
         // and rendering the form first would flash a login screen at an already-signed-in user.
         return (
