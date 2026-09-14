@@ -4,9 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
 
+import type { AuthStatus } from './authStatus';
+import { deriveAuthStatus } from './authStatus';
 import { setUnauthorizedListener } from './unauthorizedListener';
 
-export type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
+export type { AuthStatus };
 
 type AuthContextValue = {
     readonly user: AuthUserDto | null;
@@ -80,21 +82,27 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
 
     const value = useMemo<AuthContextValue>(() => {
         const user = meQuery.data ?? null;
-        let status: AuthStatus;
-        if (meQuery.isPending) {
-            status = 'loading';
-        } else {
-            status = user ? 'authenticated' : 'anonymous';
-        }
         return {
             user,
-            status,
+            status: deriveAuthStatus({
+                data: meQuery.data,
+                isPending: meQuery.isPending,
+                isError: meQuery.isError,
+            }),
             login,
             logout,
             isLoggingIn: loginMutation.isPending,
             isLoggingOut: logoutMutation.isPending,
         };
-    }, [meQuery.data, meQuery.isPending, login, logout, loginMutation.isPending, logoutMutation.isPending]);
+    }, [
+        meQuery.data,
+        meQuery.isPending,
+        meQuery.isError,
+        login,
+        logout,
+        loginMutation.isPending,
+        logoutMutation.isPending,
+    ]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
