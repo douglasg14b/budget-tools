@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 
+import { readFileSync } from 'node:fs';
+import { createServer as createHttpsServer } from 'node:https';
 import { pathToFileURL } from 'node:url';
 
 import cookieParser from 'cookie-parser';
@@ -10,8 +12,11 @@ import { getAppDatabase } from './data-persistence/database';
 import {
     API_LISTEN_HOST,
     API_PORT,
+    API_TLS_ENABLED,
     CATEGORIZATION_QUEUE_CACHE_DIR,
     getAmazonOrdersMcpEntry,
+    getApiTlsCertPath,
+    getApiTlsKeyPath,
     RECEIPTS_JSON_BODY_LIMIT,
 } from './environment';
 import { authMiddleware } from './features/auth/authMiddleware';
@@ -132,10 +137,32 @@ async function start(): Promise<void> {
     await clearLlmOverlayCache(CATEGORIZATION_QUEUE_CACHE_DIR);
     startOutboundSyncFlusher();
     await sweepPendingReceiptExtracts();
-    app.listen(API_PORT, API_LISTEN_HOST, () => {
-        console.log(`API listening on http://${API_LISTEN_HOST}:${API_PORT}`);
+    listen();
+}
+
+/**
+ * Binds the listener, over TLS when `API_TLS_ENABLED`.
+ *
+ * The certificate is read synchronously and deliberately left unguarded: if TLS is switched on but
+ * the cert is missing, the process must die loudly rather than silently fall back to plaintext —
+ * a silent downgrade is exactly the failure this feature exists to prevent.
+ */
+function listen(): void {
+    const onReady = (scheme: string) => () => {
+        console.log(`API listening on ${scheme}://${API_LISTEN_HOST}:${API_PORT}`);
         console.log(`Amazon MCP entry ${getAmazonOrdersMcpEntry() ?? 'unset'}`);
-    });
+    };
+
+    if (!API_TLS_ENABLED) {
+        app.listen(API_PORT, API_LISTEN_HOST, onReady('http'));
+        return;
+    }
+
+    const credentials = {
+        cert: readFileSync(getApiTlsCertPath()),
+        key: readFileSync(getApiTlsKeyPath()),
+    };
+    createHttpsServer(credentials, app).listen(API_PORT, API_LISTEN_HOST, onReady('https'));
 }
 
 /**

@@ -8,6 +8,25 @@ export const API_PORT = env.get('API_PORT').default('4020').asPortNumber();
 /** IPv4 all-interfaces, same as the categorization scorer. localhost-only listen misses Vite on Windows. */
 export const API_LISTEN_HOST = env.get('API_LISTEN_HOST').default('0.0.0.0').asString();
 
+/**
+ * Serve HTTPS instead of HTTP. Set in the production container so that no hop leaves the Docker
+ * network in plaintext — Caddy terminates the public certificate and re-encrypts to this listener
+ * with `tls_insecure_skip_verify`, so a self-signed cert is sufficient and identity is not checked.
+ *
+ * Off by default: local dev already gets HTTPS from Vite's basic-ssl plugin on the web side, and
+ * flipping this on would break the plain-HTTP loopback calls used by scripts and tests.
+ */
+export const API_TLS_ENABLED = env.get('API_TLS_ENABLED').default('false').asBool();
+
+/** PEM cert/key paths, read only when `API_TLS_ENABLED`. The container entrypoint generates them. */
+export function getApiTlsCertPath(): string {
+    return env.get('API_TLS_CERT_PATH').default('/tls/tls.crt').asString();
+}
+
+export function getApiTlsKeyPath(): string {
+    return env.get('API_TLS_KEY_PATH').default('/tls/tls.key').asString();
+}
+
 export const CATEGORIZATION_AI_WORKING_DIR = resolveFromCwd(
     env.get('CATEGORIZATION_AI_WORKING_DIR').default('apps/categorization-ai').asString(),
 );

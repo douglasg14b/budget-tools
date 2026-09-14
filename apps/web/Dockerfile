@@ -24,10 +24,24 @@ RUN pnpm --filter @budget-tools/web build
 
 FROM nginx:1.27-alpine AS runner
 
+# openssl for the self-signed certificate the entrypoint generates at boot.
+RUN apk add --no-cache openssl
+
 # Replace the stock config: the default server block would shadow ours on port 80 and serve the
 # nginx welcome page instead of the SPA.
 RUN rm /etc/nginx/conf.d/default.conf
 COPY apps/web/nginx.conf /etc/nginx/conf.d/budget-tools.conf
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
-EXPOSE 8080
+COPY docker/generate-self-signed-cert.sh /usr/local/bin/generate-self-signed-cert.sh
+# Normalise CRLF: this repo is developed on Windows, and a \r in the shebang line makes the
+# kernel look for an interpreter named "/bin/sh\r" and fail with a bare "not found".
+RUN sed -i 's/\r$//' /usr/local/bin/generate-self-signed-cert.sh \
+    && chmod +x /usr/local/bin/generate-self-signed-cert.sh
+
+ENV TLS_CERT_HOSTS="DNS:localhost,DNS:web,DNS:budget.moochermedia.co,IP:127.0.0.1"
+
+EXPOSE 8443
+
+ENTRYPOINT ["/usr/local/bin/generate-self-signed-cert.sh"]
+CMD ["nginx", "-g", "daemon off;"]

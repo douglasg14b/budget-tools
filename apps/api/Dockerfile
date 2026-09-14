@@ -61,11 +61,30 @@ COPY --from=builder /deploy ./
 # config. (Typechecking in CI still uses the original.)
 COPY apps/api/tsconfig.runtime.json ./tsconfig.json
 
+# openssl for the self-signed certificate the entrypoint generates at boot. node:22-slim carries
+# the OpenSSL libraries Node links against, but not the `openssl` CLI.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY docker/generate-self-signed-cert.sh /usr/local/bin/generate-self-signed-cert.sh
+# Normalise CRLF: this repo is developed on Windows, and a \r in the shebang line makes the
+# kernel look for an interpreter named "/bin/sh\r" and fail with a bare "not found".
+RUN sed -i 's/\r$//' /usr/local/bin/generate-self-signed-cert.sh \
+    && chmod +x /usr/local/bin/generate-self-signed-cert.sh
+
 ENV NODE_ENV=production
 ENV API_PORT=4020
 ENV API_LISTEN_HOST=0.0.0.0
+
+# TLS to the container, not just to the proxy: the nginx hop and any host-side access are both
+# encrypted. Caddy and nginx skip certificate validation, so self-signed is sufficient.
+ENV API_TLS_ENABLED=true
+ENV TLS_CERT_HOSTS="DNS:localhost,DNS:api,IP:127.0.0.1"
+
 EXPOSE 4020
 
 # No compile step — tsx runs the TypeScript directly, the same convention the
 # transactions-retrieval service uses. tsx is a real dependency of the API for this reason.
+ENTRYPOINT ["/usr/local/bin/generate-self-signed-cert.sh"]
 CMD ["./node_modules/.bin/tsx", "src/server.ts"]
