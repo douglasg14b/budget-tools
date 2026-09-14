@@ -159,10 +159,11 @@ services:
 
     # Idles; Coolify triggers the actual pull on a cron.
     #
-    # IMPORTANT: the image now ships a pruned production tree rather than the whole workspace, so
-    # the old `pnpm --filter @budget-tools/transactions-retrieval run:prod` no longer resolves.
-    # The scheduled command must be:
+    # IMPORTANT: the image ships a pruned production tree, not the whole workspace, so no pnpm
+    # script resolves inside it — `pnpm pull-transactions` and `pnpm run:prod` both die in pnpm's
+    # resolver on the `workspace:` protocol before running any code. The scheduled command is:
     #   docker exec transactions-retrieval ./node_modules/.bin/tsx ./src/main.ts
+    # Keep /app as the working directory: the `@/*` import alias resolves relative to cwd.
     transactions-retrieval:
         container_name: transactions-retrieval
         build:
