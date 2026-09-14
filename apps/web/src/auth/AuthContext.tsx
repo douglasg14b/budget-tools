@@ -47,13 +47,26 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     const logoutMutation = useMutation(postLogoutMutation());
 
     /**
-     * Drops to anonymous without a network round trip. Clearing the cache matters as much as
-     * clearing the user: every cached query in this app is somebody's financial data, and it
-     * must not survive into the next session shown in this tab.
+     * Drops to anonymous without a network round trip. Removing the cached queries matters as
+     * much as clearing the user: every cached query in this app is somebody's financial data, and
+     * it must not survive into the next session shown in this tab.
+     *
+     * `getMe` is deliberately exempt. This runs from the SDK's 401 interceptor, which fires while
+     * the offending response is still being processed — and on first load that response IS the
+     * `getMe` 401. `queryClient.clear()` would remove that very query mid-flight, aborting its
+     * fetch (`net::ERR_ABORTED`) so it never settles: the observer is torn down, a fresh query
+     * takes its place in `pending`/`fetching`, and the app waits on a request that was cancelled
+     * by its own 401 handler. That is a permanent "Loading…" splash for every signed-out visitor.
+     *
+     * Removing the others and then writing `null` here settles `getMe` as a definitive "signed
+     * out" instead of destroying it.
      */
     const resetToAnonymous = useCallback(() => {
-        queryClient.clear();
-        queryClient.setQueryData(getMeQueryKey(), null);
+        const meKey = getMeQueryKey();
+        queryClient.removeQueries({
+            predicate: (query) => JSON.stringify(query.queryKey) !== JSON.stringify(meKey),
+        });
+        queryClient.setQueryData(meKey, null);
     }, [queryClient]);
 
     useEffect(() => setUnauthorizedListener(resetToAnonymous), [resetToAnonymous]);
