@@ -59,6 +59,14 @@ services:
 
             # Amazon order sync needs a headed Chromium, which this image has no way to run.
             # Left unset deliberately: those endpoints return 503 instead of hanging.
+        # The browser does NOT use this port: the web client's API base URL is a relative `/api`,
+        # so requests go to the web origin and nginx proxies them over the internal network.
+        # Published only for direct access from the host - health checks, debugging, and running
+        # the one-time data migration against a deployed stack.
+        # NB: deliberately not named API_PORT - that is the container's own listen port (above),
+        # and reusing it here would move the listener out from under this mapping.
+        ports:
+            - '${API_HOST_PORT:-18020}:4020'
         volumes:
             # Only used when RECEIPTS_STORAGE=fs. Harmless (and empty) under s3.
             - receipts-data:/data/receipts
@@ -122,8 +130,11 @@ services:
             dockerfile: ./apps/web/Dockerfile
         # nginx serves the SPA and reverse-proxies /api to the api service. The web client's API
         # base URL is a hardcoded relative `/api`, so this proxy is required, not optional.
+        # This is the only port a browser needs: nginx serves the SPA here and proxies /api to the
+        # api service internally. Defaults sit in the 18000 range to stay clear of the ports this
+        # host already has in use.
         ports:
-            - '${WEB_PORT:-8080}:8080'
+            - '${WEB_PORT:-18080}:8080'
         depends_on:
             - api
         restart: unless-stopped
