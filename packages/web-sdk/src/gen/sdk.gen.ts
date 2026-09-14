@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BindReceiptData, BindReceiptErrors, BindReceiptResponses, CreateReceiptData, CreateReceiptErrors, CreateReceiptResponses, CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteClassificationDecisionData, DeleteClassificationDecisionErrors, DeleteClassificationDecisionResponses, DeleteReceiptData, DeleteReceiptErrors, DeleteReceiptResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, DetachReceiptData, DetachReceiptErrors, DetachReceiptResponses, ExtractPreviewData, ExtractPreviewErrors, ExtractPreviewResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetMeData, GetMeResponses, GetOperatingModeData, GetOperatingModeResponses, GetOutboundSyncData, GetOutboundSyncResponses, GetReceiptData, GetReceiptErrors, GetReceiptImageData, GetReceiptImageErrors, GetReceiptImageResponses, GetReceiptResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListPeriodicSeriesData, ListPeriodicSeriesErrors, ListPeriodicSeriesResponses, ListReceiptsData, ListReceiptsResponses, ListTravelWindowsData, ListTravelWindowsResponses, LookupByReceiptData, LookupByReceiptErrors, LookupByReceiptResponses, LookupByTransactionData, LookupByTransactionErrors, LookupByTransactionResponses, MatchPreviewData, MatchPreviewErrors, MatchPreviewResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchReceiptData, PatchReceiptErrors, PatchReceiptResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostClassificationDecisionsData, PostClassificationDecisionsErrors, PostClassificationDecisionsResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostLoginData, PostLoginResponses, PostLogoutData, PostLogoutResponses, PostOutboundSyncFlushData, PostOutboundSyncFlushErrors, PostOutboundSyncFlushResponses, PostPredictData, PostPredictResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
+import type { BindReceiptData, BindReceiptErrors, BindReceiptResponses, CreateReceiptData, CreateReceiptErrors, CreateReceiptResponses, CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteClassificationDecisionData, DeleteClassificationDecisionErrors, DeleteClassificationDecisionResponses, DeleteReceiptData, DeleteReceiptErrors, DeleteReceiptResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, DetachReceiptData, DetachReceiptErrors, DetachReceiptResponses, ExtractPreviewData, ExtractPreviewErrors, ExtractPreviewResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetMeData, GetMeResponses, GetOperatingModeData, GetOperatingModeResponses, GetOutboundSyncData, GetOutboundSyncResponses, GetReceiptData, GetReceiptErrors, GetReceiptImageData, GetReceiptImageErrors, GetReceiptImageResponses, GetReceiptResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListPeriodicSeriesData, ListPeriodicSeriesErrors, ListPeriodicSeriesResponses, ListReceiptsData, ListReceiptsResponses, ListTravelWindowsData, ListTravelWindowsResponses, LookupByReceiptData, LookupByReceiptErrors, LookupByReceiptResponses, LookupByTransactionData, LookupByTransactionErrors, LookupByTransactionResponses, MatchPreviewData, MatchPreviewErrors, MatchPreviewResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchPasswordData, PatchPasswordResponses, PatchReceiptData, PatchReceiptErrors, PatchReceiptResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostClassificationDecisionsData, PostClassificationDecisionsErrors, PostClassificationDecisionsResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostLoginData, PostLoginResponses, PostLogoutData, PostLogoutResponses, PostOutboundSyncFlushData, PostOutboundSyncFlushErrors, PostOutboundSyncFlushResponses, PostPredictData, PostPredictResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -398,6 +398,26 @@ export class Auth {
      */
     public static request3<ThrowOnError extends boolean = false>(options?: Options<GetMeData, ThrowOnError>): RequestResult<GetMeResponses, unknown, ThrowOnError> {
         return (options?.client ?? client).get<GetMeResponses, unknown, ThrowOnError>({ url: '/auth/me', ...options });
+    }
+    
+    /**
+     * patchPassword
+     *
+     * Changes the signed-in user's own password, re-authenticating them with their current one.
+     *
+     * Every other session for the user is revoked, so anyone holding a stolen cookie is booted;
+     * the caller's own session survives, because signing someone out of the tab they just used to
+     * change their password is a hostile way to confirm success.
+     */
+    public static request4<ThrowOnError extends boolean = false>(options: Options<PatchPasswordData, ThrowOnError>): RequestResult<PatchPasswordResponses, unknown, ThrowOnError> {
+        return (options.client ?? client).patch<PatchPasswordResponses, unknown, ThrowOnError>({
+            url: '/auth/password',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
     }
 }
 

@@ -7,13 +7,16 @@ import { createSessionToken, hashSessionToken, SESSION_DURATION_MS } from '../..
 import {
     createSession,
     deleteExpiredSessions,
+    deleteOtherSessionsForUser,
     deleteSession,
     deleteSessionsForUser,
     findPasswordHash,
+    findPasswordHashById,
     findSessionByToken,
     findUserByUsername,
     listUsernames,
     refreshSession,
+    updatePassword,
     upsertUser,
 } from '../authRepo';
 
@@ -207,6 +210,95 @@ describe('authRepo', () => {
             expect(swept).toBe(1);
             expect(await findSessionByToken(staleToken, database)).toBeUndefined();
             expect(await findSessionByToken(liveToken, database)).toBeDefined();
+        });
+    });
+
+    describe('findPasswordHashById', () => {
+        it('returns the hash for an existing user', async () => {
+            const user = await upsertUser('douglas', PASSWORD, database);
+            const hash = await findPasswordHashById(user.id, database);
+            expect(hash).toBeDefined();
+            expect(await verifyPassword(hash!, PASSWORD)).toBe(true);
+        });
+
+        it('returns undefined for an unknown id', async () => {
+            expect(await findPasswordHashById('00000000-0000-0000-0000-000000000000', database)).toBeUndefined();
+        });
+    });
+
+    describe('updatePassword', () => {
+        it('replaces the hash so only the new password verifies', async () => {
+            const user = await upsertUser('douglas', PASSWORD, database);
+            await updatePassword(user.id, 'a brand new password', database);
+
+            const hash = await findPasswordHashById(user.id, database);
+            expect(await verifyPassword(hash!, 'a brand new password')).toBe(true);
+            expect(await verifyPassword(hash!, PASSWORD)).toBe(false);
+        });
+
+        it('leaves sessions alone, unlike upsertUser', async () => {
+            // The change-password endpoint revokes selectively afterwards; the repo call itself
+            // must not pre-empt that decision.
+            const user = await upsertUser('douglas', PASSWORD, database);
+            const token = createSessionToken();
+            await createSession(user.id, token, new Date(), database);
+
+            await updatePassword(user.id, 'a brand new password', database);
+            expect(await findSessionByToken(token, database)).toBeDefined();
+        });
+
+        it('does not touch another user', async () => {
+            const douglas = await upsertUser('douglas', PASSWORD, database);
+            await upsertUser('spouse', PASSWORD, database);
+
+            await updatePassword(douglas.id, 'a brand new password', database);
+
+            const spouseHash = await findPasswordHash('spouse', database);
+            expect(await verifyPassword(spouseHash!, PASSWORD)).toBe(true);
+        });
+    });
+
+    describe('deleteOtherSessionsForUser', () => {
+        it('keeps the named session and drops the rest', async () => {
+            const user = await upsertUser('douglas', PASSWORD, database);
+            const keptToken = createSessionToken();
+            const phoneToken = createSessionToken();
+            const tabletToken = createSessionToken();
+            const { sessionId: keptId } = await createSession(user.id, keptToken, new Date(), database);
+            await createSession(user.id, phoneToken, new Date(), database);
+            await createSession(user.id, tabletToken, new Date(), database);
+
+            const revoked = await deleteOtherSessionsForUser(user.id, keptId, database);
+
+            expect(revoked).toBe(2);
+            expect(await findSessionByToken(keptToken, database)).toBeDefined();
+            expect(await findSessionByToken(phoneToken, database)).toBeUndefined();
+            expect(await findSessionByToken(tabletToken, database)).toBeUndefined();
+        });
+
+        it('reports zero when the session is the only one', async () => {
+            const user = await upsertUser('douglas', PASSWORD, database);
+            const token = createSessionToken();
+            const { sessionId } = await createSession(user.id, token, new Date(), database);
+
+            expect(await deleteOtherSessionsForUser(user.id, sessionId, database)).toBe(0);
+            expect(await findSessionByToken(token, database)).toBeDefined();
+        });
+
+        it('never touches another user’s sessions', async () => {
+            const douglas = await upsertUser('douglas', PASSWORD, database);
+            const spouse = await upsertUser('spouse', PASSWORD, database);
+            const douglasKept = createSessionToken();
+            const douglasOther = createSessionToken();
+            const spouseToken = createSessionToken();
+            const { sessionId: keptId } = await createSession(douglas.id, douglasKept, new Date(), database);
+            await createSession(douglas.id, douglasOther, new Date(), database);
+            await createSession(spouse.id, spouseToken, new Date(), database);
+
+            const revoked = await deleteOtherSessionsForUser(douglas.id, keptId, database);
+
+            expect(revoked).toBe(1);
+            expect(await findSessionByToken(spouseToken, database)).toBeDefined();
         });
     });
 });

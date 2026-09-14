@@ -48,7 +48,7 @@ export async function authMiddleware(request: Request, response: Response, next:
             return;
         }
 
-        setCurrentUser(session.user);
+        setCurrentUser(session.user, session.sessionId);
 
         if (shouldRefreshSession(session.lastUsedAt, now)) {
             const expiresAt = await refreshSession(session.sessionId, now);

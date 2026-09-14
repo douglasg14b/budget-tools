@@ -555,6 +555,19 @@ export type LogoutResponseDto = {
     ok: boolean;
 };
 
+export type ChangePasswordResponseDto = {
+    /**
+     * How many other sessions were signed out. The caller's own session is kept alive.
+     */
+    revokedSessions: number;
+    ok: boolean;
+};
+
+export type ChangePasswordRequestDto = {
+    newPassword: string;
+    currentPassword: string;
+};
+
 export type AmazonOrdersDateRangeDto = {
     end: string;
     start: string;
@@ -1385,6 +1398,22 @@ export type GetMeResponses = {
 };
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type PatchPasswordData = {
+    body: ChangePasswordRequestDto;
+    path?: never;
+    query?: never;
+    url: '/auth/password';
+};
+
+export type PatchPasswordResponses = {
+    /**
+     * Ok
+     */
+    200: ChangePasswordResponseDto;
+};
+
+export type PatchPasswordResponse = PatchPasswordResponses[keyof PatchPasswordResponses];
 
 export type GetAmazonOrdersStatusData = {
     body?: never;

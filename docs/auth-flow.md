@@ -68,12 +68,30 @@ the once-a-day floor keeps ordinary traffic from writing to the database on ever
 | `POST /api/auth/login` | public | Exchange credentials for a session cookie |
 | `POST /api/auth/logout` | public | Clear the session; safe when already signed out |
 | `GET /api/auth/me` | **protected** | The signed-in user; its 401 is how the web app detects signed-out |
+| `PATCH /api/auth/password` | **protected** | Change your own password, re-authenticating with the current one |
 | `GET /api/health` | public | Health checks and the nav badge |
 | *everything else* | **protected** | Receipts, accounts, categorization, travel, YNAB sync… |
 
 Access is **default-deny**: `authMiddleware` runs ahead of `RegisterRoutes`, so a controller added
 later is protected with no extra wiring. The public list lives in
 `apps/api/src/features/auth/publicRoutes.ts`.
+
+## Changing a password
+
+Two paths, with deliberately different session behaviour:
+
+| | Who | Current password | Sessions |
+| --- | --- | --- | --- |
+| `PATCH /api/auth/password` | the user, from the account menu | **required** | keeps the caller's, revokes their others |
+| `provision-user <username>` | an operator at a terminal | not asked for | revokes **all** of them |
+
+The self-service path keeps the caller signed in, because signing someone out of the tab they just
+used to change their password is a hostile way to confirm success. It still revokes every *other*
+session, so a stolen cookie elsewhere stops working immediately.
+
+A wrong current password returns **403, not 401**. The session is perfectly valid; it is the
+re-authentication that failed. A 401 would trip the web app's global signed-out handler and throw
+the user back to the login page over a typo.
 
 ## Design notes
 

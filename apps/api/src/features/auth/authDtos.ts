@@ -18,3 +18,14 @@ export type LoginResponseDto = {
 export type LogoutResponseDto = {
     ok: boolean;
 };
+
+export type ChangePasswordRequestDto = {
+    currentPassword: string;
+    newPassword: string;
+};
+
+export type ChangePasswordResponseDto = {
+    ok: boolean;
+    /** How many other sessions were signed out. The caller's own session is kept alive. */
+    revokedSessions: number;
+};

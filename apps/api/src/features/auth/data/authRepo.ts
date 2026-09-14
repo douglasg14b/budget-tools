@@ -74,6 +74,43 @@ export async function findPasswordHash(username: string, db?: AppDatabaseClient)
     return row?.passwordHash;
 }
 
+/** Returns the stored argon2 hash for a user id, or undefined when no such user exists. */
+export async function findPasswordHashById(userId: string, db?: AppDatabaseClient): Promise<string | undefined> {
+    const database = db ?? (await getAppDatabase());
+    const row = await database.selectFrom('users').select('passwordHash').where('id', '=', userId).executeTakeFirst();
+    return row?.passwordHash;
+}
+
+/**
+ * Replaces a user's password hash. Unlike `upsertUser` this does not touch sessions — the caller
+ * decides which to revoke, because a self-service password change keeps the caller signed in
+ * while an operator-driven reset does not.
+ */
+export async function updatePassword(userId: string, password: string, db?: AppDatabaseClient): Promise<void> {
+    const database = db ?? (await getAppDatabase());
+    const passwordHash = await hashPassword(password);
+    await database.updateTable('users').set({ passwordHash, updatedAt: new Date() }).where('id', '=', userId).execute();
+}
+
+/**
+ * Revokes every session for a user except the one given. Used by the password-change endpoint:
+ * anyone who had stolen a session elsewhere is booted, while the tab that made the change stays
+ * usable.
+ */
+export async function deleteOtherSessionsForUser(
+    userId: string,
+    keepSessionId: string,
+    db?: AppDatabaseClient,
+): Promise<number> {
+    const database = db ?? (await getAppDatabase());
+    const result = await database
+        .deleteFrom('sessions')
+        .where('userId', '=', userId)
+        .where('id', '!=', keepSessionId)
+        .executeTakeFirst();
+    return Number(result.numDeletedRows ?? 0);
+}
+
 /** Stores a new session for the given raw token. Only the token's hash is persisted. */
 export async function createSession(
     userId: string,

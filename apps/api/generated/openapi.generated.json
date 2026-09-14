@@ -2056,6 +2056,38 @@
 				],
 				"type": "object"
 			},
+			"ChangePasswordResponseDto": {
+				"properties": {
+					"revokedSessions": {
+						"type": "number",
+						"format": "double",
+						"description": "How many other sessions were signed out. The caller's own session is kept alive."
+					},
+					"ok": {
+						"type": "boolean"
+					}
+				},
+				"required": [
+					"revokedSessions",
+					"ok"
+				],
+				"type": "object"
+			},
+			"ChangePasswordRequestDto": {
+				"properties": {
+					"newPassword": {
+						"type": "string"
+					},
+					"currentPassword": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"newPassword",
+					"currentPassword"
+				],
+				"type": "object"
+			},
 			"AmazonOrdersDateRangeDto": {
 				"properties": {
 					"end": {
@@ -3399,6 +3431,40 @@
 				],
 				"security": [],
 				"parameters": []
+			}
+		},
+		"/auth/password": {
+			"patch": {
+				"operationId": "PatchPassword",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ChangePasswordResponseDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Changes the signed-in user's own password, re-authenticating them with their current one.\n\nEvery other session for the user is revoked, so anyone holding a stolen cookie is booted;\nthe caller's own session survives, because signing someone out of the tab they just used to\nchange their password is a hostile way to confirm success.",
+				"summary": "patchPassword",
+				"tags": [
+					"auth"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/ChangePasswordRequestDto"
+							}
+						}
+					}
+				}
 			}
 		},
 		"/amazon-orders/status": {

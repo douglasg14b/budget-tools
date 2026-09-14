@@ -1,11 +1,27 @@
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
-import { Body, Get, Post, Request, Route, Tags } from 'tsoa';
+import { Body, Get, Patch, Post, Request, Route, Tags } from 'tsoa';
 
-import { getCurrentUser } from '../../services/requestContext';
+import { getCurrentSessionId, getCurrentUser } from '../../services/requestContext';
 import { HttpError } from '../travelWindows/HttpError';
-import type { AuthUserDto, LoginRequestDto, LoginResponseDto, LogoutResponseDto } from './authDtos';
+import type {
+    AuthUserDto,
+    ChangePasswordRequestDto,
+    ChangePasswordResponseDto,
+    LoginRequestDto,
+    LoginResponseDto,
+    LogoutResponseDto,
+} from './authDtos';
 import { authenticateUser } from './authenticate';
-import { createSession, deleteSession, findSessionByToken } from './data/authRepo';
+import { changePasswordComplaint } from './changePasswordRules';
+import {
+    createSession,
+    deleteOtherSessionsForUser,
+    deleteSession,
+    findPasswordHashById,
+    findSessionByToken,
+    updatePassword,
+} from './data/authRepo';
+import { verifyPassword } from './password';
 import { clearSessionCookie, readSessionCookie, setSessionCookie } from './sessionCookie';
 import { createSessionToken } from './sessionToken';
 
@@ -90,5 +106,43 @@ export class AuthController {
             throw new HttpError(401, 'Not signed in.');
         }
         return { id: user.id, username: user.username };
+    }
+
+    /**
+     * Changes the signed-in user's own password, re-authenticating them with their current one.
+     *
+     * Every other session for the user is revoked, so anyone holding a stolen cookie is booted;
+     * the caller's own session survives, because signing someone out of the tab they just used to
+     * change their password is a hostile way to confirm success.
+     * @summary patchPassword
+     */
+    @Patch('password')
+    public async patchPassword(@Body() body: ChangePasswordRequestDto): Promise<ChangePasswordResponseDto> {
+        const user = getCurrentUser();
+        const sessionId = getCurrentSessionId();
+        if (!user || !sessionId) {
+            throw new HttpError(401, 'Not signed in.');
+        }
+
+        const currentPassword = body.currentPassword ?? '';
+        const newPassword = body.newPassword ?? '';
+
+        const complaint = changePasswordComplaint(currentPassword, newPassword);
+        if (complaint) {
+            throw new HttpError(400, complaint);
+        }
+
+        const storedHash = await findPasswordHashById(user.id);
+        if (!storedHash || !(await verifyPassword(storedHash, currentPassword))) {
+            // 403 rather than 401: the session is perfectly valid, it is the re-authentication
+            // that failed. A 401 would trip the web app's global signed-out handler and throw the
+            // user back to the login page over a typo.
+            throw new HttpError(403, 'Your current password is incorrect.');
+        }
+
+        await updatePassword(user.id, newPassword);
+        const revokedSessions = await deleteOtherSessionsForUser(user.id, sessionId);
+
+        return { ok: true, revokedSessions };
     }
 }

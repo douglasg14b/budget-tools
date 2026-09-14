@@ -4,7 +4,7 @@ import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanst
 
 import { client } from '../client.gen';
 import { Accounts, AmazonOrders, Auth, Categories, Categorization, Health, OperatingMode, type Options, PeriodicSeries, Receipts, TravelBias, TravelWindows } from '../sdk.gen';
-import type { BindReceiptData, BindReceiptResponse, CreateReceiptData, CreateReceiptResponse, CreateTravelWindowData, CreateTravelWindowResponse, DeleteClassificationDecisionData, DeleteClassificationDecisionResponse, DeleteReceiptData, DeleteReceiptResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, DetachReceiptData, DetachReceiptResponse, ExtractPreviewData, ExtractPreviewResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetMeData, GetMeResponse, GetOperatingModeData, GetOperatingModeResponse, GetOutboundSyncData, GetOutboundSyncResponse, GetReceiptData, GetReceiptImageData, GetReceiptImageResponse, GetReceiptResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListPeriodicSeriesData, ListPeriodicSeriesResponse, ListReceiptsData, ListReceiptsResponse, ListTravelWindowsData, ListTravelWindowsResponse, LookupByReceiptData, LookupByReceiptResponse, LookupByTransactionData, LookupByTransactionResponse, MatchPreviewData, MatchPreviewResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchReceiptData, PatchReceiptResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostClassificationDecisionsData, PostClassificationDecisionsResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostLoginData, PostLoginResponse, PostLogoutData, PostLogoutResponse, PostOutboundSyncFlushData, PostOutboundSyncFlushResponse, PostPredictData, PostPredictResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
+import type { BindReceiptData, BindReceiptResponse, CreateReceiptData, CreateReceiptResponse, CreateTravelWindowData, CreateTravelWindowResponse, DeleteClassificationDecisionData, DeleteClassificationDecisionResponse, DeleteReceiptData, DeleteReceiptResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, DetachReceiptData, DetachReceiptResponse, ExtractPreviewData, ExtractPreviewResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetMeData, GetMeResponse, GetOperatingModeData, GetOperatingModeResponse, GetOutboundSyncData, GetOutboundSyncResponse, GetReceiptData, GetReceiptImageData, GetReceiptImageResponse, GetReceiptResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListPeriodicSeriesData, ListPeriodicSeriesResponse, ListReceiptsData, ListReceiptsResponse, ListTravelWindowsData, ListTravelWindowsResponse, LookupByReceiptData, LookupByReceiptResponse, LookupByTransactionData, LookupByTransactionResponse, MatchPreviewData, MatchPreviewResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchPasswordData, PatchPasswordResponse, PatchReceiptData, PatchReceiptResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostClassificationDecisionsData, PostClassificationDecisionsResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostLoginData, PostLoginResponse, PostLogoutData, PostLogoutResponse, PostOutboundSyncFlushData, PostOutboundSyncFlushResponse, PostPredictData, PostPredictResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -668,6 +668,29 @@ export const getMeOptions = (options?: Options<GetMeData>) => queryOptions<GetMe
     },
     queryKey: getMeQueryKey(options)
 });
+
+/**
+ * patchPassword
+ *
+ * Changes the signed-in user's own password, re-authenticating them with their current one.
+ *
+ * Every other session for the user is revoked, so anyone holding a stolen cookie is booted;
+ * the caller's own session survives, because signing someone out of the tab they just used to
+ * change their password is a hostile way to confirm success.
+ */
+export const patchPasswordMutation = (options?: Partial<Options<PatchPasswordData>>): UseMutationOptions<PatchPasswordResponse, DefaultError, Options<PatchPasswordData>> => {
+    const mutationOptions: UseMutationOptions<PatchPasswordResponse, DefaultError, Options<PatchPasswordData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await Auth.request4({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 export const getAmazonOrdersStatusQueryKey = (options?: Options<GetAmazonOrdersStatusData>) => createQueryKey('getAmazonOrdersStatus', options);
 

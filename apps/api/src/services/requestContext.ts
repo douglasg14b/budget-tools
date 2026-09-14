@@ -12,6 +12,11 @@ export type RequestContext = {
     readonly requestId: string;
     /** Undefined on public routes (health, login) and before the auth middleware has run. */
     user?: RequestUser;
+    /**
+     * The session this request authenticated with. Needed by operations that revoke a user's
+     * other sessions while sparing the caller's own — a password change, most notably.
+     */
+    sessionId?: string;
 };
 
 export const requestContextStorage = new AsyncLocalStorage<RequestContext>();
@@ -32,15 +37,21 @@ export function getCurrentUser(): RequestUser | undefined {
     return getRequestContext()?.user;
 }
 
+/** The id of the session this request authenticated with, or undefined on public routes. */
+export function getCurrentSessionId(): string | undefined {
+    return getRequestContext()?.sessionId;
+}
+
 /**
- * Attaches the authenticated user to the active request context. Called by the auth middleware
- * once a session has been validated; mutates the store in place because the context object is
- * created upstream by `requestContextMiddleware`.
+ * Attaches the authenticated user and their session to the active request context. Called by the
+ * auth middleware once a session has been validated; mutates the store in place because the
+ * context object is created upstream by `requestContextMiddleware`.
  */
-export function setCurrentUser(user: RequestUser): void {
+export function setCurrentUser(user: RequestUser, sessionId: string): void {
     const context = requestContextStorage.getStore();
     if (context) {
         context.user = user;
+        context.sessionId = sessionId;
     }
 }
 

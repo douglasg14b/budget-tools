@@ -91,6 +91,75 @@ async function run(): Promise<void> {
         });
         check('a tampered cookie is rejected', tampered.status === 401, `got ${tampered.status}`);
 
+        // --- change password ------------------------------------------------------------
+        const changePassword = async (
+            currentPassword: string,
+            newPassword: string,
+            withCookie = cookie,
+        ): Promise<Response> =>
+            fetch(`${base}/auth/password`, {
+                method: 'PATCH',
+                headers: { 'content-type': 'application/json', cookie: withCookie },
+                body: JSON.stringify({ currentPassword, newPassword }),
+            });
+
+        const noSession = await fetch(`${base}/auth/password`, {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ currentPassword: PASSWORD, newPassword: 'something else here' }),
+        });
+        check('changing a password without a session is 401', noSession.status === 401, `got ${noSession.status}`);
+
+        const wrongCurrent = await changePassword('not my password', 'a perfectly fine new one');
+        check(
+            'a wrong current password is 403, not 401',
+            wrongCurrent.status === 403,
+            `got ${wrongCurrent.status} — a 401 would eject the user to the login page over a typo`,
+        );
+        const stillIn = await fetch(`${base}/auth/me`, { headers: { cookie } });
+        check('a failed change leaves the session intact', stillIn.status === 200, `got ${stillIn.status}`);
+
+        const tooShort = await changePassword(PASSWORD, 'short');
+        check('a too-short new password is 400', tooShort.status === 400, `got ${tooShort.status}`);
+
+        const unchanged = await changePassword(PASSWORD, PASSWORD);
+        check('reusing the current password is 400', unchanged.status === 400, `got ${unchanged.status}`);
+
+        // A second session, so the revoke-others behaviour has something to revoke.
+        const second = await fetch(`${base}/auth/login`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ username: USERNAME, password: PASSWORD }),
+        });
+        const secondCookie = (second.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+        check('a second session can be established', second.status === 200, `got ${second.status}`);
+
+        const NEW_PASSWORD = 'a genuinely new password';
+        const changed = await changePassword(PASSWORD, NEW_PASSWORD);
+        const changedBody = (await changed.json()) as { ok?: boolean; revokedSessions?: number };
+        check('changing the password is 200', changed.status === 200, `got ${changed.status}`);
+        check('it reports the revoked sessions', changedBody.revokedSessions === 1, JSON.stringify(changedBody));
+
+        const callerStillIn = await fetch(`${base}/auth/me`, { headers: { cookie } });
+        check('the caller stays signed in', callerStillIn.status === 200, `got ${callerStillIn.status}`);
+
+        const otherKicked = await fetch(`${base}/auth/me`, { headers: { cookie: secondCookie } });
+        check('the other session is revoked', otherKicked.status === 401, `got ${otherKicked.status}`);
+
+        const oldPassword = await fetch(`${base}/auth/login`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ username: USERNAME, password: PASSWORD }),
+        });
+        check('the old password no longer works', oldPassword.status === 401, `got ${oldPassword.status}`);
+
+        const newPassword = await fetch(`${base}/auth/login`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ username: USERNAME, password: NEW_PASSWORD }),
+        });
+        check('the new password works', newPassword.status === 200, `got ${newPassword.status}`);
+
         // --- logout ---------------------------------------------------------------------
         const logout = await fetch(`${base}/auth/logout`, { method: 'POST', headers: { cookie } });
         check('logout is 200', logout.status === 200, `got ${logout.status}`);
