@@ -40,6 +40,9 @@ function receiptRow(extractStatus: ReceiptExtractStatus, id = 'receipt-1'): Rece
         contentHash: 'abc',
         perceptualHash: null,
         totalsDisagree: false,
+        extractCostUsd: null,
+        extractPromptTokens: null,
+        extractCompletionTokens: null,
     };
 }
 

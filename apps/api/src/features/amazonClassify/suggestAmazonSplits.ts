@@ -194,7 +194,7 @@ export async function suggestAmazonSplits(transactionId: string, signal?: AbortS
         orders: matchedOrders,
         catalog,
     });
-    const content = await completeOpenRouterJson({
+    const { content } = await completeOpenRouterJson({
         apiKey,
         baseUrl: OPENROUTER_BASE_URL,
         model: OPENROUTER_MODEL,

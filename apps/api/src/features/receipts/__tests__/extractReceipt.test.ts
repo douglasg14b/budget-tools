@@ -36,7 +36,10 @@ function completeJsonReturning(contentFor: Record<string, string>): CompleteOpen
         if (!content) {
             throw new Error(`unexpected schema ${input.schemaName}`);
         }
-        return content;
+        return {
+            content,
+            usage: { promptTokens: 100, completionTokens: 10, totalTokens: 110, cachedTokens: null, costUsd: 0.001 },
+        };
     };
 }
 
@@ -101,6 +104,9 @@ describe('extractReceipt', () => {
         expect(result.printedMilliunits).toBe(8120);
         expect(result.rawText).toContain('Latte 4.50');
         expect(JSON.parse(result.extractJson)).toMatchObject({ repaired: true, gated: true });
+        expect(result.extractCostUsd).toBeCloseTo(0.002);
+        expect(result.extractPromptTokens).toBe(200);
+        expect(result.extractCompletionTokens).toBe(20);
     });
 
     it('stores ungated when line arithmetic still disagrees', async () => {
@@ -204,6 +210,7 @@ describe('extractReceipt', () => {
             expect(result.extractStatus).toBe('failed');
             expect(result.vendor).toBeNull();
             expect(result.purchaseDate).toBeNull();
+            expect(result.extractCostUsd).toBeNull();
             expect(JSON.parse(result.extractJson)).toMatchObject({ error: 'vision down' });
         }
         warn.mockRestore();

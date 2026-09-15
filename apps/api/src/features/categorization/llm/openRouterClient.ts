@@ -56,6 +56,11 @@ export type OpenRouterUsage = {
     readonly costUsd: number | null;
 };
 
+export type OpenRouterJsonResult = {
+    readonly content: string;
+    readonly usage: OpenRouterUsage | null;
+};
+
 function predictionSchema(requireAlternate: boolean) {
     const alternateType = requireAlternate ? { type: 'string' } : { type: ['string', 'null'] };
     return {
@@ -95,7 +100,7 @@ type ChatCompletionResponse = {
  * Calls OpenRouter chat completions with constrained JSON and thinking disabled.
  */
 export async function completeLlmPrediction(input: OpenRouterChatInput): Promise<OpenRouterPrediction> {
-    const content = await completeOpenRouterJson({
+    const { content } = await completeOpenRouterJson({
         apiKey: input.apiKey,
         baseUrl: input.baseUrl,
         model: input.model,
@@ -125,9 +130,9 @@ export function openRouterUserContent(user: string, images?: readonly string[]):
 }
 
 /**
- * Shared OpenRouter JSON-schema completion. Returns the raw content string.
+ * Shared OpenRouter JSON-schema completion. Returns the raw content string plus parsed usage/cost.
  */
-export async function completeOpenRouterJson(input: OpenRouterJsonInput): Promise<string> {
+export async function completeOpenRouterJson(input: OpenRouterJsonInput): Promise<OpenRouterJsonResult> {
     const endpoint = `${input.baseUrl.replace(/\/$/, '')}/chat/completions`;
     const controller = new AbortController();
     let timedOut = false;
@@ -192,7 +197,7 @@ export async function completeOpenRouterJson(input: OpenRouterJsonInput): Promis
             totalTokens: usage?.totalTokens ?? null,
             cachedTokens: usage?.cachedTokens ?? null,
         });
-        return content;
+        return { content, usage };
     } catch (error) {
         if (error instanceof LlmSuggestError) {
             throw error;

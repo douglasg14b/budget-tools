@@ -135,7 +135,7 @@ describe('completeOpenRouterJson vision payload', () => {
         });
         vi.stubGlobal('fetch', fetchMock);
 
-        await completeOpenRouterJson({
+        const result = await completeOpenRouterJson({
             apiKey: 'test-key',
             baseUrl: 'https://openrouter.example/api/v1',
             model: 'qwen/qwen3.7-flash',
@@ -145,6 +145,14 @@ describe('completeOpenRouterJson vision payload', () => {
             schemaName: 'receipt_headers',
             schema: { type: 'object' },
             images: [dataUrl],
+        });
+        expect(result.content).toBe('{"vendor":"Cafe"}');
+        expect(result.usage).toEqual({
+            promptTokens: 10,
+            completionTokens: 4,
+            totalTokens: 14,
+            cachedTokens: null,
+            costUsd: 0.0001,
         });
 
         expect(fetchMock).toHaveBeenCalledTimes(1);

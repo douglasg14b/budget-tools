@@ -368,6 +368,9 @@ export async function insertReceiptOriginal(
                 contentHash,
                 perceptualHash: incomingHash,
                 totalsDisagree: false,
+                extractCostUsd: null,
+                extractPromptTokens: null,
+                extractCompletionTokens: null,
             })
             .execute();
     } catch (error) {
@@ -400,6 +403,9 @@ export async function setReceiptExtract(
         readonly purchaseDate: string | null;
         readonly printedMilliunits: number | null;
         readonly totalsDisagree: boolean;
+        readonly extractCostUsd?: number | null;
+        readonly extractPromptTokens?: number | null;
+        readonly extractCompletionTokens?: number | null;
     },
     db?: AppDatabaseClient,
 ): Promise<void> {
@@ -415,6 +421,9 @@ export async function setReceiptExtract(
             purchaseDate: update.purchaseDate,
             printedMilliunits: update.printedMilliunits,
             totalsDisagree: update.totalsDisagree,
+            extractCostUsd: update.extractCostUsd ?? null,
+            extractPromptTokens: update.extractPromptTokens ?? null,
+            extractCompletionTokens: update.extractCompletionTokens ?? null,
         })
         .where('id', '=', id)
         .executeTakeFirst();

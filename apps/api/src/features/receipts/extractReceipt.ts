@@ -6,6 +6,7 @@ import {
 } from '../../environment';
 import { isAmazonTransaction } from '../amazonClassify/isAmazonTransaction';
 import { LlmSuggestError } from '../categorization/llm/LlmSuggestError';
+import type { OpenRouterUsage } from '../categorization/llm/openRouterClient';
 import { completeOpenRouterJson } from '../categorization/llm/openRouterClient';
 import type { ReceiptExtractStatus } from './data/receiptsSchema';
 import type { ReceiptExtractPayload } from './parseReceiptExtract';
@@ -32,6 +33,9 @@ export type ReceiptExtractComplete = {
     readonly totalsDisagree: boolean;
     readonly extractJson: string;
     readonly rawText: string | null;
+    readonly extractCostUsd: number | null;
+    readonly extractPromptTokens: number | null;
+    readonly extractCompletionTokens: number | null;
 };
 
 export type ReceiptExtractAmazon = {
@@ -95,6 +99,9 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
     let error = headerAttempt.error;
     let linesVision: ReceiptLinesVision | null = null;
     let repaired = false;
+    let costUsd = headerAttempt.usage?.costUsd ?? null;
+    let promptTokens = headerAttempt.usage?.promptTokens ?? null;
+    let completionTokens = headerAttempt.usage?.completionTokens ?? null;
 
     if (headerAttempt.error == null) {
         const linesAttempt = await tryReadLines({
@@ -104,6 +111,9 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
             expectedPrintedMilliunits: header.printedMilliunits,
         });
         error = joinErrors(error, linesAttempt.error);
+        costUsd = sumNullable(costUsd, linesAttempt.usage?.costUsd ?? null);
+        promptTokens = sumNullable(promptTokens, linesAttempt.usage?.promptTokens ?? null);
+        completionTokens = sumNullable(completionTokens, linesAttempt.usage?.completionTokens ?? null);
         if (linesAttempt.lines) {
             repaired = true;
             linesVision = linesAttempt.lines;
@@ -148,6 +158,9 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
         totalsDisagree,
         extractJson: JSON.stringify(payload),
         rawText: formatReceiptExtractDump(lines, taxMilliunits, discountMilliunits),
+        extractCostUsd: costUsd,
+        extractPromptTokens: promptTokens,
+        extractCompletionTokens: completionTokens,
     };
 }
 
@@ -174,6 +187,9 @@ export function buildFailedReceiptExtract(message: string): ReceiptExtractComple
         totalsDisagree: false,
         extractJson: JSON.stringify(payload),
         rawText: null,
+        extractCostUsd: null,
+        extractPromptTokens: null,
+        extractCompletionTokens: null,
     };
 }
 
@@ -216,29 +232,44 @@ function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
-type HeaderAttempt = { header: ReceiptHeaderVision | null; error: string | null };
+/** Adds two optional accumulators, treating a missing value as 0 but preserving null when both are null. */
+function sumNullable(left: number | null, right: number | null): number | null {
+    if (left == null && right == null) {
+        return null;
+    }
+    return (left ?? 0) + (right ?? 0);
+}
+
+type HeaderAttempt = {
+    header: ReceiptHeaderVision | null;
+    error: string | null;
+    usage: OpenRouterUsage | null;
+};
 
 async function tryReadHeaders(input: Parameters<typeof readReceiptHeaders>[0]): Promise<HeaderAttempt> {
     try {
-        return { header: await readReceiptHeaders(input), error: null };
+        const result = await readReceiptHeaders(input);
+        return { header: result.header, error: null, usage: result.usage };
     } catch (error) {
         const message = errorMessage(error);
         console.warn('receipt header vision failed', message);
-        return { header: null, error: message };
+        return { header: null, error: message, usage: null };
     }
 }
 
 type LinesAttempt = {
     lines: ReceiptLinesVision | null;
     error: string | null;
+    usage: OpenRouterUsage | null;
 };
 
 async function tryReadLines(input: Parameters<typeof readReceiptLines>[0]): Promise<LinesAttempt> {
     try {
-        return { lines: await readReceiptLines(input), error: null };
+        const result = await readReceiptLines(input);
+        return { lines: result.lines, error: null, usage: result.usage };
     } catch (error) {
         const message = errorMessage(error);
         console.warn('receipt line vision failed', message);
-        return { lines: null, error: message };
+        return { lines: null, error: message, usage: null };
     }
 }

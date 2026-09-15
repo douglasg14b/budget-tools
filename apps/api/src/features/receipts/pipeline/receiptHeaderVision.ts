@@ -1,7 +1,11 @@
 import { isIsoDate } from '../../amazonOrders/isoDate';
 import { moneyToMilliunits } from '../../amazonOrders/moneyToMilliunits';
 import { LlmSuggestError } from '../../categorization/llm/LlmSuggestError';
-import type { OpenRouterJsonInput } from '../../categorization/llm/openRouterClient';
+import type {
+    OpenRouterJsonInput,
+    OpenRouterJsonResult,
+    OpenRouterUsage,
+} from '../../categorization/llm/openRouterClient';
 import type { ReceiptExtractLine } from './arithmeticGate';
 
 export const RECEIPT_HEADER_TIMEOUT_MS = 60_000;
@@ -19,7 +23,17 @@ export type ReceiptLinesVision = ReceiptHeaderVision & {
     readonly lines: ReceiptExtractLine[];
 };
 
-export type CompleteOpenRouterJson = (input: OpenRouterJsonInput) => Promise<string>;
+export type ReceiptHeaderVisionResult = {
+    readonly header: ReceiptHeaderVision;
+    readonly usage: OpenRouterUsage | null;
+};
+
+export type ReceiptLinesVisionResult = {
+    readonly lines: ReceiptLinesVision;
+    readonly usage: OpenRouterUsage | null;
+};
+
+export type CompleteOpenRouterJson = (input: OpenRouterJsonInput) => Promise<OpenRouterJsonResult>;
 
 export type ReceiptHeaderVisionInput = {
     readonly apiKey: string;
@@ -73,8 +87,8 @@ const REPAIR_SCHEMA = {
 /**
  * Cheap vision JSON for vendor, purchase date, and printed total.
  */
-export async function readReceiptHeaders(input: ReceiptHeaderVisionInput): Promise<ReceiptHeaderVision> {
-    const content = await input.completeJson({
+export async function readReceiptHeaders(input: ReceiptHeaderVisionInput): Promise<ReceiptHeaderVisionResult> {
+    const { content, usage } = await input.completeJson({
         apiKey: input.apiKey,
         baseUrl: input.baseUrl,
         model: input.model,
@@ -85,20 +99,20 @@ export async function readReceiptHeaders(input: ReceiptHeaderVisionInput): Promi
         user: 'Read vendor name, purchase date as YYYY-MM-DD, and printed grand total from this receipt image. Do not invent values.',
         images: [input.processedDataUrl],
     });
-    return parseHeaderCompletion(content);
+    return { header: parseHeaderCompletion(content), usage };
 }
 
 /**
  * Schema-constrained line items, tax, and discount. Printed total is locked when headers already read it.
  */
-export async function readReceiptLines(input: ReceiptLinesVisionInput): Promise<ReceiptLinesVision> {
+export async function readReceiptLines(input: ReceiptLinesVisionInput): Promise<ReceiptLinesVisionResult> {
     const expectedDollars =
         input.expectedPrintedMilliunits == null ? null : (input.expectedPrintedMilliunits / 1000).toFixed(2);
     const lockTotal =
         expectedDollars == null
             ? 'Read the printed grand total the customer paid. Do not invent a total that is not on the tape.'
             : `Printed grand total must stay ${expectedDollars} dollars. Do not change that total.`;
-    const content = await input.completeJson({
+    const { content, usage } = await input.completeJson({
         apiKey: input.apiKey,
         baseUrl: input.baseUrl,
         model: input.model,
@@ -109,7 +123,7 @@ export async function readReceiptLines(input: ReceiptLinesVisionInput): Promise<
         user: [lockTotal, 'Return purchaseDate as YYYY-MM-DD if readable.'].join('\n'),
         images: [input.processedDataUrl],
     });
-    return parseLinesCompletion(content);
+    return { lines: parseLinesCompletion(content), usage };
 }
 
 export function parseHeaderCompletion(content: string): ReceiptHeaderVision {

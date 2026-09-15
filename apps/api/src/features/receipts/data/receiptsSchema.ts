@@ -14,4 +14,7 @@ export type ReceiptsTable = {
     contentHash: string;
     perceptualHash: string | null;
     totalsDisagree: boolean;
+    extractCostUsd: number | null;
+    extractPromptTokens: number | null;
+    extractCompletionTokens: number | null;
 };

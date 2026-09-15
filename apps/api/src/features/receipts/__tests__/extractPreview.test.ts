@@ -51,6 +51,9 @@ describe('extractPreview', () => {
             totalsDisagree: false,
             extractJson: '{"gated":false}',
             rawText: 'Cafe Rio',
+            extractCostUsd: null,
+            extractPromptTokens: null,
+            extractCompletionTokens: null,
         }));
         expect(result).toMatchObject({
             droppedAsAmazon: false,
@@ -98,6 +101,9 @@ describe('extractPreview', () => {
                     totalsDisagree: false,
                     extractJson: '{}',
                     rawText: 'Store',
+                    extractCostUsd: null,
+                    extractPromptTokens: null,
+                    extractCompletionTokens: null,
                 };
             },
         );

@@ -38,6 +38,9 @@ describe('extractStoredReceipt', () => {
             totalsDisagree: false,
             extractJson: '{"gated":true}',
             rawText: 'Cafe Rio',
+            extractCostUsd: 0.002,
+            extractPromptTokens: 200,
+            extractCompletionTokens: 20,
         }));
         const row = await getReceiptById(created.id, database);
         expect(row).toMatchObject({
@@ -47,6 +50,9 @@ describe('extractStoredReceipt', () => {
             printedMilliunits: 8120,
             totalsDisagree: false,
             rawText: 'Cafe Rio',
+            extractCostUsd: 0.002,
+            extractPromptTokens: 200,
+            extractCompletionTokens: 20,
         });
         expect(await appDb.storage.exists(originalRef(created.id, 0))).toBe(true);
     });
@@ -129,6 +135,9 @@ describe('extractStoredReceipt', () => {
                 totalsDisagree: false,
                 extractJson: '{}',
                 rawText: 'Store',
+                extractCostUsd: null,
+                extractPromptTokens: null,
+                extractCompletionTokens: null,
             };
         });
         expect(seen?.equals(processed)).toBe(true);

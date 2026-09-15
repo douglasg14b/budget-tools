@@ -114,6 +114,9 @@ async function persistComplete(id: string, result: ReceiptExtractComplete, db?: 
             purchaseDate: result.purchaseDate,
             printedMilliunits: result.printedMilliunits,
             totalsDisagree: result.totalsDisagree,
+            extractCostUsd: result.extractCostUsd,
+            extractPromptTokens: result.extractPromptTokens,
+            extractCompletionTokens: result.extractCompletionTokens,
         },
         db,
     );
