@@ -161,9 +161,14 @@ services:
     #
     # IMPORTANT: the image ships a pruned production tree, not the whole workspace, so no pnpm
     # script resolves inside it — `pnpm pull-transactions` and `pnpm run:prod` both die in pnpm's
-    # resolver on the `workspace:` protocol before running any code. The scheduled command is:
-    #   docker exec transactions-retrieval ./node_modules/.bin/tsx ./src/main.ts
-    # Keep /app as the working directory: the `@/*` import alias resolves relative to cwd.
+    # resolver on the `workspace:` protocol before running any code. The Coolify scheduled task's
+    # command field must be exactly:
+    #   cd /app && ./node_modules/.bin/tsx ./src/main.ts
+    # Do NOT wrap it in your own `sh -c` or add `docker exec` — Coolify already runs
+    # `docker exec <container> sh -c '<your command>'` internally, so adding another `sh -c` layer
+    # double-wraps the quoting and fails with "sh: 1: ./node_modules/.bin/tsx: not found" even
+    # though the file exists at /app/node_modules/.bin/tsx. Coolify's single sh -c wrap inherits
+    # the image's WORKDIR (/app), so the bare `cd /app && …` form is correct as-is.
     transactions-retrieval:
         container_name: transactions-retrieval
         build:

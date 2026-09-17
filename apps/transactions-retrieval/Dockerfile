@@ -42,14 +42,20 @@ ENV NODE_ENV=production
 
 # Idles until the scheduler runs the retrieval.
 #
-# THE CRON COMMAND IS:
-#   ./node_modules/.bin/tsx ./src/main.ts
+# THE COOLIFY SCHEDULED TASK COMMAND FIELD MUST BE EXACTLY:
+#   cd /app && ./node_modules/.bin/tsx ./src/main.ts
+#
+# Coolify already runs `docker exec <container> sh -c '<your command>'` internally (see
+# app/Jobs/ScheduledTaskJob.php in coollabsio/coolify) — do NOT add your own `sh -c` wrapper or
+# `docker exec` in the task command field, or you get double-wrapped shell quoting that fails with
+# "sh: 1: ./node_modules/.bin/tsx: not found" even though the file exists. Their own docs say the
+# same for `docker exec`: enter the command exactly as it should run inside the container.
 #
 # It MUST run with /app as the working directory. tsconfig maps the `@/*` alias that the source
 # imports through (`@/data`, `@/services/...`) to `src/*` relative to cwd, so invoking it by
-# absolute path from elsewhere fails with ERR_MODULE_NOT_FOUND on '@/data'. WORKDIR is /app, so a
-# plain `docker exec <container> ./node_modules/.bin/tsx ./src/main.ts` is already correct; only
-# add `sh -c 'cd /app && …'` if the scheduler overrides the working directory.
+# absolute path from elsewhere fails with ERR_MODULE_NOT_FOUND on '@/data'. Coolify's single
+# `sh -c` wrap inherits the image's WORKDIR (/app), so the bare `cd /app && …` form above is
+# correct and sufficient — verified against the built image via plain `docker exec` too.
 #
 # Not a pnpm script. `pnpm deploy --prod` prunes this image to a standalone package tree, so /app
 # is the package root itself — there is no `apps/transactions-retrieval/` path and no workspace.
