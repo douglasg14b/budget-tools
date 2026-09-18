@@ -42,6 +42,10 @@
 }
 
 @media (max-width: 40rem) {
+    .page {
+        gap: 0.7rem;
+    }
+
     .header {
         flex-direction: column;
         align-items: stretch;

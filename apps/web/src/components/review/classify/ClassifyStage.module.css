@@ -361,6 +361,11 @@
 }
 
 @media (max-width: 40rem) {
+    .stage {
+        gap: 0.8rem;
+        padding: 1rem 0.9rem;
+    }
+
     .hero {
         flex-direction: column;
         align-items: flex-start;
@@ -400,6 +405,7 @@
 
     .actions {
         flex-direction: column;
+        gap: 0.5rem;
     }
 
     .accept,

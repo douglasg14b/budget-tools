@@ -83,13 +83,16 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
     return (
         <div className={classes.page}>
             <header className={classes.header}>
-                <div className={classes.headerCopy}>
-                    <h1 className={classes.title}>{layout === 'table' ? 'Table' : 'Classify'}</h1>
-                    <p className={classes.note} data-mode={mode}>
-                        {operatingModeClassifyNote(mode)}
-                    </p>
-                </div>
+                {layout === 'table' ? (
+                    <div className={classes.headerCopy}>
+                        <h1 className={classes.title}>Table</h1>
+                        <p className={classes.note} data-mode={mode}>
+                            {operatingModeClassifyNote(mode)}
+                        </p>
+                    </div>
+                ) : null}
                 <QueueSearchInput
+                    compact={layout === 'card'}
                     value={search.q}
                     onChange={(q) => {
                         setSearchParams(serializeQueueSearchParams({ ...search, q }), { replace: true });

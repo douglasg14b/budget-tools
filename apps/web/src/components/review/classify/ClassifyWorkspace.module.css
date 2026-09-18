@@ -28,3 +28,9 @@
         display: none;
     }
 }
+
+@media (max-width: 40rem) {
+    .workspace {
+        gap: 0.7rem;
+    }
+}

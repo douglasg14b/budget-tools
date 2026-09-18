@@ -5,11 +5,12 @@ import { useRef } from 'react';
 import classes from './QueueSearchInput.module.css';
 
 type QueueSearchInputProps = {
+    compact?: boolean;
     onChange: (q: string | undefined) => void;
     value: string | undefined;
 };
 
-export function QueueSearchInput({ onChange, value }: QueueSearchInputProps) {
+export function QueueSearchInput({ compact = false, onChange, value }: QueueSearchInputProps) {
     const inputRef = useRef<HTMLInputElement>(null);
 
     useHotkeys(
@@ -29,7 +30,8 @@ export function QueueSearchInput({ onChange, value }: QueueSearchInputProps) {
         <TextInput
             ref={inputRef}
             className={classes.input}
-            label="Search"
+            aria-label={compact ? 'Search transactions' : undefined}
+            label={compact ? undefined : 'Search'}
             placeholder="Payee, memo, amount…"
             value={value ?? ''}
             rightSection={
