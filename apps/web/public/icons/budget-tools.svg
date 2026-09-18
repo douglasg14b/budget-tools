@@ -1,0 +1,12 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' role='img' aria-labelledby='title description'>
+    <title id='title'>Budget Tools</title>
+    <desc id='description'>Three rising budget bars and a coin on a dark green tile.</desc>
+    <rect width='512' height='512' rx='112' fill='#161712' />
+    <rect x='96' y='96' width='320' height='320' rx='72' fill='#1f201a' stroke='#789464' stroke-width='16' />
+    <path d='M152 338V282C152 269 163 258 176 258H192C205 258 216 269 216 282V338H152Z' fill='#a8be96' />
+    <path d='M232 338V226C232 213 243 202 256 202H272C285 202 296 213 296 226V338H232Z' fill='#789464' />
+    <path d='M312 338V170C312 157 323 146 336 146H352C365 146 376 157 376 170V338H312Z' fill='#526646' />
+    <path d='M144 354H384' stroke='#f5f3ec' stroke-width='16' stroke-linecap='round' />
+    <circle cx='176' cy='174' r='32' fill='#d4b67a' />
+    <path d='M176 155V193M187 162C184 158 180 156 175 156C167 156 162 160 162 166C162 172 167 175 177 178C187 181 191 185 191 191C191 198 185 202 176 202C170 202 164 200 160 195' fill='none' stroke='#161712' stroke-width='8' stroke-linecap='round' stroke-linejoin='round' />
+</svg>
