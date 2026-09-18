@@ -185,6 +185,11 @@
 						"type": "string",
 						"nullable": true
 					},
+					"extractCostUsd": {
+						"type": "number",
+						"format": "double",
+						"nullable": true
+					},
 					"rawText": {
 						"type": "string",
 						"nullable": true
@@ -222,6 +227,7 @@
 					"totalsDisagree",
 					"contentHash",
 					"transactionId",
+					"extractCostUsd",
 					"rawText",
 					"extractJson",
 					"extractStatus",

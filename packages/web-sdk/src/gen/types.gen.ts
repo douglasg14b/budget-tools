@@ -55,6 +55,7 @@ export type ReceiptDto = {
     totalsDisagree: boolean;
     contentHash: string;
     transactionId: string | null;
+    extractCostUsd: number | null;
     rawText: string | null;
     extractJson: string | null;
     extractStatus: ReceiptExtractStatus;

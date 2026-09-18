@@ -10,6 +10,7 @@ export type ReceiptDto = {
     extractStatus: ReceiptExtractStatus;
     extractJson: string | null;
     rawText: string | null;
+    extractCostUsd: number | null;
     transactionId: string | null;
     contentHash: string;
     totalsDisagree: boolean;

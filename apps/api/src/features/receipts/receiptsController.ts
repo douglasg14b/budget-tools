@@ -58,6 +58,7 @@ async function toReceiptDto(row: ReceiptRow): Promise<ReceiptDto> {
         extractStatus: row.extractStatus,
         extractJson: row.extractJson,
         rawText: row.rawText,
+        extractCostUsd: row.extractCostUsd,
         transactionId: row.transactionId,
         contentHash: row.contentHash,
         totalsDisagree: row.totalsDisagree,

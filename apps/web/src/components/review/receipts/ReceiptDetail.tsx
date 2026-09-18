@@ -21,6 +21,7 @@ export type ReceiptDetailModel = {
     readonly totalsDisagree: boolean;
     readonly extractJson: string | null;
     readonly rawText: string | null;
+    readonly extractCostUsd: number | null;
     readonly transactionId: string | null;
     readonly createdAt: string | null;
     readonly frameCount: number | null;
@@ -263,8 +264,20 @@ function ExtractSummary({ receipt }: { readonly receipt: ReceiptDetailModel }) {
                     {receipt.printedMilliunits != null ? formatYnabAmount(receipt.printedMilliunits) : 'No total yet'}
                 </dd>
             </div>
+            {receipt.extractCostUsd != null ? (
+                <div>
+                    <dt>OCR cost</dt>
+                    <dd>{formatInferenceCost(receipt.extractCostUsd)}</dd>
+                </div>
+            ) : null}
         </dl>
     );
+}
+export function formatInferenceCost(costUsd: number): string {
+    if (costUsd === 0) {
+        return '$0';
+    }
+    return `$${costUsd.toFixed(costUsd >= 0.01 ? 4 : 6)}`;
 }
 
 function SplitDraftPreview({ draft }: { readonly draft: ReceiptSplitDraftDto | null }) {
