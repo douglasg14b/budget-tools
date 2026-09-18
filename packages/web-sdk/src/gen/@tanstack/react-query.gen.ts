@@ -4,7 +4,7 @@ import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanst
 
 import { client } from '../client.gen';
 import { Accounts, AmazonOrders, Auth, Categories, Categorization, Health, OperatingMode, type Options, PeriodicSeries, Receipts, TravelBias, TravelWindows } from '../sdk.gen';
-import type { BindReceiptData, BindReceiptResponse, CreateReceiptData, CreateReceiptResponse, CreateTravelWindowData, CreateTravelWindowResponse, DeleteClassificationDecisionData, DeleteClassificationDecisionResponse, DeleteReceiptData, DeleteReceiptResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, DetachReceiptData, DetachReceiptResponse, ExtractPreviewData, ExtractPreviewResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetMeData, GetMeResponse, GetOperatingModeData, GetOperatingModeResponse, GetOutboundSyncData, GetOutboundSyncResponse, GetReceiptData, GetReceiptImageData, GetReceiptImageResponse, GetReceiptResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListPeriodicSeriesData, ListPeriodicSeriesResponse, ListReceiptsData, ListReceiptsResponse, ListTravelWindowsData, ListTravelWindowsResponse, LookupByReceiptData, LookupByReceiptResponse, LookupByTransactionData, LookupByTransactionResponse, MatchPreviewData, MatchPreviewResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchPasswordData, PatchPasswordResponse, PatchReceiptData, PatchReceiptResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostClassificationDecisionsData, PostClassificationDecisionsResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostLoginData, PostLoginResponse, PostLogoutData, PostLogoutResponse, PostOutboundSyncFlushData, PostOutboundSyncFlushResponse, PostPredictData, PostPredictResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
+import type { BindReceiptData, BindReceiptResponse, CreateReceiptData, CreateReceiptResponse, CreateTravelWindowData, CreateTravelWindowResponse, DeleteClassificationDecisionData, DeleteClassificationDecisionResponse, DeleteReceiptData, DeleteReceiptResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, DetachReceiptData, DetachReceiptResponse, ExtractPreviewData, ExtractPreviewResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetMeData, GetMeResponse, GetOperatingModeData, GetOperatingModeResponse, GetOutboundSyncData, GetOutboundSyncResponse, GetReceiptData, GetReceiptImageData, GetReceiptImageResponse, GetReceiptResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListPeriodicSeriesData, ListPeriodicSeriesResponse, ListReceiptsData, ListReceiptsResponse, ListTravelWindowsData, ListTravelWindowsResponse, LookupByReceiptData, LookupByReceiptResponse, LookupByTransactionData, LookupByTransactionResponse, MatchPreviewData, MatchPreviewResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchPasswordData, PatchPasswordResponse, PatchReceiptData, PatchReceiptResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostClassificationDecisionsData, PostClassificationDecisionsResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostLoginData, PostLoginResponse, PostLogoutData, PostLogoutResponse, PostOutboundSyncFlushData, PostOutboundSyncFlushResponse, PostPredictData, PostPredictResponse, RetryReceiptExtractData, RetryReceiptExtractResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -339,12 +339,29 @@ export const patchReceiptMutation = (options?: Partial<Options<PatchReceiptData>
 };
 
 /**
+ * retryReceiptExtract
+ */
+export const retryReceiptExtractMutation = (options?: Partial<Options<RetryReceiptExtractData>>): UseMutationOptions<RetryReceiptExtractResponse, DefaultError, Options<RetryReceiptExtractData>> => {
+    const mutationOptions: UseMutationOptions<RetryReceiptExtractResponse, DefaultError, Options<RetryReceiptExtractData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await Receipts.request11({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
  * detachReceipt
  */
 export const detachReceiptMutation = (options?: Partial<Options<DetachReceiptData>>): UseMutationOptions<DetachReceiptResponse, DefaultError, Options<DetachReceiptData>> => {
     const mutationOptions: UseMutationOptions<DetachReceiptResponse, DefaultError, Options<DetachReceiptData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await Receipts.request11({
+            const { data } = await Receipts.request12({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -361,7 +378,7 @@ export const detachReceiptMutation = (options?: Partial<Options<DetachReceiptDat
 export const bindReceiptMutation = (options?: Partial<Options<BindReceiptData>>): UseMutationOptions<BindReceiptResponse, DefaultError, Options<BindReceiptData>> => {
     const mutationOptions: UseMutationOptions<BindReceiptResponse, DefaultError, Options<BindReceiptData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await Receipts.request12({
+            const { data } = await Receipts.request13({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

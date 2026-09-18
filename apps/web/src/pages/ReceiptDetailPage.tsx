@@ -11,6 +11,7 @@ import {
     lookupByReceiptQueryKey,
     patchReceiptMutation,
     Receipts,
+    retryReceiptExtractMutation,
 } from '@budget-tools/web-sdk';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -106,6 +107,14 @@ export function ReceiptDetailPage() {
             await cacheReceiptRow(queryClient, row);
             await invalidateReceiptQueries(queryClient, receiptId);
             setSaveEpoch((epoch) => epoch + 1);
+        },
+    });
+
+    const retryMutation = useMutation({
+        ...retryReceiptExtractMutation(),
+        onSuccess: async (row) => {
+            await cacheReceiptRow(queryClient, row);
+            await invalidateReceiptQueries(queryClient, receiptId);
         },
     });
 
@@ -219,6 +228,13 @@ export function ReceiptDetailPage() {
         }
     }
 
+    function retryExtract(): void {
+        if (!receipt || !live || receipt.extractStatus !== 'failed') {
+            return;
+        }
+        retryMutation.mutate({ path: { id: receipt.id } });
+    }
+
     const matchError = live ? lookupQuery.error : practiceMatchQuery.error;
     const writeError = bindMutation.error ?? detachMutation.error ?? deleteMutation.error;
 
@@ -238,6 +254,8 @@ export function ReceiptDetailPage() {
                 match={match}
                 missing={missing}
                 receipt={receipt}
+                retrying={retryMutation.isPending}
+                retryError={formatDetailError(retryMutation.error)}
                 saveError={practiceSaveError ?? formatDetailError(patchMutation.error)}
                 saveEpoch={saveEpoch}
                 saving={patchMutation.isPending}
@@ -245,6 +263,7 @@ export function ReceiptDetailPage() {
                 onBind={bindTo}
                 onDelete={remove}
                 onDetach={detach}
+                onRetry={retryExtract}
                 onSave={saveExtract}
             />
         </div>

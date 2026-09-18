@@ -28,7 +28,7 @@ import {
     setReceiptTransactionId,
 } from './data/receiptsRepo';
 import { extractPreview as previewReceiptExtract } from './extractPreview';
-import { kickReceiptExtractIfPending } from './extractStoredReceipt';
+import { enqueueReceiptExtract, kickReceiptExtractIfPending } from './extractStoredReceipt';
 import {
     lookupByReceipt as lookupReceiptRow,
     lookupByTransaction as lookupTransactionRow,
@@ -47,6 +47,7 @@ import type {
     ReceiptMatchDto,
     ReceiptsDto,
 } from './receiptsDtos';
+import { retryReceiptExtract as retryReceiptExtractRow } from './retryReceiptExtract';
 
 async function toReceiptDto(row: ReceiptRow): Promise<ReceiptDto> {
     return {
@@ -179,6 +180,19 @@ export class ReceiptsController {
     @Patch('{id}')
     public async patchReceipt(@Path() id: string, @Body() body: PatchReceiptDto): Promise<ReceiptDto> {
         return toReceiptDto(await patchReceiptRow(id, body));
+    }
+
+    /**
+     * @summary retryReceiptExtract
+     */
+    @Response(403, 'Practice mode')
+    @Response(404, 'Not found')
+    @Response(409, 'Extract is not failed')
+    @Post('{id}/retry-extract')
+    public async retryReceiptExtract(@Path() id: string): Promise<ReceiptDto> {
+        const row = await retryReceiptExtractRow(id);
+        enqueueReceiptExtract(row.id);
+        return toReceiptDto(row);
     }
 
     /**

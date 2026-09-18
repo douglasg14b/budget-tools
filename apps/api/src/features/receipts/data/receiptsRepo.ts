@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import type { AppDatabaseClient } from '../../../data-persistence/database';
 import { getAppDatabase } from '../../../data-persistence/database';
-import { HttpError, NotFoundError } from '../../travelWindows/HttpError';
+import { ConflictError, HttpError, NotFoundError } from '../../travelWindows/HttpError';
 import { assertReceiptWritesAllowed } from '../assertReceiptWritesAllowed';
 import type { PerceptualNeighbor } from '../perceptualHash';
 import { findNearestPerceptualMatch, perceptualHashOf } from '../perceptualHash';
@@ -430,6 +430,38 @@ export async function setReceiptExtract(
     if (Number(result.numUpdatedRows) === 0) {
         throw new NotFoundError(`receipt not found: ${id}`);
     }
+}
+
+/**
+ * Clears a failed extract so it can be placed back on the live extraction queue.
+ * The status condition makes repeated retry requests safe: only the request that
+ * changed the row from failed to pending may enqueue another extraction.
+ */
+export async function resetFailedReceiptExtract(id: string, db?: AppDatabaseClient): Promise<ReceiptRow> {
+    const database = db ?? (await getAppDatabase());
+    await assertReceiptWritesAllowed(database);
+    const result = await database
+        .updateTable('receipts')
+        .set({
+            extractStatus: 'pending',
+            extractJson: null,
+            rawText: null,
+            vendor: null,
+            purchaseDate: null,
+            printedMilliunits: null,
+            totalsDisagree: false,
+            extractCostUsd: null,
+            extractPromptTokens: null,
+            extractCompletionTokens: null,
+        })
+        .where('id', '=', id)
+        .where('extractStatus', '=', 'failed')
+        .executeTakeFirst();
+    if (Number(result.numUpdatedRows) === 0) {
+        await requireReceipt(id, database);
+        throw new ConflictError('Only failed receipt extracts can be retried');
+    }
+    return requireReceipt(id, database);
 }
 
 export async function setReceiptTransactionId(

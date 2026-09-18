@@ -138,7 +138,7 @@ export function useReceiptOverlay({
             if (!transactionId || !id) {
                 throw new Error('No receipt to bind');
             }
-            const result = await Receipts.request12({
+            const result = await Receipts.request13({
                 path: { id },
                 body: { transactionId },
                 throwOnError: true,

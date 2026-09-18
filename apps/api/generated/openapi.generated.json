@@ -2824,6 +2824,47 @@
 				]
 			}
 		},
+		"/receipts/{id}/retry-extract": {
+			"post": {
+				"operationId": "RetryReceiptExtract",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptDto"
+								}
+							}
+						}
+					},
+					"403": {
+						"description": "Practice mode"
+					},
+					"404": {
+						"description": "Not found"
+					},
+					"409": {
+						"description": "Extract is not failed"
+					}
+				},
+				"summary": "retryReceiptExtract",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
 		"/receipts/{id}/bind": {
 			"post": {
 				"operationId": "BindReceipt",

@@ -38,6 +38,8 @@ type ReceiptDetailProps = {
     readonly match: ReceiptMatchDto | undefined;
     readonly missing: boolean;
     readonly receipt: ReceiptDetailModel | null;
+    readonly retrying: boolean;
+    readonly retryError: string | null;
     readonly saveError: string | null;
     readonly saveEpoch: number;
     readonly saving: boolean;
@@ -45,6 +47,7 @@ type ReceiptDetailProps = {
     readonly onBind: (transactionId: string) => void;
     readonly onDelete: () => void;
     readonly onDetach: () => void;
+    readonly onRetry: () => void;
     readonly onSave: (edit: ReceiptExtractEdit) => void;
 };
 
@@ -58,6 +61,8 @@ export function ReceiptDetail({
     match,
     missing,
     receipt,
+    retrying,
+    retryError,
     saveError,
     saveEpoch,
     saving,
@@ -65,6 +70,7 @@ export function ReceiptDetail({
     onBind,
     onDelete,
     onDetach,
+    onRetry,
     onSave,
 }: ReceiptDetailProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -129,6 +135,14 @@ export function ReceiptDetail({
                         </div>
                         <p className={classes.status}>{receiptExtractCopy(receipt)}</p>
                         {extract?.error ? <p className={classes.error}>{extract.error}</p> : null}
+                        {live && receipt.extractStatus === 'failed' ? (
+                            <div className={classes.retry}>
+                                <Button size="compact-sm" loading={retrying} onClick={onRetry}>
+                                    Retry parsing
+                                </Button>
+                                {retryError ? <p className={classes.error}>{retryError}</p> : null}
+                            </div>
+                        ) : null}
 
                         {editing && canEdit ? (
                             <ExtractEditor

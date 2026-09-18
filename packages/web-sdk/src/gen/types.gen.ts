@@ -1011,6 +1011,39 @@ export type PatchReceiptResponses = {
 
 export type PatchReceiptResponse = PatchReceiptResponses[keyof PatchReceiptResponses];
 
+export type RetryReceiptExtractData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/receipts/{id}/retry-extract';
+};
+
+export type RetryReceiptExtractErrors = {
+    /**
+     * Practice mode
+     */
+    403: unknown;
+    /**
+     * Not found
+     */
+    404: unknown;
+    /**
+     * Extract is not failed
+     */
+    409: unknown;
+};
+
+export type RetryReceiptExtractResponses = {
+    /**
+     * Ok
+     */
+    200: ReceiptDto;
+};
+
+export type RetryReceiptExtractResponse = RetryReceiptExtractResponses[keyof RetryReceiptExtractResponses];
+
 export type DetachReceiptData = {
     body?: never;
     path: {
