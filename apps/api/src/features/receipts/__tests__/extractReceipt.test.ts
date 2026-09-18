@@ -70,6 +70,45 @@ describe('extractReceipt', () => {
         expect(completeJson.mock.calls[1]?.[0].user).not.toContain('OCR dump');
     });
 
+    it('can use one stronger vision model for both explicit retry passes', async () => {
+        const completeJson = vi.fn(
+            completeJsonReturning({
+                receipt_headers: headerContent(),
+                receipt_lines: linesContent(),
+            }),
+        );
+
+        await extractReceipt({
+            frames: [processed],
+            apiKey: 'test-key',
+            prep: async () => processed,
+            completeJson,
+            headerModel: 'test/frontier-vision',
+            repairModel: 'test/frontier-vision',
+        });
+
+        expect(completeJson.mock.calls.map((call) => call[0].model)).toEqual([
+            'test/frontier-vision',
+            'test/frontier-vision',
+        ]);
+    });
+
+    it('reads only header keys for a focused payee retry', async () => {
+        const completeJson = vi.fn(completeJsonReturning({ receipt_headers: headerContent({ vendor: 'TJ Maxx' }) }));
+        const result = await extractReceipt({
+            frames: [processed],
+            apiKey: 'test-key',
+            prep: async () => processed,
+            completeJson,
+            headerOnly: true,
+            headerModel: 'test/frontier-vision',
+        });
+
+        expect(result).toMatchObject({ kind: 'complete', vendor: 'TJ Maxx', extractStatus: 'ungated' });
+        expect(completeJson.mock.calls.map((call) => call[0].schemaName)).toEqual(['receipt_headers']);
+        expect(completeJson.mock.calls[0]?.[0].model).toBe('test/frontier-vision');
+    });
+
     it('returns amazon when the header vendor is Amazon and skips line vision', async () => {
         const completeJson = vi.fn(completeJsonReturning({ receipt_headers: headerContent({ vendor: 'AMAZON.COM' }) }));
         const result = await extractReceipt({

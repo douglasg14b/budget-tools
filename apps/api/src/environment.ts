@@ -50,6 +50,16 @@ export const OPENROUTER_RECEIPT_REPAIR_MODEL = env
     .default('qwen/qwen3.7-plus')
     .asString();
 
+/**
+ * Frontier vision model used only when a reviewer explicitly retries a failed receipt.
+ * It reads both match keys and line items, so logo-only merchant names get a second
+ * chance without making every receipt costlier or slower.
+ */
+export const OPENROUTER_RECEIPT_RETRY_MODEL = env
+    .get('OPENROUTER_RECEIPT_RETRY_MODEL')
+    .default('qwen/qwen3.8-max')
+    .asString();
+
 export const OPENROUTER_BASE_URL = env.get('OPENROUTER_BASE_URL').default('https://openrouter.ai/api/v1').asString();
 
 /**

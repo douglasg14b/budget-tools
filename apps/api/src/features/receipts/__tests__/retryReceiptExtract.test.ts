@@ -23,7 +23,7 @@ describe('retryReceiptExtract', () => {
         await appDb.close();
     });
 
-    it('clears a failed extract and returns it to pending', async () => {
+    it('clears a failed extract and routes it to the normal parser', async () => {
         const created = await createReceipt(
             { frames: [jpegDataUrl(jpegBytes)], receiptsDir: appDb.receiptsDir },
             database,
@@ -48,21 +48,80 @@ describe('retryReceiptExtract', () => {
         const retried = await retryReceiptExtract(created.id, database);
 
         expect(retried).toMatchObject({
-            extractStatus: 'pending',
-            extractJson: null,
-            rawText: null,
-            vendor: null,
-            purchaseDate: null,
-            printedMilliunits: null,
-            totalsDisagree: false,
-            extractCostUsd: null,
-            extractPromptTokens: null,
-            extractCompletionTokens: null,
+            kind: 'normal',
+            row: {
+                extractStatus: 'pending',
+                extractJson: null,
+                rawText: null,
+                vendor: null,
+                purchaseDate: null,
+                printedMilliunits: null,
+                totalsDisagree: false,
+                extractCostUsd: null,
+                extractPromptTokens: null,
+                extractCompletionTokens: null,
+            },
         });
         expect(await getReceiptById(created.id, database)).toMatchObject({ extractStatus: 'pending' });
     });
 
-    it('rejects retrying an extract that is not failed', async () => {
+    it('routes a missing payee to the focused stronger header retry without clearing lines', async () => {
+        const created = await createReceipt(
+            { frames: [jpegDataUrl(jpegBytes)], receiptsDir: appDb.receiptsDir },
+            database,
+        );
+        await setReceiptExtract(
+            created.id,
+            {
+                extractStatus: 'failed',
+                extractJson: '{"lines":[{"name":"Shirt","amountMilliunits":1200,"quantity":1}]}',
+                rawText: 'Shirt 1.20',
+                vendor: null,
+                purchaseDate: '2026-09-17',
+                printedMilliunits: 1200,
+                totalsDisagree: false,
+            },
+            database,
+        );
+
+        await expect(retryReceiptExtract(created.id, database)).resolves.toMatchObject({
+            kind: 'header',
+            row: {
+                extractStatus: 'pending',
+                extractJson: '{"lines":[{"name":"Shirt","amountMilliunits":1200,"quantity":1}]}',
+                rawText: 'Shirt 1.20',
+                purchaseDate: '2026-09-17',
+                printedMilliunits: 1200,
+            },
+        });
+    });
+
+    it('routes a completed extract to the stronger full parser', async () => {
+        const created = await createReceipt(
+            { frames: [jpegDataUrl(jpegBytes)], receiptsDir: appDb.receiptsDir },
+            database,
+        );
+        await setReceiptExtract(
+            created.id,
+            {
+                extractStatus: 'gated',
+                extractJson: null,
+                rawText: null,
+                vendor: 'TJ Maxx',
+                purchaseDate: '2026-09-17',
+                printedMilliunits: 1200,
+                totalsDisagree: false,
+            },
+            database,
+        );
+
+        await expect(retryReceiptExtract(created.id, database)).resolves.toMatchObject({
+            kind: 'stronger',
+            row: { extractStatus: 'pending', vendor: null, extractJson: null },
+        });
+    });
+
+    it('rejects retrying a pending extract', async () => {
         const created = await createReceipt(
             { frames: [jpegDataUrl(jpegBytes)], receiptsDir: appDb.receiptsDir },
             database,

@@ -135,11 +135,12 @@ export function ReceiptDetail({
                         </div>
                         <p className={classes.status}>{receiptExtractCopy(receipt)}</p>
                         {extract?.error ? <p className={classes.error}>{extract.error}</p> : null}
-                        {live && receipt.extractStatus === 'failed' ? (
+                        {live && receipt.extractStatus !== 'pending' ? (
                             <div className={classes.retry}>
                                 <Button size="compact-sm" loading={retrying} onClick={onRetry}>
-                                    Retry parsing
+                                    Retry
                                 </Button>
+                                <p className={classes.quiet}>{retryExplanation(receipt)}</p>
                                 {retryError ? <p className={classes.error}>{retryError}</p> : null}
                             </div>
                         ) : null}
@@ -259,6 +260,16 @@ export function ReceiptDetail({
             ) : null}
         </div>
     );
+}
+
+function retryExplanation(receipt: ReceiptDetailModel): string {
+    if (receipt.extractStatus !== 'failed') {
+        return 'Reprocesses this receipt with the higher-capability model.';
+    }
+    if (receipt.vendor == null && receipt.purchaseDate != null && receipt.printedMilliunits != null) {
+        return 'Rechecks the missing payee and header with the higher-capability model.';
+    }
+    return 'Tries the normal receipt parser again.';
 }
 
 function ExtractSummary({ receipt }: { readonly receipt: ReceiptDetailModel }) {

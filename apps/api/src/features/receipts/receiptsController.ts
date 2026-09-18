@@ -28,7 +28,12 @@ import {
     setReceiptTransactionId,
 } from './data/receiptsRepo';
 import { extractPreview as previewReceiptExtract } from './extractPreview';
-import { enqueueReceiptExtract, kickReceiptExtractIfPending } from './extractStoredReceipt';
+import {
+    enqueueReceiptExtract,
+    extractStoredReceiptHeaderWithStrongerModel,
+    extractStoredReceiptWithStrongerModel,
+    kickReceiptExtractIfPending,
+} from './extractStoredReceipt';
 import {
     lookupByReceipt as lookupReceiptRow,
     lookupByTransaction as lookupTransactionRow,
@@ -187,12 +192,18 @@ export class ReceiptsController {
      */
     @Response(403, 'Practice mode')
     @Response(404, 'Not found')
-    @Response(409, 'Extract is not failed')
+    @Response(409, 'Extract is already pending')
     @Post('{id}/retry-extract')
     public async retryReceiptExtract(@Path() id: string): Promise<ReceiptDto> {
-        const row = await retryReceiptExtractRow(id);
-        enqueueReceiptExtract(row.id);
-        return toReceiptDto(row);
+        const retry = await retryReceiptExtractRow(id);
+        const extract =
+            retry.kind === 'normal'
+                ? undefined
+                : retry.kind === 'header'
+                  ? extractStoredReceiptHeaderWithStrongerModel
+                  : extractStoredReceiptWithStrongerModel;
+        enqueueReceiptExtract(retry.row.id, extract);
+        return toReceiptDto(retry.row);
     }
 
     /**

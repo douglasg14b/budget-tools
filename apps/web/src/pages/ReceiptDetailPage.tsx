@@ -229,7 +229,7 @@ export function ReceiptDetailPage() {
     }
 
     function retryExtract(): void {
-        if (!receipt || !live || receipt.extractStatus !== 'failed') {
+        if (!receipt || !live || receipt.extractStatus === 'pending') {
             return;
         }
         retryMutation.mutate({ path: { id: receipt.id } });

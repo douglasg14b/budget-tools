@@ -56,6 +56,8 @@ export type ExtractReceiptInput = {
     readonly baseUrl?: string;
     readonly headerTimeoutMs?: number;
     readonly repairTimeoutMs?: number;
+    /** Re-read only receipt match keys, preserving prior line-item extraction. */
+    readonly headerOnly?: boolean;
 };
 
 /**
@@ -93,6 +95,9 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
     });
     if (headerAttempt.header && isAmazonReceiptVendor(headerAttempt.header.vendor)) {
         return { kind: 'amazon' };
+    }
+    if (input.headerOnly) {
+        return completeHeaderOnly(headerAttempt);
     }
 
     const header = headerAttempt.header ?? emptyHeader();
@@ -190,6 +195,34 @@ export function buildFailedReceiptExtract(message: string): ReceiptExtractComple
         extractCostUsd: null,
         extractPromptTokens: null,
         extractCompletionTokens: null,
+    };
+}
+
+function completeHeaderOnly(attempt: HeaderAttempt): ReceiptExtractComplete {
+    const header = attempt.header ?? emptyHeader();
+    const hasKeys = Boolean(header.vendor && header.purchaseDate && header.printedMilliunits != null);
+    const payload: ReceiptExtractPayload = {
+        repaired: false,
+        gated: false,
+        headerPrintedMilliunits: header.printedMilliunits,
+        ocrPrintedMilliunits: null,
+        taxMilliunits: 0,
+        discountMilliunits: 0,
+        lines: [],
+        error: attempt.error,
+    };
+    return {
+        kind: 'complete',
+        extractStatus: hasKeys ? 'ungated' : 'failed',
+        vendor: header.vendor,
+        purchaseDate: header.purchaseDate,
+        printedMilliunits: header.printedMilliunits,
+        totalsDisagree: false,
+        extractJson: JSON.stringify(payload),
+        rawText: null,
+        extractCostUsd: attempt.usage?.costUsd ?? null,
+        extractPromptTokens: attempt.usage?.promptTokens ?? null,
+        extractCompletionTokens: attempt.usage?.completionTokens ?? null,
     };
 }
 
