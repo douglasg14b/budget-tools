@@ -131,6 +131,24 @@ export async function listPendingExtractReceipts(db?: AppDatabaseClient): Promis
 }
 
 /**
+ * Completed Live receipts whose extracted match keys can still be paired with a bank row.
+ * The periodic binder deliberately leaves pending, failed, and manually bound receipts alone.
+ */
+export async function listUnboundReceiptsForBinding(db?: AppDatabaseClient): Promise<ReceiptRow[]> {
+    const database = db ?? (await getAppDatabase());
+    return database
+        .selectFrom('receipts')
+        .selectAll()
+        .where('transactionId', 'is', null)
+        .where('purchaseDate', 'is not', null)
+        .where('printedMilliunits', 'is not', null)
+        .where('extractStatus', 'in', ['gated', 'ungated'])
+        .orderBy('purchaseDate', 'asc')
+        .orderBy('id', 'asc')
+        .execute();
+}
+
+/**
  * Indexed purchase-date window for Classify lookup. Null dates are excluded by the comparison.
  */
 export async function listReceiptsInPurchaseDateWindow(
@@ -479,6 +497,30 @@ export async function setReceiptTransactionId(
     if (Number(result.numUpdatedRows) === 0) {
         throw new NotFoundError(`receipt not found: ${id}`);
     }
+}
+
+/**
+ * Claim an unbound receipt without replacing a user's manual or concurrent binding.
+ * @returns whether this call performed the bind.
+ */
+export async function bindReceiptIfUnbound(
+    id: string,
+    transactionId: string,
+    db?: AppDatabaseClient,
+): Promise<boolean> {
+    const database = db ?? (await getAppDatabase());
+    await assertReceiptWritesAllowed(database);
+    const result = await database
+        .updateTable('receipts')
+        .set({ transactionId })
+        .where('id', '=', id)
+        .where('transactionId', 'is', null)
+        .executeTakeFirst();
+    if (Number(result.numUpdatedRows) > 0) {
+        return true;
+    }
+    await requireReceipt(id, database);
+    return false;
 }
 
 export async function deleteReceipt(id: string, db?: AppDatabaseClient): Promise<void> {

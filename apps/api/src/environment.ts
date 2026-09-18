@@ -95,6 +95,12 @@ export const RECEIPTS_JSON_BODY_LIMIT = env
     .default(String(15 * 1024 * 1024))
     .asIntPositive();
 
+/** How often Live retries exact receipt-to-transaction bindings for receipts still unbound. */
+export const RECEIPT_BIND_SWEEP_INTERVAL_MS = env
+    .get('RECEIPT_BIND_SWEEP_INTERVAL_MS')
+    .default('300000')
+    .asIntPositive();
+
 /**
  * Receipt image storage backend. `fs` (default) stores originals under `RECEIPTS_DIR`; `s3`
  * stores them in an S3-compatible bucket (the on-network rust-fs server in production).
