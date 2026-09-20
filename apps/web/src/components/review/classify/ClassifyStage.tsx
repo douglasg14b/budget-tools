@@ -4,7 +4,8 @@ import type {
     CategoryOptionDto,
     PayeeSuggestionDto,
 } from '@budget-tools/web-sdk';
-import { Button, Loader, Select, Tooltip, UnstyledButton } from '@mantine/core';
+import { ActionIcon, Button, Loader, Select, Tooltip, UnstyledButton } from '@mantine/core';
+import { IconRefresh } from '@tabler/icons-react';
 
 import { FlagChips } from '../FlagChips';
 import { formatConfidence } from '../formatConfidence';
@@ -18,6 +19,7 @@ import { ClassifyReceiptCapture } from './ClassifyReceiptCapture';
 import { ClassifyReceiptContext } from './ClassifyReceiptContext';
 import { ClassifySplitEditor } from './ClassifySplitEditor';
 import classes from './ClassifyStage.module.css';
+import { ClearedBadge } from './ClearedBadge';
 import { CLASSIFY_KEY_LABELS } from './classifyKeys';
 import type { CategoryChoice, CategorySelectGroup } from './flattenCategoryChoices';
 import { formatCategoryLabel } from './formatCategoryLabel';
@@ -48,9 +50,12 @@ type ClassifyStageProps = {
     onPickCategoryId: (categoryId: string) => void;
     onPickOption: (option: CategoryOptionDto) => void;
     onReject: () => void;
+    onRetryLlm?: () => void;
     onUndo: () => void;
     payee: string;
     rename: PayeeSuggestionDto | null;
+    retryingLlm?: boolean;
+    retryLlmError?: string | null;
     scoreError?: string | null;
     scoring?: boolean;
     splitLines?: readonly SplitLine[];
@@ -86,9 +91,12 @@ export function ClassifyStage({
     onPickCategoryId,
     onPickOption,
     onReject,
+    onRetryLlm,
     onUndo,
     payee,
     rename,
+    retryingLlm = false,
+    retryLlmError = null,
     scoreError = null,
     scoring = false,
     splitLines,
@@ -145,6 +153,7 @@ export function ClassifyStage({
                             relatedTransactions={item.relatedTransactions}
                         />
                     ) : null}
+                    <ClearedBadge cleared={transaction.cleared} />
                 </div>
                 <p className={classes.amount} data-inflow={transaction.amount >= 0 || undefined}>
                     {formatYnabAmount(transaction.amount)}
@@ -170,6 +179,20 @@ export function ClassifyStage({
 
             <div className={classes.verdict}>
                 <p className={classes.verdictLabel}>Suggestion</p>
+                {onRetryLlm && proposal && !amazonSuggestion && !scoring && !llmAsking ? (
+                    <Tooltip label="Retry LLM categorization">
+                        <ActionIcon
+                            aria-label="Retry LLM categorization"
+                            className={classes.retryLlm}
+                            loading={retryingLlm}
+                            size="sm"
+                            variant="subtle"
+                            onClick={onRetryLlm}
+                        >
+                            <IconRefresh size={16} />
+                        </ActionIcon>
+                    </Tooltip>
+                ) : null}
                 <p className={amazonSuggestion || suggestion ? classes.verdictCategory : classes.verdictEmpty}>
                     {scoring ? (
                         <span className={classes.scoringLabel}>
@@ -198,6 +221,7 @@ export function ClassifyStage({
                     </p>
                 ) : null}
                 {llmError && !llmAsking ? <p className={classes.llmBanner}>{llmError}</p> : null}
+                {retryLlmError && !retryingLlm ? <p className={classes.llmBanner}>{retryLlmError}</p> : null}
                 {amazon?.asking && !amazon.overlay ? (
                     <p className={classes.llmBanner}>
                         <Loader size={14} color="gray" />

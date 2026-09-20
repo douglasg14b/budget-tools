@@ -208,6 +208,8 @@ export type CategorizationPredictDto = {
 
 export type LlmSuggestRequestDto = {
     transactionId: string;
+    /** Bypass the cached overlay and ask the LLM again. */
+    forceRefresh?: boolean;
 };
 
 export type LlmSuggestOverlayDto = {

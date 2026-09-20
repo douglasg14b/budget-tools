@@ -26,7 +26,11 @@ const OPENROUTER_TIMEOUT_MS = 15_000;
 /**
  * Just-in-time LLM overlay for one scored queue transaction.
  */
-export async function suggestWithLlm(transactionId: string, signal?: AbortSignal): Promise<LlmSuggestOverlayDto> {
+export async function suggestWithLlm(
+    transactionId: string,
+    signal?: AbortSignal,
+    forceRefresh = false,
+): Promise<LlmSuggestOverlayDto> {
     const trimmedId = transactionId.trim();
     if (!trimmedId) {
         throw new LlmSuggestError(422, 'transactionId is required');
@@ -35,7 +39,9 @@ export async function suggestWithLlm(transactionId: string, signal?: AbortSignal
     const scored = await getScoredQueueItem(trimmedId);
     const travelSignature = await loadTravelWindowsSignature();
     const overlayKey = overlayFingerprint(scored.fingerprint, travelSignature);
-    const cached = await readLlmOverlay(CATEGORIZATION_QUEUE_CACHE_DIR, scored.transaction.id, overlayKey);
+    const cached = forceRefresh
+        ? undefined
+        : await readLlmOverlay(CATEGORIZATION_QUEUE_CACHE_DIR, scored.transaction.id, overlayKey);
     if (cached) {
         logLlmSuggest('cache hit, skipping OpenRouter', {
             cachePath: overlayCachePath(CATEGORIZATION_QUEUE_CACHE_DIR),
@@ -46,7 +52,7 @@ export async function suggestWithLlm(transactionId: string, signal?: AbortSignal
         return cached;
     }
 
-    logLlmSuggest('cache miss', {
+    logLlmSuggest(forceRefresh ? 'forced refresh, skipping cache' : 'cache miss', {
         fingerprint: overlayKey,
         transactionId: scored.transaction.id,
     });

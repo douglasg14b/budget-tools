@@ -160,6 +160,14 @@
     margin: 0;
 }
 
+.retryLlm {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    align-self: start;
+    color: var(--app-text-muted);
+}
+
 .confidence {
     font-family: var(--app-font-mono);
     font-size: 1.25rem;

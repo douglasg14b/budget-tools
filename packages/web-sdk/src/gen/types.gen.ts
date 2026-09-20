@@ -395,6 +395,10 @@ export type LlmSuggestOverlayDto = {
 };
 
 export type LlmSuggestRequestDto = {
+    /**
+     * Bypass the cached overlay and ask the LLM again.
+     */
+    forceRefresh?: boolean;
     transactionId: string;
 };
 
@@ -1030,7 +1034,7 @@ export type RetryReceiptExtractErrors = {
      */
     404: unknown;
     /**
-     * Extract is not failed
+     * Extract is already pending
      */
     409: unknown;
 };

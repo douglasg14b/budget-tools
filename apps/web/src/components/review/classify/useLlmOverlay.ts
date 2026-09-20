@@ -1,6 +1,6 @@
 import type { CategorizationQueueItemDto, LlmSuggestOverlayDto } from '@budget-tools/web-sdk';
 import { Categorization } from '@budget-tools/web-sdk';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { getBackendErrorMessage } from '../../BackendErrorNotice';
 import {
@@ -23,6 +23,9 @@ type UseLlmOverlayResult = {
     readonly errorMessage: string | null;
     readonly isPending: boolean;
     readonly item: CategorizationQueueItemDto | undefined;
+    readonly retry: () => void;
+    readonly retryError: string | null;
+    readonly retrying: boolean;
 };
 
 /**
@@ -36,15 +39,25 @@ export function useLlmOverlay({
     receiptSkip,
 }: UseLlmOverlayInput): UseLlmOverlayResult {
     const currentEnabled = Boolean(current && needsLlmSuggest(current, currentDecided, receiptSkip));
+    const currentQueryKey = ['categorization', 'llm-suggest', ...(current ? overlayQueryKey(current) : ['none'])];
 
+    const queryClient = useQueryClient();
     const currentQuery = useQuery({
-        queryKey: ['categorization', 'llm-suggest', ...(current ? overlayQueryKey(current) : ['none'])],
+        queryKey: currentQueryKey,
         queryFn: ({ signal }) => fetchOverlay(current?.transaction.id ?? '', signal),
         enabled: currentEnabled,
         staleTime: Number.POSITIVE_INFINITY,
         gcTime: Number.POSITIVE_INFINITY,
         refetchOnWindowFocus: false,
         retry: retryLlmSuggest,
+    });
+
+    const currentTransactionId = current?.transaction.id;
+    const retryMutation = useMutation({
+        mutationFn: () => fetchOverlay(currentTransactionId ?? '', undefined, true),
+        onSuccess: (data) => {
+            queryClient.setQueryData(currentQueryKey, data);
+        },
     });
 
     usePrefetchOverlay(prefetchPrevious, 'prefetch-previous');
@@ -58,6 +71,13 @@ export function useLlmOverlay({
         errorMessage: currentQuery.isError ? formatLlmError(currentQuery.error) : null,
         isPending: currentEnabled && currentQuery.isFetching,
         item,
+        retry: () => {
+            if (currentTransactionId) {
+                retryMutation.mutate();
+            }
+        },
+        retryError: retryMutation.isError ? formatLlmError(retryMutation.error) : null,
+        retrying: retryMutation.isPending,
     };
 }
 
@@ -73,9 +93,13 @@ function usePrefetchOverlay(item: CategorizationQueueItemDto | undefined, scope:
     });
 }
 
-async function fetchOverlay(transactionId: string, signal?: AbortSignal): Promise<LlmSuggestOverlayDto> {
+async function fetchOverlay(
+    transactionId: string,
+    signal?: AbortSignal,
+    forceRefresh?: boolean,
+): Promise<LlmSuggestOverlayDto> {
     const result = await Categorization.request2({
-        body: { transactionId },
+        body: { transactionId, forceRefresh },
         signal,
         throwOnError: true,
     });

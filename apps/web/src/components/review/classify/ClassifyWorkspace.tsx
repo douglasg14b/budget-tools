@@ -194,6 +194,9 @@ export function ClassifyWorkspace({
                 item={displayItem}
                 llmAsking={overlay.isPending}
                 llmError={overlay.errorMessage}
+                onRetryLlm={overlay.retry}
+                retryingLlm={overlay.retrying}
+                retryLlmError={overlay.retryError}
                 payee={classify.payeeName(displayItem)}
                 rename={classify.payeeRename(displayItem)}
                 scoreError={predict.errorMessage}

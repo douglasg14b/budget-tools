@@ -1500,6 +1500,10 @@
 			},
 			"LlmSuggestRequestDto": {
 				"properties": {
+					"forceRefresh": {
+						"type": "boolean",
+						"description": "Bypass the cached overlay and ask the LLM again."
+					},
 					"transactionId": {
 						"type": "string"
 					}
@@ -2845,7 +2849,7 @@
 						"description": "Not found"
 					},
 					"409": {
-						"description": "Extract is not failed"
+						"description": "Extract is already pending"
 					}
 				},
 				"summary": "retryReceiptExtract",

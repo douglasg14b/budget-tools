@@ -75,7 +75,7 @@ export class CategorizationController {
         @Body() body: LlmSuggestRequestDto,
         @Request() request: ExpressRequest,
     ): Promise<LlmSuggestOverlayDto> {
-        return await suggestWithLlm(body.transactionId, abortSignalFromRequest(request));
+        return await suggestWithLlm(body.transactionId, abortSignalFromRequest(request), body.forceRefresh);
     }
 
     /**
