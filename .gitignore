@@ -167,3 +167,6 @@ apps/web/vendor/scanic/
 
 # Local planning workspace
 nimbalyst-local/
+
+# Throwaway spikes. Holds a venv and real scraped Amazon data - never commit.
+.spike/

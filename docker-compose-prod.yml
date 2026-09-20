@@ -9,11 +9,13 @@ name: budget-tools
 #
 # Postgres itself is NOT in this stack — it is the existing external/managed database that the
 # transactions-retrieval service already uses. Point DB_CONNECTION_STRING at it.
+#
+# Do not set `container_name`: Coolify must own resource-scoped names so it can replace containers
+# during redeploys. Services reach each other through the stable Compose service names below.
 
 services:
     # One-shot: applies migrations, then exits 0. Not a long-running service.
     migrator:
-        container_name: budget-tools-migrator
         build:
             context: .
             dockerfile: ./packages/db/Dockerfile
@@ -24,7 +26,6 @@ services:
             - budget-tools
 
     api:
-        container_name: budget-tools-api
         build:
             context: .
             dockerfile: ./apps/api/Dockerfile
@@ -92,7 +93,6 @@ services:
 
     # Warm .NET scorer. Holds a loaded ScoringSession so the API pays model-load cost once.
     scorer:
-        container_name: budget-tools-scorer
         build:
             context: .
             dockerfile: ./apps/categorization-ai/Dockerfile
@@ -131,7 +131,6 @@ services:
             - budget-tools
 
     web:
-        container_name: budget-tools-web
         build:
             context: .
             dockerfile: ./apps/web/Dockerfile
@@ -171,7 +170,6 @@ services:
     # though the file exists at /app/node_modules/.bin/tsx. Coolify's single sh -c wrap inherits
     # the image's WORKDIR (/app), so the bare `cd /app && …` form is correct as-is.
     transactions-retrieval:
-        container_name: transactions-retrieval
         build:
             context: .
             dockerfile: ./apps/transactions-retrieval/Dockerfile
