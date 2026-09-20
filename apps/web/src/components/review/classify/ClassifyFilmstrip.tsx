@@ -7,6 +7,7 @@ import { formatYnabAmount } from '../formatYnabAmount';
 import { humanizeEnum } from '../humanizeEnum';
 import { QueuePrefetchSentinel } from '../QueuePrefetchSentinel';
 import classes from './ClassifyFilmstrip.module.css';
+import { ClearedBadge } from './ClearedBadge';
 import { isCertainProposal } from './isCertainProposal';
 import type { SessionDecision, SessionDecisions } from './sessionDecisions';
 import { isSplitDecision } from './sessionDecisions';
@@ -89,7 +90,10 @@ export function ClassifyFilmstrip({
                             >
                                 <span className={classes.index}>{index + 1}</span>
                                 <span className={classes.body}>
-                                    <span className={classes.payee}>{payee}</span>
+                                    <span className={classes.payeeRow}>
+                                        <span className={classes.payee}>{payee}</span>
+                                        <ClearedBadge cleared={item.transaction.cleared} />
+                                    </span>
                                     <span className={classes.meta}>
                                         {formatTransactionDate(item.transaction.date)}
                                         {proposal?.periodicMatch

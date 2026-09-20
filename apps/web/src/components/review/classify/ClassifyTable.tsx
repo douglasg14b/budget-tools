@@ -19,6 +19,7 @@ import { ClassifyPayee } from './ClassifyPayee';
 import { ClassifyProgress } from './ClassifyProgress';
 import { ClassifyShortcuts } from './ClassifyShortcuts';
 import classes from './ClassifyTable.module.css';
+import { ClearedBadge } from './ClearedBadge';
 import type { CategorySelectGroup } from './flattenCategoryChoices';
 import { formatCategoryLabel } from './formatCategoryLabel';
 import { isCertainProposal } from './isCertainProposal';
@@ -243,6 +244,11 @@ function TableRow({
                 {proposal?.travelWindow ? (
                     <span className={classes.travelChip}>
                         <TravelWindowChip travelWindow={proposal.travelWindow} />
+                    </span>
+                ) : null}
+                {transaction.cleared === 'uncleared' ? (
+                    <span className={classes.travelChip}>
+                        <ClearedBadge cleared={transaction.cleared} />
                     </span>
                 ) : null}
             </td>

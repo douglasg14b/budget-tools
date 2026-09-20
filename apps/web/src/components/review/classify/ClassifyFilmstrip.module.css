@@ -82,6 +82,13 @@
     gap: 0.05rem;
 }
 
+.payeeRow {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
 .payee {
     overflow: hidden;
     text-overflow: ellipsis;
