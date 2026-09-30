@@ -1,8 +1,10 @@
 import {
     getOpenRouterApiKey,
     OPENROUTER_BASE_URL,
+    OPENROUTER_DECISIONS_MODEL,
     OPENROUTER_MODEL,
     OPENROUTER_RECEIPT_REPAIR_MODEL,
+    RECEIPT_VERIFY_ENABLED,
 } from '../../environment';
 import { isAmazonTransaction } from '../amazonClassify/isAmazonTransaction';
 import { LlmSuggestError } from '../categorization/llm/LlmSuggestError';
@@ -21,6 +23,8 @@ import {
     readReceiptHeaders,
     readReceiptLines,
 } from './pipeline/receiptHeaderVision';
+import type { ReceiptVerifyFlag } from './pipeline/verifyReceiptExtract';
+import { verifyReceiptExtract } from './pipeline/verifyReceiptExtract';
 
 export type { ReceiptExtractPayload } from './parseReceiptExtract';
 
@@ -58,6 +62,9 @@ export type ExtractReceiptInput = {
     readonly repairTimeoutMs?: number;
     /** Re-read only receipt match keys, preserving prior line-item extraction. */
     readonly headerOnly?: boolean;
+    /** Off by default in tests so the extract pipeline stays offline-testable. */
+    readonly verify?: boolean;
+    readonly verifyModel?: string;
 };
 
 /**
@@ -143,6 +150,17 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
     const hasKeys = Boolean(vendor && purchaseDate && printedMilliunits != null);
     const extractStatus: ReceiptExtractStatus = !hasKeys ? 'failed' : gated && !totalsDisagree ? 'gated' : 'ungated';
 
+    const verifyFlags = await tryVerify({
+        enabled: input.verify ?? RECEIPT_VERIFY_ENABLED,
+        apiKey,
+        model: input.verifyModel ?? OPENROUTER_DECISIONS_MODEL,
+        vendor,
+        printedMilliunits,
+        lines,
+        taxMilliunits,
+        discountMilliunits,
+    });
+
     const payload: ReceiptExtractPayload = {
         repaired,
         gated,
@@ -152,6 +170,7 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
         discountMilliunits,
         lines,
         error,
+        ...(verifyFlags ? { verifyFlags } : {}),
     };
 
     return {
@@ -224,6 +243,33 @@ function completeHeaderOnly(attempt: HeaderAttempt): ReceiptExtractComplete {
         extractPromptTokens: attempt.usage?.promptTokens ?? null,
         extractCompletionTokens: attempt.usage?.completionTokens ?? null,
     };
+}
+
+/**
+ * Advisory only. A verification failure must never cost us a good extract, so
+ * every error path returns undefined — which parseReceiptExtract keeps distinct
+ * from an empty flag list.
+ */
+async function tryVerify(input: {
+    readonly enabled: boolean;
+    readonly apiKey: string;
+    readonly model: string;
+    readonly vendor: string | null;
+    readonly printedMilliunits: number | null;
+    readonly lines: readonly ReceiptExtractLine[];
+    readonly taxMilliunits: number;
+    readonly discountMilliunits: number;
+}): Promise<readonly ReceiptVerifyFlag[] | undefined> {
+    if (!input.enabled || !input.vendor) {
+        return undefined;
+    }
+    try {
+        const result = await verifyReceiptExtract(input);
+        return result.flags;
+    } catch (error) {
+        console.warn('receipt extract verification failed', errorMessage(error));
+        return undefined;
+    }
 }
 
 function requireOpenRouterApiKey(): string {

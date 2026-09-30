@@ -63,6 +63,16 @@ export const OPENROUTER_RECEIPT_RETRY_MODEL = env
 export const OPENROUTER_BASE_URL = env.get('OPENROUTER_BASE_URL').default('https://openrouter.ai/api/v1').asString();
 
 /**
+ * Structured decision model used for the post-extract receipt sanity check.
+ * Text-only and billed per input token, so it cannot re-read the photo — it
+ * judges the extracted fields. Set RECEIPT_VERIFY_ENABLED=false to turn the
+ * pass off without removing the wiring.
+ */
+export const OPENROUTER_DECISIONS_MODEL = env.get('OPENROUTER_DECISIONS_MODEL').default('typesafe/jev-1.13').asString();
+
+export const RECEIPT_VERIFY_ENABLED = env.get('RECEIPT_VERIFY_ENABLED').default('true').asBool();
+
+/**
  * OpenRouter key. Optional so OpenAPI generation can load without secrets.
  * The LLM suggest endpoint fails loud when this is empty.
  */

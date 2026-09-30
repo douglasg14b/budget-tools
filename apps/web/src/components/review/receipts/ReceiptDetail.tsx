@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { formatTransactionDate } from '../formatTransactionDate';
 import { formatYnabAmount } from '../formatYnabAmount';
 import type { ReceiptExtractEdit } from './applyReceiptExtractEdit';
+import type { ReceiptVerifyFlag } from './parseReceiptExtract';
 import { parseReceiptExtract } from './parseReceiptExtract';
 import { ReceiptBindPanel } from './ReceiptBindPanel';
 import classes from './ReceiptDetail.module.css';
@@ -135,6 +136,7 @@ export function ReceiptDetail({
                         </div>
                         <p className={classes.status}>{receiptExtractCopy(receipt)}</p>
                         {extract?.error ? <p className={classes.error}>{extract.error}</p> : null}
+                        <ExtractWarnings flags={extract?.verifyFlags} />
                         {live && receipt.extractStatus !== 'pending' ? (
                             <div className={classes.retry}>
                                 <Button size="compact-sm" loading={retrying} onClick={onRetry}>
@@ -259,6 +261,28 @@ export function ReceiptDetail({
                 </>
             ) : null}
         </div>
+    );
+}
+
+const VERIFY_FLAG_COPY: Readonly<Record<ReceiptVerifyFlag, string>> = {
+    'vendor-suspect': 'The store name may be misread — check it against the photo.',
+    'discount-double-counted': 'A discount may be counted twice, once as a line and once as the discount total.',
+};
+
+/**
+ * Advisory second-opinion flags. Nothing here blocks the extract; an empty or
+ * absent list is not a clean bill of health, so we render nothing in that case.
+ */
+function ExtractWarnings({ flags }: { readonly flags: readonly ReceiptVerifyFlag[] | undefined }) {
+    if (!flags?.length) {
+        return null;
+    }
+    return (
+        <ul className={classes.warnings}>
+            {flags.map((flag) => (
+                <li key={flag}>{VERIFY_FLAG_COPY[flag]}</li>
+            ))}
+        </ul>
     );
 }
 

@@ -124,6 +124,14 @@
     color: var(--app-status-error);
 }
 
+/* Advisory second-opinion flags. Reuses the review amber: worth a look, not an error. */
+.warnings {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.875rem;
+    color: var(--app-tier-review);
+}
+
 .retry {
     display: flex;
     align-items: center;

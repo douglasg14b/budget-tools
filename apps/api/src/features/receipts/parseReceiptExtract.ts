@@ -1,4 +1,5 @@
 import type { ReceiptExtractLine } from './pipeline/arithmeticGate';
+import type { ReceiptVerifyFlag } from './pipeline/verifyReceiptExtract';
 
 export type ReceiptExtractPayload = {
     readonly repaired: boolean;
@@ -10,6 +11,12 @@ export type ReceiptExtractPayload = {
     readonly discountMilliunits: number;
     readonly lines: ReceiptExtractLine[];
     readonly error: string | null;
+    /**
+     * Advisory flags from the post-extract decision pass. Absent on records
+     * written before the check existed, and on receipts where it failed or was
+     * disabled — never treat an empty list as "verified clean".
+     */
+    readonly verifyFlags?: readonly ReceiptVerifyFlag[];
 };
 
 /**
@@ -33,8 +40,11 @@ export function parseReceiptExtract(extractJson: string | null): ReceiptExtractP
             discountMilliunits?: unknown;
             lines?: unknown;
             error?: unknown;
+            verifyFlags?: unknown;
         };
+        const verifyFlags = parseVerifyFlags(record.verifyFlags);
         return {
+            ...(verifyFlags ? { verifyFlags } : {}),
             repaired: record.repaired === true,
             gated: record.gated === true,
             headerPrintedMilliunits:
@@ -68,6 +78,16 @@ export function formatReceiptExtractDump(
         rows.push(`Discount ${(discountMilliunits / 1000).toFixed(2)}`);
     }
     return rows.length > 0 ? rows.join('\n') : null;
+}
+
+const VERIFY_FLAGS: readonly ReceiptVerifyFlag[] = ['vendor-suspect', 'discount-double-counted'];
+
+/** Undefined (not []) when the key is absent, so "unchecked" stays distinct from "checked, clean". */
+function parseVerifyFlags(value: unknown): readonly ReceiptVerifyFlag[] | undefined {
+    if (!Array.isArray(value)) {
+        return undefined;
+    }
+    return value.filter((flag): flag is ReceiptVerifyFlag => VERIFY_FLAGS.includes(flag as ReceiptVerifyFlag));
 }
 
 function parseLines(value: unknown): ReceiptExtractLine[] {

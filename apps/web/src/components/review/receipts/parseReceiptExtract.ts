@@ -4,6 +4,9 @@ export type ReceiptExtractLine = {
     readonly quantity: number | null;
 };
 
+/** Mirrors ReceiptVerifyFlag on the api side. */
+export type ReceiptVerifyFlag = 'vendor-suspect' | 'discount-double-counted';
+
 export type ParsedReceiptExtract = {
     readonly repaired: boolean;
     readonly gated: boolean;
@@ -13,6 +16,8 @@ export type ParsedReceiptExtract = {
     readonly discountMilliunits: number;
     readonly lines: readonly ReceiptExtractLine[];
     readonly error: string | null;
+    /** Undefined when the extract predates the check or it did not run. */
+    readonly verifyFlags?: readonly ReceiptVerifyFlag[];
 };
 
 /**
@@ -36,8 +41,11 @@ export function parseReceiptExtract(extractJson: string | null): ParsedReceiptEx
             discountMilliunits?: unknown;
             lines?: unknown;
             error?: unknown;
+            verifyFlags?: unknown;
         };
+        const verifyFlags = parseVerifyFlags(record.verifyFlags);
         return {
+            ...(verifyFlags ? { verifyFlags } : {}),
             repaired: record.repaired === true,
             gated: record.gated === true,
             headerPrintedMilliunits:
@@ -51,6 +59,15 @@ export function parseReceiptExtract(extractJson: string | null): ParsedReceiptEx
     } catch {
         return null;
     }
+}
+
+const VERIFY_FLAGS: readonly ReceiptVerifyFlag[] = ['vendor-suspect', 'discount-double-counted'];
+
+function parseVerifyFlags(value: unknown): readonly ReceiptVerifyFlag[] | undefined {
+    if (!Array.isArray(value)) {
+        return undefined;
+    }
+    return value.filter((flag): flag is ReceiptVerifyFlag => VERIFY_FLAGS.includes(flag as ReceiptVerifyFlag));
 }
 
 function parseLines(value: unknown): ReceiptExtractLine[] {
