@@ -7,6 +7,7 @@ import {
     parseOpenRouterPrediction,
     parseOpenRouterUsage,
 } from '../openRouterClient';
+import { UnknownOpenRouterModelError } from '../openRouterModelProfiles';
 
 describe('parseOpenRouterPrediction', () => {
     it('reads primary and alternate categories', () => {
@@ -192,5 +193,61 @@ describe('completeOpenRouterJson vision payload', () => {
             messages: Array<{ role: string; content: unknown }>;
         };
         expect(body.messages[1]?.content).toBe('hello');
+    });
+});
+
+describe('completeOpenRouterJson model profile', () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.restoreAllMocks();
+    });
+
+    async function postedBody(model: string): Promise<{ reasoning: unknown; temperature: unknown }> {
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }] }),
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        await completeOpenRouterJson({
+            apiKey: 'test-key',
+            baseUrl: 'https://openrouter.example/api/v1',
+            model,
+            system: 'system',
+            user: 'hello',
+            timeoutMs: 5_000,
+            schemaName: 'receipt_headers',
+            schema: { type: 'object' },
+        });
+        const [, init] = fetchMock.mock.calls[0] as [string, { body: string }];
+        return JSON.parse(init.body) as { reasoning: unknown; temperature: unknown };
+    }
+
+    it('rejects an unregistered model before calling OpenRouter', async () => {
+        const fetchMock = vi.fn();
+        vi.stubGlobal('fetch', fetchMock);
+        await expect(
+            completeOpenRouterJson({
+                apiKey: 'test-key',
+                baseUrl: 'https://openrouter.example/api/v1',
+                model: 'vendor/unknown-model',
+                system: 'system',
+                user: 'hello',
+                timeoutMs: 5_000,
+                schemaName: 'receipt_headers',
+                schema: { type: 'object' },
+            }),
+        ).rejects.toThrow(UnknownOpenRouterModelError);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('disables reasoning for models registered without it', async () => {
+        expect(await postedBody('qwen/qwen3.7-flash')).toMatchObject({
+            temperature: 0.1,
+            reasoning: { enabled: false },
+        });
+    });
+
+    it('requests an effort for models that cannot disable reasoning', async () => {
+        expect((await postedBody('qwen/qwen3.8-max')).reasoning).toEqual({ effort: 'low' });
     });
 });

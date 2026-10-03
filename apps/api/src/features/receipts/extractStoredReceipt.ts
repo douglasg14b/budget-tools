@@ -12,6 +12,7 @@ import {
 import type { ExtractFramesFn, ReceiptExtractComplete } from './extractReceipt';
 import { buildFailedReceiptExtract, extractReceipt } from './extractReceipt';
 import { parseReceiptExtract } from './parseReceiptExtract';
+import { RECEIPT_HEADER_TIMEOUT_MS, RECEIPT_LINES_TIMEOUT_MS } from './pipeline/receiptHeaderVision';
 
 type DeleteReceiptFn = (id: string, db?: AppDatabaseClient) => Promise<void>;
 
@@ -20,6 +21,15 @@ export type ExtractStoredFn = (receiptId: string) => Promise<void>;
 export type EnqueueReceiptExtractFn = (receiptId: string) => void;
 
 const inFlightExtractIds = new Set<string>();
+
+/**
+ * Frontier retry models are slower (some always reason; see openRouterModelProfiles),
+ * and retries run off the request path, so they get a longer budget.
+ */
+const STRONGER_MODEL_OPTIONS = {
+    headerModel: OPENROUTER_RECEIPT_RETRY_MODEL,
+    headerTimeoutMs: RECEIPT_HEADER_TIMEOUT_MS * 2,
+} as const;
 
 /**
  * Live extract against stored processed JPEG when present, otherwise originals. Amazon vendor deletes the row and files.
@@ -66,8 +76,9 @@ export async function extractStoredReceiptWithStrongerModel(id: string, db?: App
     return extractStoredReceipt(id, db, (input) =>
         extractReceipt({
             ...input,
-            headerModel: OPENROUTER_RECEIPT_RETRY_MODEL,
+            ...STRONGER_MODEL_OPTIONS,
             repairModel: OPENROUTER_RECEIPT_RETRY_MODEL,
+            repairTimeoutMs: RECEIPT_LINES_TIMEOUT_MS * 2,
         }),
     );
 }
@@ -80,7 +91,7 @@ export async function extractStoredReceiptHeaderWithStrongerModel(id: string, db
         const result = await extractReceipt({
             frames,
             headerOnly: true,
-            headerModel: OPENROUTER_RECEIPT_RETRY_MODEL,
+            ...STRONGER_MODEL_OPTIONS,
         });
         if (result.kind === 'amazon') {
             await preserveHeaderRetryFailure(id, row, db);

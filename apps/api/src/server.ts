@@ -17,12 +17,16 @@ import {
     getAmazonOrdersMcpEntry,
     getApiTlsCertPath,
     getApiTlsKeyPath,
+    OPENROUTER_MODEL,
+    OPENROUTER_RECEIPT_REPAIR_MODEL,
+    OPENROUTER_RECEIPT_RETRY_MODEL,
     RECEIPTS_JSON_BODY_LIMIT,
 } from './environment';
 import { authMiddleware } from './features/auth/authMiddleware';
 import { deleteExpiredSessions } from './features/auth/data/authRepo';
 import { QueryValidationError } from './features/categorization/filterQueue';
 import { LlmSuggestError } from './features/categorization/llm/LlmSuggestError';
+import { assertOpenRouterModelsRegistered } from './features/categorization/llm/openRouterModelProfiles';
 import { clearLlmOverlayCache } from './features/categorization/llm/overlayCache';
 import { PredictJsonError } from './features/categorization/predictJson';
 import { sweepPendingReceiptExtracts } from './features/receipts/extractStoredReceipt';
@@ -130,6 +134,12 @@ app.use(errorHandler);
 
 async function start(): Promise<void> {
     console.log('API starting');
+    // Fail at boot, not on the first receipt or classify call, when a configured model has no profile.
+    assertOpenRouterModelsRegistered({
+        OPENROUTER_MODEL,
+        OPENROUTER_RECEIPT_REPAIR_MODEL,
+        OPENROUTER_RECEIPT_RETRY_MODEL,
+    });
     await getAppDatabase();
     const sweptSessions = await deleteExpiredSessions(new Date());
     if (sweptSessions > 0) {

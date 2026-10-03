@@ -1,5 +1,6 @@
 import { LlmSuggestError } from './LlmSuggestError';
 import { logLlmSuggest } from './logLlmSuggest';
+import { openRouterProfileRequestFields, resolveOpenRouterModelProfile } from './openRouterModelProfiles';
 
 export type OpenRouterChatInput = {
     readonly apiKey: string;
@@ -97,7 +98,7 @@ type ChatCompletionResponse = {
 };
 
 /**
- * Calls OpenRouter chat completions with constrained JSON and thinking disabled.
+ * Calls OpenRouter chat completions with constrained JSON, using the model's request profile.
  */
 export async function completeLlmPrediction(input: OpenRouterChatInput): Promise<OpenRouterPrediction> {
     const { content } = await completeOpenRouterJson({
@@ -130,9 +131,13 @@ export function openRouterUserContent(user: string, images?: readonly string[]):
 }
 
 /**
- * Shared OpenRouter JSON-schema completion. Returns the raw content string plus parsed usage/cost.
+ * Shared OpenRouter JSON-schema completion. Temperature and reasoning come from the model's
+ * profile in openRouterModelProfiles; an unregistered model throws UnknownOpenRouterModelError
+ * before any request. Returns the raw content string plus parsed usage/cost.
  */
 export async function completeOpenRouterJson(input: OpenRouterJsonInput): Promise<OpenRouterJsonResult> {
+    // Outside the try below so a config error is not reported as a failed request.
+    const profileFields = openRouterProfileRequestFields(resolveOpenRouterModelProfile(input.model));
     const endpoint = `${input.baseUrl.replace(/\/$/, '')}/chat/completions`;
     const controller = new AbortController();
     let timedOut = false;
@@ -158,8 +163,7 @@ export async function completeOpenRouterJson(input: OpenRouterJsonInput): Promis
             },
             body: JSON.stringify({
                 model: input.model,
-                temperature: 0.1,
-                reasoning: { enabled: false },
+                ...profileFields,
                 response_format: {
                     type: 'json_schema',
                     json_schema: {
