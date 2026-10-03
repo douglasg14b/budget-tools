@@ -12,7 +12,7 @@ import type {
 } from '../features/amazonOrders/data/amazonOrdersSchema';
 import type { SessionsTable, UsersTable } from '../features/auth/data/authSchema';
 import type { OperatingModeTable } from '../features/operatingMode/data/operatingModeSchema';
-import type { ReceiptsTable } from '../features/receipts/data/receiptsSchema';
+import type { ReceiptBindRejectionsTable, ReceiptsTable } from '../features/receipts/data/receiptsSchema';
 import type { TravelBiasConfigTable } from '../features/travelWindows/data/travelBiasConfigSchema';
 import type { TravelWindowAccountsTable, TravelWindowsTable } from '../features/travelWindows/data/travelWindowsSchema';
 import type { ClassificationSyncTable } from '../features/ynabSync/data/classificationSyncSchema';
@@ -40,6 +40,7 @@ export type AppDatabase = {
     operating_mode: OperatingModeTable;
     classification_sync: ClassificationSyncTable;
     receipts: ReceiptsTable;
+    receipt_bind_rejections: ReceiptBindRejectionsTable;
     users: UsersTable;
     sessions: SessionsTable;
 };

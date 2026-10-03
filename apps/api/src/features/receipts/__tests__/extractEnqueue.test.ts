@@ -43,6 +43,11 @@ function receiptRow(extractStatus: ReceiptExtractStatus, id = 'receipt-1'): Rece
         extractCostUsd: null,
         extractPromptTokens: null,
         extractCompletionTokens: null,
+        bindSource: null,
+        boundAt: null,
+        bindJevScore: null,
+        bindCheckedAt: null,
+        bindCheckOutcome: null,
     };
 }
 

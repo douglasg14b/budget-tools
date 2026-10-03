@@ -14,3 +14,8 @@ export function getDatabase(): DatabaseClient {
     }
     return database;
 }
+
+/** Points the core client at a test database (PGlite); `undefined` restores lazy creation. */
+export function setDatabaseForTests(client: DatabaseClient | undefined): void {
+    database = client;
+}

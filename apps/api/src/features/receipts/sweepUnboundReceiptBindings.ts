@@ -1,43 +1,30 @@
 import type { AppDatabaseClient } from '../../data-persistence/database';
 import { getOperatingMode } from '../operatingMode/data/operatingModeRepo';
+import type { AutoBindDeps } from './autoBindReceipt';
+import { autoBindReceipt } from './autoBindReceipt';
 import type { ReceiptRow } from './data/receiptsRepo';
-import { bindReceiptIfUnbound, listUnboundReceiptsForBinding } from './data/receiptsRepo';
-import { listTransactionsForReceiptMatch } from './listTransactionsForReceiptMatch';
-import { receiptRowToMatchKeys, transactionDetailToMatchKeys } from './lookupReceiptMatch';
-import { matchTransactionsToReceipt } from './matchReceipts';
+import { listUnboundReceiptsForBinding } from './data/receiptsRepo';
 
 type ListUnboundReceipts = (db?: AppDatabaseClient) => Promise<readonly ReceiptRow[]>;
-type ListMatchTransactions = (purchaseDate: string) => ReturnType<typeof listTransactionsForReceiptMatch>;
-type ClaimReceiptBinding = (receiptId: string, transactionId: string, db?: AppDatabaseClient) => Promise<boolean>;
 
 /**
- * Replays the exact, receipt-detail auto-bind decision for completed receipts that remain unbound.
- * This makes delayed bank imports bind without relying on someone opening the receipt UI.
+ * Retries auto-binding for completed receipts that remain unbound, so a bank
+ * charge that arrives days after the photo still binds without anyone opening
+ * the receipt. Transactions are written by a separate cron container, so this
+ * poll is the hook for "a new charge landed".
  */
 export async function sweepUnboundReceiptBindings(
-    db?: AppDatabaseClient,
+    deps: AutoBindDeps = {},
     listUnbound: ListUnboundReceipts = listUnboundReceiptsForBinding,
-    listTransactions: ListMatchTransactions = listTransactionsForReceiptMatch,
-    claim: ClaimReceiptBinding = bindReceiptIfUnbound,
 ): Promise<number> {
-    if ((await getOperatingMode(db)) !== 'live') {
+    if ((await getOperatingMode(deps.db)) !== 'live') {
         return 0;
     }
 
     let bound = 0;
-    for (const receipt of await listUnbound(db)) {
-        if (!receipt.purchaseDate) {
-            continue;
-        }
-        const transactions = await listTransactions(receipt.purchaseDate);
-        const match = matchTransactionsToReceipt({
-            receipt: receiptRowToMatchKeys(receipt),
-            transactions: transactions.map(transactionDetailToMatchKeys),
-        });
-        if (!match.autoBind || !match.exactTransactionId) {
-            continue;
-        }
-        if (await claim(receipt.id, match.exactTransactionId, db)) {
+    for (const receipt of await listUnbound(deps.db)) {
+        const result = await autoBindReceipt(receipt, deps);
+        if (result?.outcome === 'bound') {
             bound += 1;
         }
     }

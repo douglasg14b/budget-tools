@@ -2,10 +2,13 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import type { Database } from '@budget-tools/db';
 import { migrateToLatest } from '@budget-tools/db';
 import { PGlite } from '@electric-sql/pglite';
+import { Kysely } from 'kysely';
 import { PGliteDialect } from 'kysely-pglite-dialect';
 
+import { setDatabaseForTests } from '../data/database';
 import { FilesystemReceiptStorage } from '../features/receipts/storage/filesystemReceiptStorage';
 import { getReceiptStorage, setReceiptStorageForTests } from '../features/receipts/storage/getReceiptStorage';
 import type { AppDatabaseClient } from './database';
@@ -39,6 +42,9 @@ export async function createTestAppDatabase(): Promise<TestAppDatabase> {
     const receiptsDir = await mkdtemp(join(tmpdir(), 'api-receipts-'));
     const storage = new FilesystemReceiptStorage(receiptsDir);
     setReceiptStorageForTests(storage);
+    // Core YNAB tables share the same PGlite, so code that reaches for `getDatabase()`
+    // (e.g. auto-bind after extract) never touches the configured Postgres in tests.
+    setDatabaseForTests(new Kysely<Database>({ dialect: new PGliteDialect(pglite) }));
 
     return {
         db,
@@ -49,6 +55,7 @@ export async function createTestAppDatabase(): Promise<TestAppDatabase> {
         close: async () => {
             await db.destroy();
             setReceiptStorageForTests(undefined);
+            setDatabaseForTests(undefined);
             await rm(receiptsDir, { recursive: true, force: true });
         },
     };

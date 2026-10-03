@@ -16,6 +16,7 @@ import {
 } from 'tsoa';
 
 import { HttpError } from '../travelWindows/HttpError';
+import { autoBindReceipt as autoBindReceiptRow } from './autoBindReceipt';
 import { createReceipt } from './createReceipt';
 import type { ReceiptRow } from './data/receiptsRepo';
 import {
@@ -70,6 +71,11 @@ async function toReceiptDto(row: ReceiptRow): Promise<ReceiptDto> {
         totalsDisagree: row.totalsDisagree,
         frameCount: await countReceiptFrames(row.id),
         hasProcessed: await hasReceiptProcessed(row.id),
+        bindSource: row.bindSource,
+        boundAt: row.boundAt,
+        bindJevScore: row.bindJevScore,
+        bindCheckedAt: row.bindCheckedAt,
+        bindCheckOutcome: row.bindCheckOutcome,
     };
 }
 
@@ -218,6 +224,20 @@ export class ReceiptsController {
     }
 
     /**
+     * Runs the server auto-bind (exact amount + Jev confirmation) for an unbound
+     * receipt right now instead of waiting for the background sweep. A no-op for
+     * bound, incomplete, or Practice receipts.
+     * @summary autoBindReceipt
+     */
+    @Response(404, 'Not found')
+    @Post('{id}/auto-bind')
+    public async autoBindReceipt(@Path() id: string): Promise<ReceiptDto> {
+        await autoBindReceiptRow(await requireReceipt(id));
+        return toReceiptDto(await requireReceipt(id));
+    }
+
+    /**
+     * Detaching also stops the background binder from re-attaching this charge.
      * @summary detachReceipt
      */
     @Response(403, 'Practice mode')

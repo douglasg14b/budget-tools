@@ -5,6 +5,7 @@ import * as apiAppTables from './migrations/2026-09-11-Api_App_Tables';
 import * as coreYnabTables from './migrations/2026-09-11-Core_Ynab_Tables';
 import * as authTables from './migrations/2026-09-13-Auth_Tables';
 import * as receiptExtractCost from './migrations/2026-09-14-Receipt_Extract_Cost';
+import * as receiptBindTracking from './migrations/2026-10-03-Receipt_Bind_Tracking';
 
 /**
  * Explicit migration registry for the shared Budget Tools Postgres schema.
@@ -18,6 +19,7 @@ export const MIGRATIONS: Record<string, Migration> = {
     '2026-09-11-Api_App_Tables': apiAppTables,
     '2026-09-13-Auth_Tables': authTables,
     '2026-09-14-Receipt_Extract_Cost': receiptExtractCost,
+    '2026-10-03-Receipt_Bind_Tracking': receiptBindTracking,
 };
 
 class StaticMigrationProvider implements MigrationProvider {

@@ -1,5 +1,6 @@
 import type { ReceiptDto, ReceiptMatchDto } from '@budget-tools/web-sdk';
 import {
+    autoBindReceiptMutation,
     bindReceiptMutation,
     deleteReceiptMutation,
     detachReceiptMutation,
@@ -93,6 +94,16 @@ export function ReceiptDetailPage() {
         },
     });
 
+    const autoBindMutation = useMutation({
+        ...autoBindReceiptMutation(),
+        onSuccess: async (row) => {
+            await cacheReceiptRow(queryClient, row);
+            if (row?.transactionId) {
+                await invalidateReceiptQueries(queryClient, receiptId);
+            }
+        },
+    });
+
     const detachMutation = useMutation({
         ...detachReceiptMutation(),
         onSuccess: async (row) => {
@@ -131,8 +142,24 @@ export function ReceiptDetailPage() {
         setPracticeSaveError(null);
     }, [receiptId]);
 
+    // Live: opening an unbound, fully read receipt asks the server to auto-bind it now (exact amount +
+    // Jev confirmation) instead of waiting for the background sweep. Bound receipts never trigger it.
+    const liveRow = live ? receiptQuery.data : undefined;
+    const autoBindable =
+        liveRow !== undefined &&
+        !liveRow.transactionId &&
+        (liveRow.extractStatus === 'gated' || liveRow.extractStatus === 'ungated');
     useEffect(() => {
-        if (!receipt || !match?.autoBind || !match.exactTransactionId) {
+        if (!autoBindable || bindAttempted.current === receiptId) {
+            return;
+        }
+        bindAttempted.current = receiptId;
+        autoBindMutation.mutate({ path: { id: receiptId } });
+    }, [autoBindable, receiptId, autoBindMutation.mutate]);
+
+    // Practice keeps the session-only exact-match bind; nothing is written or sent to Jev.
+    useEffect(() => {
+        if (live || !receipt || !match?.autoBind || !match.exactTransactionId) {
             return;
         }
         if (receipt.transactionId === match.exactTransactionId) {
@@ -143,12 +170,8 @@ export function ReceiptDetailPage() {
             return;
         }
         bindAttempted.current = attemptKey;
-        if (live) {
-            bindMutation.mutate({ path: { id: receipt.id }, body: { transactionId: match.exactTransactionId } });
-            return;
-        }
         setSessionReceipts((previous) => bindPracticeReceipt(previous, receipt.id, match.exactTransactionId));
-    }, [live, match?.autoBind, match?.exactTransactionId, receipt, setSessionReceipts, bindMutation.mutate]);
+    }, [live, match?.autoBind, match?.exactTransactionId, receipt, setSessionReceipts]);
 
     function goToInbox(): void {
         const target = receiptsInboxBackTarget({
@@ -246,7 +269,7 @@ export function ReceiptDetailPage() {
                         ? lookupQuery.isFetching && lookupQuery.data === undefined
                         : practiceMatchQuery.isFetching && practiceMatchQuery.data === undefined
                 }
-                binding={bindMutation.isPending || detachMutation.isPending}
+                binding={bindMutation.isPending || detachMutation.isPending || autoBindMutation.isPending}
                 deleting={deleteMutation.isPending}
                 error={formatDetailError(matchError ?? writeError ?? (live ? receiptQuery.error : null))}
                 live={live}
@@ -285,6 +308,12 @@ function modelFromDto(row: ReceiptDto): ReceiptDetailModel {
         createdAt: row.createdAt,
         frameCount: row.frameCount,
         imageSrc: liveReceiptImageSrc(row),
+        bindStatus: {
+            bindSource: row.bindSource,
+            bindJevScore: row.bindJevScore,
+            bindCheckedAt: row.bindCheckedAt,
+            bindCheckOutcome: row.bindCheckOutcome,
+        },
     };
 }
 
@@ -303,6 +332,7 @@ function modelFromPractice(row: PracticeReceipt): ReceiptDetailModel {
         createdAt: null,
         frameCount: row.frames.length,
         imageSrc: practiceReceiptImageSrc(row),
+        bindStatus: null,
     };
 }
 

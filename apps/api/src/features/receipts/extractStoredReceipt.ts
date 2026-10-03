@@ -1,9 +1,11 @@
 import type { AppDatabaseClient } from '../../data-persistence/database';
 import { OPENROUTER_RECEIPT_RETRY_MODEL } from '../../environment';
 import { getOperatingMode } from '../operatingMode/data/operatingModeRepo';
+import { autoBindReceipt } from './autoBindReceipt';
 import type { ReceiptRow } from './data/receiptsRepo';
 import {
     deleteReceipt,
+    getReceiptById,
     listPendingExtractReceipts,
     readReceiptExtractFrameBytes,
     requireReceipt,
@@ -64,6 +66,21 @@ export async function extractStoredReceipt(
             const persistMessage = persistError instanceof Error ? persistError.message : String(persistError);
             console.error('receipt extract status persist failed', { id, persistMessage });
         }
+        return;
+    }
+    await tryAutoBind(id, db);
+}
+
+/** The bank charge often lands before the photo is read; try to bind straight away. */
+async function tryAutoBind(id: string, db?: AppDatabaseClient): Promise<void> {
+    try {
+        const row = await getReceiptById(id, db);
+        if (row) {
+            await autoBindReceipt(row, { db });
+        }
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('receipt auto-bind after extract failed', { id, message });
     }
 }
 

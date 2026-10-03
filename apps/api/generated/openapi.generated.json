@@ -166,8 +166,61 @@
 					"failed"
 				]
 			},
+			"ReceiptBindSource": {
+				"type": "string",
+				"enum": [
+					"capture",
+					"manual",
+					"auto"
+				],
+				"description": "`capture` = photographed from a transaction card; `auto` = the binder, confirmed by Jev."
+			},
+			"ReceiptBindCheckOutcome": {
+				"type": "string",
+				"enum": [
+					"bound",
+					"no-candidate",
+					"not-confirmed",
+					"ambiguous",
+					"jev-unavailable",
+					"lost-race"
+				],
+				"description": "Why the last auto-bind attempt left a receipt unbound (or `bound`)."
+			},
 			"ReceiptDto": {
 				"properties": {
+					"bindCheckOutcome": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/ReceiptBindCheckOutcome"
+							}
+						],
+						"nullable": true
+					},
+					"bindCheckedAt": {
+						"type": "string",
+						"nullable": true,
+						"description": "Last background auto-bind attempt and what it concluded."
+					},
+					"bindJevScore": {
+						"type": "number",
+						"format": "double",
+						"nullable": true,
+						"description": "Jev same-purchase probability behind an `auto` bind."
+					},
+					"boundAt": {
+						"type": "string",
+						"nullable": true
+					},
+					"bindSource": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/ReceiptBindSource"
+							}
+						],
+						"nullable": true,
+						"description": "How the current binding was made; null when unbound."
+					},
 					"hasProcessed": {
 						"type": "boolean"
 					},
@@ -222,6 +275,11 @@
 					}
 				},
 				"required": [
+					"bindCheckOutcome",
+					"bindCheckedAt",
+					"bindJevScore",
+					"boundAt",
+					"bindSource",
 					"hasProcessed",
 					"frameCount",
 					"totalsDisagree",
@@ -2936,7 +2994,44 @@
 						"description": "Not found"
 					}
 				},
+				"description": "Detaching also stops the background binder from re-attaching this charge.",
 				"summary": "detachReceipt",
+				"tags": [
+					"receipts"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/receipts/{id}/auto-bind": {
+			"post": {
+				"operationId": "AutoBindReceipt",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ReceiptDto"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Not found"
+					}
+				},
+				"description": "Runs the server auto-bind (exact amount + Jev confirmation) for an unbound\nreceipt right now instead of waiting for the background sweep. A no-op for\nbound, incomplete, or Practice receipts.",
+				"summary": "autoBindReceipt",
 				"tags": [
 					"receipts"
 				],

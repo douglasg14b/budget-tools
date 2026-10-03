@@ -10,7 +10,7 @@ import { FilesystemReceiptStorage } from '../storage/filesystemReceiptStorage';
 import { getReceiptStorage } from '../storage/getReceiptStorage';
 import type { ReceiptStorage } from '../storage/receiptStorage';
 import { originalRef, processedRef } from '../storage/receiptStorage';
-import type { ReceiptExtractStatus, ReceiptsTable } from './receiptsSchema';
+import type { ReceiptBindCheckOutcome, ReceiptExtractStatus, ReceiptsTable } from './receiptsSchema';
 
 export type ReceiptRow = ReceiptsTable;
 
@@ -383,6 +383,8 @@ export async function insertReceiptOriginal(
                 rawText: null,
                 originalPath,
                 transactionId: input.transactionId ?? null,
+                bindSource: input.transactionId ? 'capture' : null,
+                boundAt: input.transactionId ? createdAt : null,
                 contentHash,
                 perceptualHash: incomingHash,
                 totalsDisagree: false,
@@ -482,6 +484,10 @@ export async function resetFailedReceiptExtract(id: string, db?: AppDatabaseClie
     return requireReceipt(id, database);
 }
 
+/**
+ * A person binding (or, with `null`, detaching) a receipt. Detaching records the
+ * pair as rejected so the background binder never re-attaches the same charge.
+ */
 export async function setReceiptTransactionId(
     id: string,
     transactionId: string | null,
@@ -489,30 +495,54 @@ export async function setReceiptTransactionId(
 ): Promise<void> {
     const database = db ?? (await getAppDatabase());
     await assertReceiptWritesAllowed(database);
-    const result = await database
-        .updateTable('receipts')
-        .set({ transactionId })
-        .where('id', '=', id)
-        .executeTakeFirst();
-    if (Number(result.numUpdatedRows) === 0) {
+    const previous = await getReceiptById(id, database);
+    if (!previous) {
         throw new NotFoundError(`receipt not found: ${id}`);
     }
+    const now = new Date().toISOString();
+    if (previous.transactionId && previous.transactionId !== transactionId) {
+        await database
+            .insertInto('receipt_bind_rejections')
+            .values({ receiptId: id, transactionId: previous.transactionId, createdAt: now })
+            .onConflict((conflict) => conflict.columns(['receiptId', 'transactionId']).doNothing())
+            .execute();
+    }
+    await database
+        .updateTable('receipts')
+        .set({
+            transactionId,
+            bindSource: transactionId ? 'manual' : null,
+            boundAt: transactionId ? now : null,
+            bindJevScore: null,
+        })
+        .where('id', '=', id)
+        .execute();
 }
 
 /**
- * Claim an unbound receipt without replacing a user's manual or concurrent binding.
+ * Auto-bind claim: binds only a still-unbound receipt so it never replaces a
+ * person's or a concurrent binding.
  * @returns whether this call performed the bind.
  */
 export async function bindReceiptIfUnbound(
     id: string,
     transactionId: string,
+    jevScore: number | null,
     db?: AppDatabaseClient,
 ): Promise<boolean> {
     const database = db ?? (await getAppDatabase());
     await assertReceiptWritesAllowed(database);
+    const now = new Date().toISOString();
     const result = await database
         .updateTable('receipts')
-        .set({ transactionId })
+        .set({
+            transactionId,
+            bindSource: 'auto',
+            boundAt: now,
+            bindJevScore: jevScore,
+            bindCheckedAt: now,
+            bindCheckOutcome: 'bound',
+        })
         .where('id', '=', id)
         .where('transactionId', 'is', null)
         .executeTakeFirst();
@@ -521,6 +551,47 @@ export async function bindReceiptIfUnbound(
     }
     await requireReceipt(id, database);
     return false;
+}
+
+/** Stamps the outcome of an auto-bind attempt that left the receipt unbound. */
+export async function recordReceiptBindCheck(
+    id: string,
+    outcome: ReceiptBindCheckOutcome,
+    db?: AppDatabaseClient,
+): Promise<void> {
+    const database = db ?? (await getAppDatabase());
+    await database
+        .updateTable('receipts')
+        .set({ bindCheckedAt: new Date().toISOString(), bindCheckOutcome: outcome })
+        .where('id', '=', id)
+        .execute();
+}
+
+export async function listRejectedTransactionIds(receiptId: string, db?: AppDatabaseClient): Promise<Set<string>> {
+    const database = db ?? (await getAppDatabase());
+    const rows = await database
+        .selectFrom('receipt_bind_rejections')
+        .select('transactionId')
+        .where('receiptId', '=', receiptId)
+        .execute();
+    return new Set(rows.map((row) => row.transactionId));
+}
+
+/** Which of these transactions already have a receipt bound to them. */
+export async function listBoundTransactionIds(
+    transactionIds: readonly string[],
+    db?: AppDatabaseClient,
+): Promise<Set<string>> {
+    if (transactionIds.length === 0) {
+        return new Set();
+    }
+    const database = db ?? (await getAppDatabase());
+    const rows = await database
+        .selectFrom('receipts')
+        .select('transactionId')
+        .where('transactionId', 'in', [...transactionIds])
+        .execute();
+    return new Set(rows.flatMap((row) => (row.transactionId ? [row.transactionId] : [])));
 }
 
 export async function deleteReceipt(id: string, db?: AppDatabaseClient): Promise<void> {

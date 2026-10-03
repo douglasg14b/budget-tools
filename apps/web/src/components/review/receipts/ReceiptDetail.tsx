@@ -11,6 +11,7 @@ import { parseReceiptExtract } from './parseReceiptExtract';
 import { ReceiptBindPanel } from './ReceiptBindPanel';
 import classes from './ReceiptDetail.module.css';
 import { ReceiptImageLightbox } from './ReceiptImageLightbox';
+import type { ReceiptBindStatus } from './receiptBindStatusCopy';
 import { receiptExtractCopy } from './receiptExtractCopy';
 
 export type ReceiptDetailModel = {
@@ -27,6 +28,8 @@ export type ReceiptDetailModel = {
     readonly createdAt: string | null;
     readonly frameCount: number | null;
     readonly imageSrc: string | null;
+    /** Live only. */
+    readonly bindStatus: ReceiptBindStatus | null;
 };
 
 type ReceiptDetailProps = {
@@ -209,6 +212,7 @@ export function ReceiptDetail({
                             asking={askingMatch}
                             binding={binding}
                             boundTransactionId={receipt.transactionId}
+                            bindStatus={receipt.bindStatus}
                             error={null}
                             live={live}
                             match={match}

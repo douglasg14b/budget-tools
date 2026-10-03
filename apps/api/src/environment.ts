@@ -115,11 +115,18 @@ export const RECEIPTS_JSON_BODY_LIMIT = env
     .default(String(15 * 1024 * 1024))
     .asIntPositive();
 
-/** How often Live retries exact receipt-to-transaction bindings for receipts still unbound. */
+/** How often Live retries auto-binding for receipts still unbound. */
 export const RECEIPT_BIND_SWEEP_INTERVAL_MS = env
     .get('RECEIPT_BIND_SWEEP_INTERVAL_MS')
     .default('300000')
     .asIntPositive();
+
+/**
+ * Jev `same_purchase` probability required before a receipt binds itself.
+ * Calibrated 2026-10-03 on 19 bound receipts: every true pair scored 0.95-0.98,
+ * the highest genuinely wrong pair 0.74. Small sample; 0.9 sits in the gap.
+ */
+export const RECEIPT_AUTO_BIND_THRESHOLD = env.get('RECEIPT_AUTO_BIND_THRESHOLD').default('0.9').asFloatPositive();
 
 /**
  * Receipt image storage backend. `fs` (default) stores originals under `RECEIPTS_DIR`; `s3`

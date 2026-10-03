@@ -49,7 +49,31 @@ export type AccountsDto = {
 
 export type ReceiptExtractStatus = 'pending' | 'gated' | 'ungated' | 'failed';
 
+/**
+ * `capture` = photographed from a transaction card; `auto` = the binder, confirmed by Jev.
+ */
+export type ReceiptBindSource = 'capture' | 'manual' | 'auto';
+
+/**
+ * Why the last auto-bind attempt left a receipt unbound (or `bound`).
+ */
+export type ReceiptBindCheckOutcome = 'bound' | 'no-candidate' | 'not-confirmed' | 'ambiguous' | 'jev-unavailable' | 'lost-race';
+
 export type ReceiptDto = {
+    bindCheckOutcome: ReceiptBindCheckOutcome | null;
+    /**
+     * Last background auto-bind attempt and what it concluded.
+     */
+    bindCheckedAt: string | null;
+    /**
+     * Jev same-purchase probability behind an `auto` bind.
+     */
+    bindJevScore: number | null;
+    boundAt: string | null;
+    /**
+     * How the current binding was made; null when unbound.
+     */
+    bindSource: ReceiptBindSource | null;
     hasProcessed: boolean;
     frameCount: number;
     totalsDisagree: boolean;
@@ -1105,6 +1129,31 @@ export type BindReceiptResponses = {
 };
 
 export type BindReceiptResponse = BindReceiptResponses[keyof BindReceiptResponses];
+
+export type AutoBindReceiptData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/receipts/{id}/auto-bind';
+};
+
+export type AutoBindReceiptErrors = {
+    /**
+     * Not found
+     */
+    404: unknown;
+};
+
+export type AutoBindReceiptResponses = {
+    /**
+     * Ok
+     */
+    200: ReceiptDto;
+};
+
+export type AutoBindReceiptResponse = AutoBindReceiptResponses[keyof AutoBindReceiptResponses];
 
 export type ListPeriodicSeriesData = {
     body?: never;

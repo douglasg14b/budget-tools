@@ -7,11 +7,15 @@ import { formatYnabAmount } from '../formatYnabAmount';
 import { QueueSearchInput } from '../QueueSearchInput';
 import { filterBindCandidates } from './filterBindCandidates';
 import classes from './ReceiptBindPanel.module.css';
+import type { ReceiptBindStatus } from './receiptBindStatusCopy';
+import { describeBoundSource, describeLastBindCheck } from './receiptBindStatusCopy';
 
 type ReceiptBindPanelProps = {
     readonly asking: boolean;
     readonly binding: boolean;
     readonly boundTransactionId: string | null;
+    /** Live only: who bound it and what the background binder last concluded. */
+    readonly bindStatus: ReceiptBindStatus | null;
     readonly error: string | null;
     readonly live: boolean;
     readonly match: ReceiptMatchDto | undefined;
@@ -23,12 +27,15 @@ export function ReceiptBindPanel({
     asking,
     binding,
     boundTransactionId,
+    bindStatus,
     error,
     live,
     match,
     onBind,
     onDetach,
 }: ReceiptBindPanelProps) {
+    const boundSource = bindStatus ? describeBoundSource(bindStatus) : null;
+    const lastCheck = bindStatus && !boundTransactionId ? describeLastBindCheck(bindStatus) : null;
     const [query, setQuery] = useState<string | undefined>();
     const candidates = match?.bindCandidates ?? [];
     const closeMatches = useMemo(() => {
@@ -47,7 +54,7 @@ export function ReceiptBindPanel({
         <div className={classes.panel}>
             {bound ? (
                 <div className={classes.boundCard}>
-                    <p className={classes.kicker}>Bound to</p>
+                    <p className={classes.kicker}>Bound to{boundSource ? ` · ${boundSource}` : ''}</p>
                     <CandidateRow candidate={bound} />
                     {live ? (
                         <Button size="compact-sm" variant="subtle" color="gray" loading={binding} onClick={onDetach}>
@@ -60,6 +67,8 @@ export function ReceiptBindPanel({
                     )}
                 </div>
             ) : null}
+
+            {lastCheck ? <p className={classes.quiet}>{lastCheck}</p> : null}
 
             {exactFailed && closeMatches.length > 0 ? (
                 <section className={classes.section} aria-labelledby="close-matches-title">

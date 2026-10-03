@@ -17,8 +17,9 @@ export function ReceiptsPage() {
                     <p className={classes.kicker}>Tapes</p>
                     <h1 className={classes.title}>Receipts</h1>
                     <p className={classes.lede}>
-                        Capture a pile of stills without picking a charge first. Exact unique pairs bind themselves;
-                        tips and misses wait for you.
+                        Capture a pile of stills without picking a charge first. A receipt binds itself once its exact
+                        total shows up on the bank and Jev confirms it is the same purchase; tips and misses wait for
+                        you.
                     </p>
                 </div>
                 <p className={classes.note} data-mode={mode}>

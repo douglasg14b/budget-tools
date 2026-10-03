@@ -1,4 +1,4 @@
-import type { ReceiptExtractStatus } from './data/receiptsSchema';
+import type { ReceiptBindCheckOutcome, ReceiptBindSource, ReceiptExtractStatus } from './data/receiptsSchema';
 import type { ClosePairMatch } from './matchReceipts';
 
 export type ReceiptDto = {
@@ -16,6 +16,14 @@ export type ReceiptDto = {
     totalsDisagree: boolean;
     frameCount: number;
     hasProcessed: boolean;
+    /** How the current binding was made; null when unbound. */
+    bindSource: ReceiptBindSource | null;
+    boundAt: string | null;
+    /** Jev same-purchase probability behind an `auto` bind. */
+    bindJevScore: number | null;
+    /** Last background auto-bind attempt and what it concluded. */
+    bindCheckedAt: string | null;
+    bindCheckOutcome: ReceiptBindCheckOutcome | null;
 };
 
 export type ReceiptsDto = {

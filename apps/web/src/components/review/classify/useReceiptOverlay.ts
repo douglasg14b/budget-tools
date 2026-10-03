@@ -132,19 +132,21 @@ export function useReceiptOverlay({
 
     const bindAttempted = useRef<string | null>(null);
     const extractStatusSeen = useRef<ReceiptDto['extractStatus'] | null>(null);
+    // Asks the server to auto-bind the matched receipt (exact amount + Jev confirmation); the
+    // server decides, so the card never binds on the client's say-so.
+    // The lookup's strict tier (`exactReceiptId`) or a unique exact amount it held back over the
+    // payee name (`blocked-exact`): either way the server's Jev check makes the call.
+    const autoBindReceiptId =
+        match?.exactReceiptId ?? match?.closeMatches.find((row) => row.reason === 'blocked-exact')?.receiptId ?? null;
     const bindMutation = useMutation({
         mutationFn: async () => {
-            const id = match?.exactReceiptId;
-            if (!transactionId || !id) {
+            const id = autoBindReceiptId;
+            if (!id) {
                 throw new Error('No receipt to bind');
             }
-            const result = await Receipts.request13({
-                path: { id },
-                body: { transactionId },
-                throwOnError: true,
-            });
+            const result = await Receipts.request14({ path: { id }, throwOnError: true });
             if (!result.data) {
-                throw new Error('Bind receipt returned no data');
+                throw new Error('Auto-bind receipt returned no data');
             }
             return result.data;
         },
@@ -170,14 +172,22 @@ export function useReceiptOverlay({
         extractStatusSeen.current = status;
     }, [liveReceipt?.extractStatus, queryClient]);
 
+    const autoBindTargetBound = Boolean(
+        listQuery.data?.receipts.find((row) => row.id === autoBindReceiptId)?.transactionId,
+    );
     useEffect(() => {
-        if (!live || !currentEnabled || !match?.autoBind || !match.exactReceiptId || !transactionId) {
+        // Only unbound receipts (per the list) are worth asking the server about.
+        if (
+            !live ||
+            !currentEnabled ||
+            !autoBindReceiptId ||
+            !transactionId ||
+            !listQuery.data ||
+            autoBindTargetBound
+        ) {
             return;
         }
-        if (liveReceipt?.transactionId === transactionId) {
-            return;
-        }
-        const attemptKey = `${match.exactReceiptId}:${transactionId}`;
+        const attemptKey = `${autoBindReceiptId}:${transactionId}`;
         if (bindAttempted.current === attemptKey) {
             return;
         }
@@ -186,9 +196,9 @@ export function useReceiptOverlay({
     }, [
         currentEnabled,
         live,
-        liveReceipt?.transactionId,
-        match?.autoBind,
-        match?.exactReceiptId,
+        autoBindReceiptId,
+        autoBindTargetBound,
+        listQuery.data,
         transactionId,
         bindMutation.mutate,
     ]);
