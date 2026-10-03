@@ -103,6 +103,37 @@ Kept because later phases are justified by these and `.spike/` is disposable.
   the challenge solution the headless browser earned and harvested back. That token
   may be load-bearing for the warm session; preserve the whole jar, not a subset.
 
+## Verification log
+
+What has and has not been proven, so nobody mistakes the plan for tested.
+
+| # | Claim | Status | Evidence |
+|---|---|---|---|
+| 1 | Desktop headless login mints a usable jar | **Proven** 2026-09-14 | Stage 1; 14 cookies incl. all auth-bearing names |
+| 2 | Warm jar drives pure HTTP, no browser installed | **Proven** 2026-09-14 | Stage 2; 134 orders / 89 transactions, zero prompts |
+| 3 | Jar survives time | **Proven ≥19 days** 2026-10-03 | Same jar, untouched, re-ran stage 2: 145 orders / 94 transactions |
+| 4 | Desktop-minted jar works from a Linux container (no browser) | **Proven** 2026-10-03 | `.spike/container/Dockerfile`, python:3.12-slim, 167 MB, no Playwright/Chromium. Identical to desktop: same 145 order numbers, 0 differing totals/item counts |
+| 5 | Library data fits the existing parser/splitter | **Proven offline** 2026-10-03 | Field mapping table in Phase 1; Σ price×qty = subtotal on 130/130 |
+| 6 | Jar works on the Coolify host / production IP | **Not tested — accepted risk** | Decided 2026-10-03 to let the first real deploy be the test. Likely fine (home-lan host, probably the desktop's public IP), but an IP mismatch would only surface after Phases 1-7 are built |
+| 7 | Refresh command pushes a jar to production | **Not built** | Phase 3 |
+| 8 | Per-order `get_order(order_id)` (the API's actual call pattern) works | **Proven** 2026-10-03 | Spike used bulk `get_order_history`; this is a separate code path. `111-4826676-5544239`: 7 items, subtotal 125.64, tax 10.53, `full_details=True`; `113-5130017-1225037`: qty 3 × 7.59, promo −1.14, total 21.63 |
+| 9 | Expired-jar failure mode | **Unobserved** | Only cold-no-jar (`JSAuthBlocker`) and warm-jar (works) have been seen. A stale jar likely hits `check_response()` → `AmazonOrdersAuthRedirectError` + `logout()` before any blocker. Phase 1 must catch **both** `AmazonOrdersAuthRedirectError` and `AmazonOrdersAuthError` as `COOKIES_EXPIRED`, and snapshot the jar before `login()` |
+
+Notes from #8: `Item.quantity` is `None` for single-quantity items (the parser
+already defaults to 1), and discount fields come back **negative** (`promotion_applied
+= -1.14`); `grand_total = subtotal + promotion`. Use the absolute value when summing
+discounts for the `$0 grand_total` fallback.
+
+To repeat #4 locally (Git Bash needs `MSYS_NO_PATHCONV=1` or it rewrites `/out`
+into a Windows path and the container never finds the jar):
+
+```bash
+docker build -t amazon-orders-spike -f .spike/container/Dockerfile .spike
+mkdir -p .spike/out-container && cp .spike/out/cookies.json .spike/out-container/
+MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W)/.spike/out-container:/out" \
+  -e SPIKE_OUT_DIR=/out amazon-orders-spike
+```
+
 ## Options considered and rejected
 
 Recorded so they are not re-litigated.
@@ -151,43 +182,94 @@ adapter can return `true` honestly. The partial branch stays as an unused safety
 ## Architecture
 
 ```
-Desktop (occasional)                 Server (continuous)
-────────────────────                 ───────────────────
-pnpm amazon:refresh-cookies          amazon-sync container
-  └ Playwright + [browser] extra       └ amazon-orders, NO browser
-  └ solves JS challenge                └ reads jar from volume
-  └ mints cookies.json                 └ emits MCP-compatible JSON on stdout
-  └ delivers to server ──────────────► └ API spawns it, parses, upserts
+Desktop (occasional)                 S3                 Server (continuous)
+────────────────────                 ──                 ───────────────────
+pnpm amazon:refresh-cookies   ──►  amazon-session  ◄──  amazon-sync container (HTTP :4022)
+  └ Playwright + [browser] extra     bucket               └ amazon-orders, NO browser
+  └ solves JS challenge                                    └ reads jar from S3 per call
+  └ verifies, then uploads jar                             └ returns MCP-compatible JSON
+                                                                    ▲
+                                                 api ── HTTP ───────┘  (AMAZON_SYNC_URL)
+                                                  └ in-process scheduler triggers sync
 ```
+
+**Correction (2026-10-03).** An earlier draft had the API *spawn* the Python
+process. That cannot work once Python lives in its own container: one container
+cannot start a process in another. The API already solves this for the scorer —
+`CATEGORIZATION_SCORER_URL: http://scorer:4021` (`docker-compose-prod.yml:39`,
+`environment.ts:91-94`), optional, with behaviour falling back when unset. The Amazon
+service follows the same pattern: `AMAZON_SYNC_URL: http://amazon-sync:4022`. Unset
+means Amazon endpoints return 503, which is today's behaviour.
 
 The API keeps its existing seam. `AmazonOrdersSource`
 (`amazonOrdersSource.ts:4-8`) is three methods; only the implementation behind it
-changes. The Python process emits the **same JSON payload shapes** the current
+changes. The Python service returns the **same JSON payload shapes** the current
 `parseAmazonMcp.ts` already validates, so the parse layer survives nearly intact.
 
 ## Phases
 
 ### Phase 1 — Python sync service
 
-New `apps/amazon-sync/`, a CLI emitting JSON on stdout.
+New `apps/amazon-sync/`, a small internal HTTP service (not a CLI — see the
+Architecture correction).
 
-- Three subcommands mirroring the source interface: `check-auth`,
-  `get-transactions --start --end`, `get-order-details --order-id`.
+- Three endpoints mirroring the source interface: `GET /auth`,
+  `GET /transactions?start=&end=`, `GET /orders/{orderId}`, plus `GET /health` for
+  the compose healthcheck. Internal network only; not published.
+- **One request at a time, enforced in Python.** The old client serialised calls in
+  TS (`toolChain`, `amazonMcpClient.ts:88-94`). The Python service owns the session
+  and cookie jar now, so it holds the lock: concurrent requests would race the jar.
 - Output shapes match `parseAmazonMcp.ts` exactly: `{ authenticated, username,
   message, loginUrl }`, `{ transactions[], paginationComplete }`,
-  and the order-details shape including the `purchasedItems` wrapper.
-- `cookie_jar_path` from `AMAZON_COOKIE_JAR_PATH`, defaulting to a volume path.
+  and `{ order: { id, date, total, shipping, tax, promotion }, items[] }`.
+- **Field mapping (verified 2026-10-03 against spike data):**
+
+  | Parser expects | Emit from library |
+  |---|---|
+  | payment `date` | `Transaction.completed_date` |
+  | payment `amount` | `Transaction.grand_total` **as-is** (see sign note) |
+  | payment `orderIds[]` | `[order_number]`, or `[]` when blank (digital) |
+  | payment `cardInfo` | `payment_method_last_4` |
+  | payment `vendor` | `Transaction.seller` |
+  | item `unitPrice` | `Item.price` — it is a **unit** price |
+  | item `itemTotal` | `Item.price × quantity` (quantity `None` → 1) |
+  | item `quantity`, `asin`, `title` | same-named fields |
+  | order `total` | `grand_total`, with the fallback below |
+  | order `tax` / `shipping` | `estimated_tax` / `shipping_total` |
+  | order `promotion` | `subscription_discount + coupon_savings + promotion_applied` |
+
+  `Item.price` was confirmed to be a unit price: `Σ price × quantity == subtotal`
+  on **130/130** live orders, versus 123/130 for `Σ price`. The current MCP computes
+  `itemTotal` the same way (`unitPrice × quantity`, patch lines 1274-1278), so the
+  splitter sees identical semantics. The splitter only needs item *proportions* —
+  `allocateAmazonItemsToBank` rescales to the bank charge — plus the completeness
+  check in `amazonOrderLooksIncomplete` (items within $5 of order total).
+- Jar source of truth is S3 (see Phase 3). Each run downloads it to a local
+  `cookie_jar_path`, and uploads it back only if its contents changed. Back the jar up
+  before `login()`: `check_response()` calls `logout()` on an auth redirect and wipes
+  the local file, and that must not propagate to S3 as an empty jar.
 - No credentials anywhere. If the jar is cold the command exits non-zero with a
   structured `{"status":"error","code":"COOKIES_EXPIRED"}` — never prompts.
   Enforced with an `IODefault` subclass that raises on any prompt.
 - **Date-range shim.** `get_transactions(days=N)` takes a lookback window, not a
   range. Compute `days` from `start`, fetch, then filter to `[start, end]` locally.
-- **Sign convention.** `Transaction.is_refund = grand_total > 0`, so purchases are
-  **negative**. Normalise to the existing positive-amount convention at the boundary
-  and cover it with a test — getting this wrong inverts every YNAB split.
+- **Sign convention — no conversion.** An earlier draft said to normalise negative
+  purchases. That was wrong: the existing parser already treats purchases as
+  negative (`parseAmazonMcp.ts:156`, `isRefund: amountMilliunits > 0`), which is the
+  library's convention too. Pass amounts through unchanged, and pin that with a test
+  so nobody "fixes" it later.
 - **Field names.** `order_placed_date` not `order_date`; `estimated_tax` not `tax`.
-- **`$0 grand_total` fix.** When `grand_total` is 0 or missing, fall back to
-  `subtotal + estimated_tax`, and prefer the transaction amount when joinable.
+- **`$0 grand_total` fix — required, not cosmetic.** `amazonOrderNeedsRefetch`
+  returns true for a 0/null total, so an order the library always reports as $0
+  would be re-fetched on every sync. 2 of 130 live orders hit this.
+  **Fallback: the sum of that order's transactions, joined on order number.** This is
+  a hard fact (exact on both affected orders). If an order has no transactions, emit
+  the total as missing rather than reconstructing one.
+  `subtotal + tax + shipping − discounts` was considered and **rejected**: it missed on
+  17 of 128 orders that do report a total, so it is a guess. That conflicts with the
+  project rule that matching code uses hard facts only and does not tune rules to the
+  current rows. Missing-total orders need a *stop-refetching* rule instead, e.g. a
+  per-order attempt limit; decide that in Phase 2.
 
 #### API reference for `amazon-orders` 4.6.0
 
@@ -241,9 +323,10 @@ Short-circuit evaluation saves it today; any reordering raises `UnboundLocalErro
 
 ### Phase 2 — API adapter swap
 
-- New `amazonPythonClient.ts` implementing `AmazonOrdersSource`, spawning the
-  container command and parsing stdout. Keep the serialised `toolChain` pattern
-  from `amazonMcpClient.ts:88-94` and the `AMAZON_ORDERS_SYNC_TIMEOUT_MS` timeout.
+- New `amazonSyncClient.ts` implementing `AmazonOrdersSource` as plain HTTP calls to
+  `AMAZON_SYNC_URL` (new optional env var, mirroring
+  `getCategorizationScorerUrl()`). Keep the `AMAZON_ORDERS_SYNC_TIMEOUT_MS` timeout.
+  Serialisation moves to the Python side (Phase 1); the client needs no `toolChain`.
 - Delete `amazonMcpClient.ts`; keep `parseAmazonMcp.ts` (rename to
   `parseAmazonPayloads.ts`) since the shapes are unchanged.
 - Replace the `AMAZON_ORDERS_MCP_ENTRY` 503s (`amazonMcpClient.ts:40-49`) with
@@ -255,21 +338,45 @@ Short-circuit evaluation saves it today; any reordering raises `UnboundLocalErro
 ### Phase 3 — Cookie refresh command
 
 `pnpm amazon:refresh-cookies`, the answer to "I don't want to forget this process".
+**This is the primary path** (decided 2026-10-03); UI login is deferred until it works.
 
-1. Runs the Playwright login locally (prompts for email/password/OTP; nothing stored).
-2. Writes `cookies.json`.
-3. Delivers it, preferring in order: direct S3 upload to the existing
-   `s3.home.lan` bucket → authenticated POST to the API upload endpoint → prints the
-   absolute path with copy-paste `docker cp` instructions.
-4. Verifies by calling the API status endpoint and reporting the new expiry.
+**Transport: S3** (decided 2026-10-03). The existing `s3.home.lan` store, a private
+key such as `amazon/cookies.json`. The sync container downloads it at the start of
+each run and uploads it back if the library rewrote it. Chosen over an API upload
+endpoint (the API only has browser sessions, so a CLI would need a new token) and
+over SSH + `docker cp` (needs host access and Coolify's generated volume names).
+
+1. Runs the stage 1 login locally — same code, `PlaywrightJSAuthForm` +
+   `PlaywrightAcicForm` registered — prompting for email, password, SMS code.
+   Nothing stored.
+2. Writes the jar to a temp file and checks the five auth-bearing cookie names are
+   present before going any further.
+3. **Verifies locally first**: runs the stage 2 check (HTTP-only, `check-auth`)
+   against the new jar, so a bad jar never overwrites a good one.
+4. Uploads to S3, keeping the previous object as `cookies.previous.json` for rollback.
+5. Prints what happened: cookie names (never values), upload key, and the previous
+   jar's age — which is also the lifetime measurement.
+
+Needs: Python + the `[browser]` extra on the desktop. The command should create its
+own venv on first run so there is nothing to remember.
+
+**Use a dedicated bucket and service account, not the receipts bucket.** Checked
+2026-10-03: the receipts bucket looks private. `scripts/provision-receipts-s3.mjs`
+creates only a bucket-scoped IAM policy and a service account, with no anonymous
+policy, and the API proxies reads through `GetObjectCommand`
+(`s3ReceiptStorage.ts:53`) rather than presigned or public URLs. But an anonymous
+bucket policy is server-side state the repo can't prove absent, and a jar is a live
+Amazon session, a different risk from a receipt photo. A separate
+`amazon-session` bucket, provisioned by the same script pattern, means leaked receipt
+credentials can't read the session and vice versa. Settings: `AMAZON_COOKIES_S3_*`.
 
 Documented in `docs/amazon-cookie-refresh.md`, one page, command first.
 
-### Phase 4 — Upload endpoint + UI
+### Phase 4 — Upload endpoint + UI (fallback; can slip until after Phase 7)
 
 - `POST /api/amazon-orders/cookies` — authenticated, validates the JSON is a cookie
   dict containing the auth-bearing names (`x-main`, `at-main`, `sess-at-main`,
-  `ubid-main`, `session-id`), writes to the volume atomically.
+  `ubid-main`, `session-id`), writes it to the same S3 key the command uses.
 - Admin page with a file drop, showing current jar age and last successful sync.
 - Never log or echo cookie *values*; names only.
 
@@ -297,13 +404,19 @@ These are real charges with no retail order and no line items.
 - `apps/amazon-sync/Dockerfile` on `python:3.12-slim`, **no browser packages**.
   Header comment explaining why no Chromium is needed, mirroring the detail in
   `transactions-retrieval/Dockerfile`.
-- `docker-compose-prod.yml`: new service, a named volume for the cookie jar,
+- `docker-compose-prod.yml`: new service, S3 settings for the cookie jar (no volume
+  needed — the jar lives in S3),
   `depends_on` the migrator.
 - **Fix the now-false comments** at `docker-compose-prod.yml:60-61` and
   `.env.compose.prod.example:62-63`.
-- Cron via `docker exec`, matching the documented `transactions-retrieval` pattern.
-- Verify the cwd/entrypoint assumption on a freshly built image before documenting
-  the command — that exact mistake cost two commits (`5dad2fe`, `3d950e4`).
+- **Scheduling lives in the API, not Coolify cron.** The API already runs in-process
+  `setInterval` schedulers (`startOutboundSyncFlusher.ts`,
+  `startReceiptBindingSweeper.ts`). Add `startAmazonSyncScheduler.ts` on the same
+  pattern: no external cron, no `docker exec`, and no auth token to call a protected
+  endpoint. The `docker exec` cron pattern exists for `transactions-retrieval` only
+  because that is a standalone one-shot script; this is not.
+- The amazon-sync container is a long-running service with a `/health` check, like
+  `scorer`, not an idle `sleep infinity` container.
 
 ### Phase 8 — Retire the MCP and update tests
 
@@ -316,6 +429,19 @@ These are real charges with no retail order and no line items.
   and `fetchAmazonOrderInvoices.test.ts` stub the interface so they need only minor
   updates. Add coverage for the negative-amount convention, `$0 grand_total`
   fallback, and blank-order-number transactions.
+- **Fixtures must be synthetic.** `.spike/out*/` holds real order data: titles,
+  ASINs, card last-4s, order numbers. Never copy it into a fixture. Hand-write minimal
+  fixtures that pin the facts the spike established: unit-price semantics,
+  `quantity: None` for single items, negative `promotion_applied`, `grand_total: 0.0`
+  with real subtotal and tax, blank `order_number` on digital charges, and split
+  shipments summing to the order total.
+
+## First milestone
+
+Phases 1 and 2 only: the Python service and the API client, working end to end
+against the **dev** stack with the desktop jar, and the MCP left untouched alongside.
+This is a vertical slice. It's the point where the real splitter tests the data-fit
+claims, not just the offline analysis. Phases 3–8 follow once it works.
 
 ## Environment facts this plan assumes
 
@@ -344,8 +470,11 @@ Established during research; not obvious from the repo.
 
 ## Risks
 
-- **Cookie jar lifetime is unknown.** Determines refresh cadence. Phase 5's age
-  reporting starts gathering that data from day one.
+- **Cookie jar lifetime: at least 19 days of non-use.** The jar minted 2026-09-14
+  sat untouched until 2026-10-03 and still authenticated. Reads do not rewrite the
+  local file (mtime unchanged), though one read on day 19 cannot rule out Amazon
+  extending the session server-side on access. Upper bound unknown; Phase 3's
+  "previous jar age" output and Phase 5's age reporting keep measuring.
 - **Validated against one month of orders.** Other shapes may surprise us. Mitigate
   by keeping the MCP in git history and running both for one cycle before Phase 8.
 - **A fourth runtime** (Python) in a Node/.NET stack. Contained to one service.
@@ -354,6 +483,20 @@ Established during research; not obvious from the repo.
   home-lan Coolify host. A scheduled sync makes this unattended — a deliberate choice.
 
 ## Out of scope
+
+- **UI-driven login — deferred, not rejected.** Decided 2026-10-03: get the command
+  path working first, then evaluate. Notes for when it is revisited: the challenge
+  solver (`PlaywrightJSAuthForm`) runs headless, so a server-side login needs a
+  headless Chromium in *one* login container only — no Xvfb, VNC, profile volume or
+  `shm_size`; the sync container stays browser-free. Login code is identical to
+  stage 1; only the `IODefault` subclass changes (state machine
+  `idle → needs_credentials → needs_otp → done/failed`, `login()` in a worker thread
+  because `prompt()` blocks inside the retry loop). Untested: whether the JS
+  challenge resolves headless in a GPU-less Linux container, whether the 5s
+  `auth_reattempt_wait` re-triggers SMS, and whether `_solve_captcha`'s
+  `PIL.Image.show()` hangs without a display. Installing Chromium on
+  `python:3.12-slim` needs `playwright install --with-deps` (or the
+  `mcr.microsoft.com/playwright/python` base) for system libraries.
 
 - TOTP auto-solve (`AMAZON_OTP_SECRET_KEY`). Would make re-auth unattended, but
   requires switching the account from SMS to an authenticator app. Revisit if manual
