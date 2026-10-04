@@ -35,7 +35,7 @@ public sealed class CategoryCatalog
         {
             string name = CategoryNormalizer.Normalize(c.Name)!;
             string groupName = CategoryNormalizer.Normalize(c.Group.Name)!;
-            if (CategoryNormalizer.IsExcludedName(name) || CategoryNormalizer.IsExcludedGroup(groupName))
+            if (!CategoryNormalizer.IsAssignable(name, groupName))
                 continue;
 
             var info = new CategoryInfo

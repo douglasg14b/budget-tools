@@ -113,34 +113,40 @@ export async function listSimilarFinalizedTransactions(
 }
 
 function finalizedQuery(database: ReturnType<typeof getDatabase>) {
-    return database
-        .selectFrom('transactions as t')
-        .innerJoin('categories as c', 'c.id', 't.category_id')
-        .innerJoin('category_groups as g', 'g.id', 'c.category_group_id')
-        .select([
-            't.id',
-            't.date',
-            't.amount',
-            't.account_id',
-            't.payee_id',
-            't.payee_name',
-            't.import_payee_name_original',
-            't.memo',
-            't.category_name',
-            'g.name as category_group',
-        ])
-        .where('t.deleted', '=', false)
-        .where('t.transfer_account_id', 'is', null)
-        .where('t.cleared', 'in', ['cleared', 'reconciled'])
-        .where('t.approved', '=', true)
-        .where('t.category_id', 'is not', null)
-        .where('c.deleted', '=', false)
-        .where('g.deleted', '=', false)
-        .where(sql<boolean>`jsonb_typeof(t.subtransactions) = 'array' and jsonb_array_length(t.subtransactions) = 0`)
-        .where(sql<boolean>`coalesce(btrim(t.category_name), '') <> ''`)
-        .where(sql<boolean>`lower(t.category_name) <> 'uncategorized'`)
-        .where(sql<boolean>`lower(t.category_name) not like 'inflow:%'`)
-        .where(sql<boolean>`lower(g.name) <> 'internal master category'`);
+    return (
+        database
+            .selectFrom('transactions as t')
+            .innerJoin('categories as c', 'c.id', 't.category_id')
+            .innerJoin('category_groups as g', 'g.id', 'c.category_group_id')
+            .select([
+                't.id',
+                't.date',
+                't.amount',
+                't.account_id',
+                't.payee_id',
+                't.payee_name',
+                't.import_payee_name_original',
+                't.memo',
+                't.category_name',
+                'g.name as category_group',
+            ])
+            .where('t.deleted', '=', false)
+            .where('t.transfer_account_id', 'is', null)
+            .where('t.cleared', 'in', ['cleared', 'reconciled'])
+            .where('t.approved', '=', true)
+            .where('t.category_id', 'is not', null)
+            .where('c.deleted', '=', false)
+            .where('g.deleted', '=', false)
+            .where(
+                sql<boolean>`jsonb_typeof(t.subtransactions) = 'array' and jsonb_array_length(t.subtransactions) = 0`,
+            )
+            .where(sql<boolean>`coalesce(btrim(t.category_name), '') <> ''`)
+            .where(sql<boolean>`lower(t.category_name) <> 'uncategorized'`)
+            // Ready to Assign ("Inflow: ...") is the one real category in Internal Master Category.
+            .where(
+                sql<boolean>`(lower(g.name) <> 'internal master category' or lower(t.category_name) like 'inflow:%')`,
+            )
+    );
 }
 
 function similarCategoryHistogram(rows: readonly RankedSimilarTransaction[]): Record<string, number> {

@@ -1,3 +1,4 @@
+import { isAssignableCategory } from '../../categories/assignableCategory';
 import type { CategoryGroupDto } from '../../categories/categoriesDtos';
 import type { CategoryOptionDto, TravelWindowHitDto } from '../categorizationDtos';
 import type { RankedSimilarTransaction } from '../pickSimilarTransactions';
@@ -19,15 +20,6 @@ export type NearbyCategorySet = {
     readonly pickList: AssignableCategory[];
 };
 
-function isExcludedCategoryGroup(groupName: string): boolean {
-    return groupName.toLowerCase() === 'internal master category';
-}
-
-function isExcludedCategoryName(name: string): boolean {
-    const lower = name.toLowerCase();
-    return lower === 'uncategorized' || lower.startsWith('inflow:');
-}
-
 function categoryKey(name: string, groupName: string): string {
     return `${groupName.trim().toLowerCase()}\0${name.trim().toLowerCase()}`;
 }
@@ -38,11 +30,8 @@ function categoryKey(name: string, groupName: string): string {
 export function assignableCategories(groups: readonly CategoryGroupDto[]): AssignableCategory[] {
     const choices: AssignableCategory[] = [];
     for (const group of groups) {
-        if (group.hidden || isExcludedCategoryGroup(group.name)) {
-            continue;
-        }
         for (const category of group.categories) {
-            if (category.hidden || isExcludedCategoryName(category.name)) {
+            if (!isAssignableCategory(group, category)) {
                 continue;
             }
             choices.push({ id: category.id, name: category.name, groupName: group.name });

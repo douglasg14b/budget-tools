@@ -55,6 +55,8 @@ describe('buildLlmPrompt', () => {
         expect(prompt.system).toContain('alternateCategoryName');
         expect(prompt.system).toContain('Grocery stores');
         expect(prompt.system).toContain('use the merchant name');
+        expect(prompt.system).toContain('positive is money received (inflow)');
+        expect(prompt.system).toContain('Inflow: Ready to Assign');
         expect(prompt.system).not.toContain('Trip context');
         expect(prompt.system).not.toContain('Vacation-group');
     });

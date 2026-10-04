@@ -60,8 +60,7 @@ public static class TransactionQueries
                 || t.CategoryId == null
                 || t.CategoryName == null
                 || t.CategoryName == ""
-                || t.CategoryName.ToLower() == "uncategorized"
-                || t.CategoryName.ToLower().StartsWith("inflow:"));
+                || t.CategoryName.ToLower() == "uncategorized");
 
         if (transactionIds is not null)
         {

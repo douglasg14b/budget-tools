@@ -30,7 +30,7 @@ public record PendingTransaction(
 
 /// <summary>
 /// Cleared non-split history used to detect periodic series, including unapproved queue items.
-/// Category is null when the row has no real budget category yet (including Uncategorized / Inflow placeholders).
+/// Category is null when the row has no real budget category yet (including the Uncategorized placeholder).
 /// </summary>
 public record PeriodicHistoryTransaction(
     string Id,

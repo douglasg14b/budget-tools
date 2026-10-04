@@ -20,7 +20,7 @@ A .NET 8 console app that categorizes YNAB transactions using a tiered pipeline:
 
 **Untrained categories** (in YNAB but never classified in your history) are never auto-applied by local ML; LLM may suggest them but flags for review.
 
-**Placeholder categories** (`Uncategorized`, `Inflow:*`, Internal Master Category) are never training labels or suggestions. Pending rows still contribute to periodic cadence detection; those names do not vote as a series category.
+**Placeholder categories** (`Uncategorized` and the rest of Internal Master Category) are never training labels or suggestions. Pending rows still contribute to periodic cadence detection; those names do not vote as a series category. `Inflow: Ready to Assign` is the exception: it is YNAB's income category, so approved rows are finalized training labels and it can be suggested.
 
 ## Approval workflow (API-ready)
 

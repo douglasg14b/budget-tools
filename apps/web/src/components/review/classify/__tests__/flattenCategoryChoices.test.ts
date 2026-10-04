@@ -28,7 +28,7 @@ describe('flattenCategoryChoices', () => {
         ]);
     });
 
-    it('omits YNAB placeholder groups and category names', () => {
+    it('omits YNAB placeholders but keeps Ready to Assign', () => {
         const choices = flattenCategoryChoices([
             {
                 id: 'g-internal',
@@ -36,23 +36,24 @@ describe('flattenCategoryChoices', () => {
                 hidden: false,
                 categories: [
                     { id: 'c-uncat', name: 'Uncategorized', hidden: false, note: null },
-                    { id: 'c-rta', name: 'Ready to Assign', hidden: false, note: null },
+                    { id: 'c-deferred', name: 'Deferred Income SubCategory', hidden: false, note: null },
+                    { id: 'c-rta', name: 'Inflow: Ready to Assign', hidden: false, note: null },
                 ],
-            },
-            {
-                id: 'g-inflow',
-                name: 'Inflow',
-                hidden: false,
-                categories: [{ id: 'c-inflow', name: 'Inflow: Ready to Assign', hidden: false, note: null }],
             },
             {
                 id: 'g-needs',
                 name: 'Needs',
                 hidden: false,
-                categories: [{ id: 'c-groc', name: 'Groceries', hidden: false, note: null }],
+                categories: [
+                    { id: 'c-groc', name: 'Groceries', hidden: false, note: null },
+                    { id: 'c-needs-uncat', name: 'Uncategorized', hidden: false, note: null },
+                ],
             },
         ]);
 
-        expect(choices).toEqual([{ groupName: 'Needs', id: 'c-groc', name: 'Groceries' }]);
+        expect(choices).toEqual([
+            { groupName: 'Internal Master Category', id: 'c-rta', name: 'Inflow: Ready to Assign' },
+            { groupName: 'Needs', id: 'c-groc', name: 'Groceries' },
+        ]);
     });
 });

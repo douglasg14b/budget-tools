@@ -11,8 +11,6 @@ public sealed class CategoryNormalizerTests
     [InlineData("   ")]
     [InlineData("Uncategorized")]
     [InlineData("uncategorized")]
-    [InlineData("Inflow: Ready to Assign")]
-    [InlineData("inflow: Ready to Assign")]
     public void TreatsPlaceholderNamesAsExcluded(string? name) =>
         Assert.True(CategoryNormalizer.IsExcludedName(name));
 
@@ -20,8 +18,19 @@ public sealed class CategoryNormalizerTests
     [InlineData("Streaming")]
     [InlineData("Groceries")]
     [InlineData("Ready to Assign")]
+    [InlineData("Inflow: Ready to Assign")]
     public void TreatsBudgetCategoryNamesAsAssignable(string name) =>
         Assert.False(CategoryNormalizer.IsExcludedName(name));
+
+    [Theory]
+    [InlineData("Inflow: Ready to Assign", "Internal Master Category", true)]
+    [InlineData("inflow: Ready to Assign", "internal master category", true)]
+    [InlineData("Uncategorized", "Internal Master Category", false)]
+    [InlineData("Deferred Income SubCategory", "Internal Master Category", false)]
+    [InlineData("Streaming", "Monthly Bills", true)]
+    [InlineData("Uncategorized", "Monthly Bills", false)]
+    public void AllowsReadyToAssignButNotOtherInternalPlaceholders(string name, string group, bool expected) =>
+        Assert.Equal(expected, CategoryNormalizer.IsAssignable(name, group));
 
     [Fact]
     public void TreatsInternalMasterCategoryAsExcludedGroup()

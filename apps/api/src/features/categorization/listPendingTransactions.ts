@@ -29,7 +29,6 @@ export async function listPendingTransactions(): Promise<PendingTransactionRow[]
                 builder('category_id', 'is', null),
                 sql<boolean>`coalesce(btrim(category_name), '') = ''`,
                 sql<boolean>`lower(category_name) = 'uncategorized'`,
-                sql<boolean>`lower(category_name) like 'inflow:%'`,
             ]),
         )
         .orderBy('date', 'desc')

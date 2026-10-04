@@ -11,27 +11,34 @@ export type CategorySelectGroup = {
     readonly items: { label: string; value: string }[];
 };
 
-function isExcludedCategoryGroup(groupName: string): boolean {
-    return groupName.toLowerCase() === 'internal master category';
+/** YNAB's income category ("Inflow: Ready to Assign"); the one real category in Internal Master Category. */
+function isReadyToAssignName(name: string): boolean {
+    return name.trim().toLowerCase().startsWith('inflow:');
 }
 
-function isExcludedCategoryName(name: string): boolean {
-    const lower = name.toLowerCase();
-    return lower === 'uncategorized' || lower.startsWith('inflow:');
+/** Mirrors the API's `isAssignableCategory`, which rejects anything else on save. */
+function isAssignableCategory(group: { name: string; hidden: boolean }, category: { name: string; hidden: boolean }) {
+    if (group.hidden || category.hidden) {
+        return false;
+    }
+    if (isReadyToAssignName(category.name)) {
+        return true;
+    }
+    if (group.name.trim().toLowerCase() === 'internal master category') {
+        return false;
+    }
+    return category.name.trim().toLowerCase() !== 'uncategorized';
 }
 
 /**
  * Visible, assignable categories flattened for search and grouped Select data.
- * YNAB placeholders (Uncategorized, Inflow:*, Internal Master Category) are omitted.
+ * YNAB placeholders (Uncategorized, the rest of Internal Master Category) are omitted; Ready to Assign is kept.
  */
 export function flattenCategoryChoices(groups: readonly CategoryGroupDto[]): CategoryChoice[] {
     const choices: CategoryChoice[] = [];
     for (const group of groups) {
-        if (group.hidden || isExcludedCategoryGroup(group.name)) {
-            continue;
-        }
         for (const category of group.categories) {
-            if (category.hidden || isExcludedCategoryName(category.name)) {
+            if (!isAssignableCategory(group, category)) {
                 continue;
             }
             choices.push({ groupName: group.name, id: category.id, name: category.name });

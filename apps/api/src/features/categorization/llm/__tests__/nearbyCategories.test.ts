@@ -9,6 +9,43 @@ describe('assignableCategories', () => {
         const catalog = assignableCategories(groups());
         expect(catalog.map((category) => category.name)).toEqual(['Streaming', 'Internet', 'Groceries']);
     });
+
+    it('keeps Ready to Assign but not the other Internal Master Category placeholders', () => {
+        const catalog = assignableCategories([
+            {
+                id: 'internal',
+                name: 'Internal Master Category',
+                hidden: false,
+                categories: [
+                    { id: 'uncat', name: 'Uncategorized', hidden: false, note: null },
+                    { id: 'deferred', name: 'Deferred Income SubCategory', hidden: false, note: null },
+                    { id: 'rta', name: 'Inflow: Ready to Assign', hidden: false, note: null },
+                ],
+            },
+        ]);
+        expect(catalog).toEqual([
+            { id: 'rta', name: 'Inflow: Ready to Assign', groupName: 'Internal Master Category' },
+        ]);
+    });
+
+    it('resolves similar Ready to Assign history as a likely category', () => {
+        const catalog = assignableCategories([
+            ...groups(),
+            {
+                id: 'internal-2',
+                name: 'Internal Master Category',
+                hidden: false,
+                categories: [{ id: 'rta', name: 'Inflow: Ready to Assign', hidden: false, note: null }],
+            },
+        ]);
+        const nearby = buildNearbyCategories({
+            catalog,
+            similar: [example('Inflow: Ready to Assign', 'Internal Master Category')],
+            options: [],
+            periodicCategory: null,
+        });
+        expect(nearby.likely.map((category) => category.id)).toEqual(['rta']);
+    });
 });
 
 describe('buildNearbyCategories', () => {

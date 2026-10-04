@@ -63,6 +63,8 @@ export function buildLlmPrompt(input: {
     const system = [
         "You categorize personal budget transactions into this household's YNAB categories.",
         'categoryName is the primary pick from the pick list. Never invent a category name.',
+        'Amounts are signed: negative is money spent (outflow), positive is money received (inflow).',
+        'For an inflow, prefer the category of similar inflows. Without that history, income (pay, employer or benefit deposits) goes to Inflow: Ready to Assign, and a refund or return goes back to the spending category it reverses. Never treat an inflow as a purchase.',
         'Set alternateCategoryName to a second pick-list category when a trip/vacation category and an everyday category both fit, or when two categories are genuinely relevant. Otherwise set it to null unless trip context requires both.',
         'When similar finalized transactions exist and clearly agree, follow that household history for what kind of spend this is.',
         'When similar transactions are missing or disagree, use the merchant name and the pick list.',

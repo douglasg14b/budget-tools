@@ -26,6 +26,22 @@ public sealed class TransactionQueriesTests
         Assert.True(TransactionQueries.IsTrainingEligible(Categorized("reconciled")));
     }
 
+    [Fact]
+    public void TreatsApprovedReadyToAssignAsFinalizedNotPending()
+    {
+        Transaction income = Tx("cleared", approved: true, categoryId: "cat-rta", categoryName: "Inflow: Ready to Assign");
+        Assert.False(TransactionQueries.IsPendingCategorization(income));
+        Assert.True(TransactionQueries.IsTrainingEligible(income));
+    }
+
+    [Fact]
+    public void StillQueuesApprovedUncategorized()
+    {
+        Transaction placeholder = Tx("cleared", approved: true, categoryId: "cat-uncat", categoryName: "Uncategorized");
+        Assert.True(TransactionQueries.IsPendingCategorization(placeholder));
+        Assert.False(TransactionQueries.IsTrainingEligible(placeholder));
+    }
+
     [Theory]
     [InlineData("cleared", true)]
     [InlineData("reconciled", true)]

@@ -21,8 +21,6 @@ export type ClassificationSplitDecision = {
 
 export type ClassificationDecision = ClassificationCategoryDecision | ClassificationSplitDecision;
 
-const EXCLUDED_GROUP = 'internal master category';
-
 /**
  * Parses a request DTO into a stored classification decision. Invalid shapes fail loud.
  */
@@ -74,15 +72,6 @@ export function validateClassificationDecision(
     if (total !== transactionAmount) {
         throw new QueryValidationError('split amounts must sum to the transaction amount');
     }
-}
-
-export function isExcludedCategoryGroup(groupName: string): boolean {
-    return groupName.toLowerCase() === EXCLUDED_GROUP;
-}
-
-export function isExcludedCategoryName(name: string): boolean {
-    const lower = name.toLowerCase();
-    return lower === 'uncategorized' || lower.startsWith('inflow:');
 }
 
 function parseSplitLines(lines: ClassificationDecisionLineDto[] | undefined): ClassificationSplitLine[] {

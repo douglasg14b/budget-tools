@@ -115,11 +115,11 @@ A transaction appears in the review queue when it is cleared or reconciled, not 
 
 - `approved = false`
 - `category_id` is null
-- Category name is excluded (e.g. `Uncategorized`, `Inflow:*`)
+- Category name is the `Uncategorized` placeholder
 
 (Source: `TransactionQueries.GetPendingTransactions`)
 
-Placeholder categories (`Uncategorized`, `Inflow:*`, Internal Master Category) are never suggested or offered as assignable picker options.
+Placeholder categories (`Uncategorized` and the rest of Internal Master Category) are never suggested or offered as assignable picker options. **Exception (2026-10-04):** `Inflow: Ready to Assign` lives in Internal Master Category but is YNAB's income category, so it is assignable, suggested, and used as history. An approved row categorized to it is finalized, not pending.
 
 ### Proposal shape
 
