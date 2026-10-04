@@ -5,15 +5,26 @@ import { listTransactionsByIds } from '../categorization/listTransactionsByIds';
 import { requireLiveMode } from '../operatingMode/data/operatingModeRepo';
 import { NotFoundError } from '../travelWindows/HttpError';
 import { assignableCategoryIds } from './assignableCategoryIds';
-import { parseClassificationDecision, validateClassificationDecision } from './classificationDecision';
+import {
+    completeClassificationDecision,
+    parseClassificationDecision,
+    validateClassificationDecision,
+} from './classificationDecision';
 import { countClassificationSyncByStatus, enqueueClassificationDecision } from './data/classificationSyncRepo';
 import { requestOutboundFlushIfDue } from './flush/flushOutboundSync';
 import type { ClassificationDecisionDto, ClassificationDecisionsResponseDto } from './ynabSyncDtos';
 
+/** Mirrored transaction fields a decision is checked and completed against. */
+export type DecisionTransaction = {
+    readonly id: string;
+    readonly amount: number;
+    readonly approved: boolean;
+};
+
 export type RecordDecisionsContext = {
     readonly db?: AppDatabaseClient;
     readonly requireLive?: (db?: AppDatabaseClient) => Promise<void>;
-    readonly loadTransactions?: (ids: readonly string[]) => Promise<Array<{ id: string; amount: number }>>;
+    readonly loadTransactions?: (ids: readonly string[]) => Promise<DecisionTransaction[]>;
     readonly loadAssignableCategoryIds?: () => Promise<ReadonlySet<string>>;
     readonly onEnqueued?: (pendingCount: number) => void;
 };
@@ -34,7 +45,7 @@ export async function recordDecisions(
 
     const parsed = decisions.map((decision) => ({
         transactionId: decision.transactionId.trim(),
-        decision: parseClassificationDecision(decision),
+        draft: parseClassificationDecision(decision),
     }));
 
     const ids = parsed.map((item) => item.transactionId);
@@ -52,15 +63,19 @@ export async function recordDecisions(
     }
 
     const categoryIds = (await context.loadAssignableCategoryIds?.()) ?? assignableCategoryIds(await listCategories());
-    for (const item of parsed) {
+    const completed = parsed.map((item) => {
         const transaction = transactionsById.get(item.transactionId);
         if (!transaction) {
             throw new NotFoundError(`transaction ${item.transactionId} was not found`);
         }
-        validateClassificationDecision(item.decision, transaction.amount, categoryIds);
-    }
+        validateClassificationDecision(item.draft, transaction.amount, categoryIds);
+        return {
+            transactionId: item.transactionId,
+            decision: completeClassificationDecision(item.draft, transaction.approved),
+        };
+    });
 
-    for (const item of parsed) {
+    for (const item of completed) {
         await enqueueClassificationDecision(item.transactionId, item.decision, database);
     }
 

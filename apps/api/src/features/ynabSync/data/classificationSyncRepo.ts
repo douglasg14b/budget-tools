@@ -1,7 +1,15 @@
 import type { AppDatabaseClient } from '../../../data-persistence/database';
 import { getAppDatabase } from '../../../data-persistence/database';
 import { ConflictError } from '../../travelWindows/HttpError';
-import type { ClassificationDecision } from '../classificationDecision';
+import type {
+    ClassificationAnnotations,
+    ClassificationDecision,
+    ClassificationSplitLine,
+    MirroredAnnotations,
+} from '../classificationDecision';
+import { isAnnotationMirrored } from '../classificationDecision';
+import type { YnabFlagColor } from '../ynabFlagColor';
+import { isYnabFlagColor } from '../ynabFlagColor';
 import type { ClassificationSyncRow } from './classificationSyncRow';
 import type { ClassificationSyncStatus } from './classificationSyncSchema';
 
@@ -25,14 +33,18 @@ export async function getClassificationSync(
     return row ? mapRow(row) : undefined;
 }
 
+/**
+ * Ids hidden from the review queue: in-flight or pushed category/split decisions.
+ * Annotations never hide a transaction; the reviewer comes back to it later.
+ */
 export async function listExcludedTransactionIds(db?: AppDatabaseClient): Promise<Set<string>> {
     const database = db ?? (await getAppDatabase());
     const rows = await database
         .selectFrom('classification_sync')
-        .select('transactionId')
+        .select(['transactionId', 'decisionJson'])
         .where('status', 'in', EXCLUDED_STATUSES)
         .execute();
-    return new Set(rows.map((row) => row.transactionId));
+    return new Set(rows.filter((row) => !isAnnotationRow(row)).map((row) => row.transactionId));
 }
 
 export async function listPendingClassificationSync(
@@ -92,7 +104,9 @@ export async function latestClassificationSyncError(db?: AppDatabaseClient): Pro
 }
 
 /**
- * Inserts or replaces a pending/failed row. Syncing, synced, and confirmed rows refuse replacement.
+ * Inserts or replaces a pending/failed row. Syncing, synced, and confirmed category/split rows
+ * refuse replacement. An annotation row is replaceable in any status: clearing its `batchId`
+ * keeps an in-flight batch from later marking the replacement synced.
  */
 export async function enqueueClassificationDecision(
     transactionId: string,
@@ -101,13 +115,13 @@ export async function enqueueClassificationDecision(
 ): Promise<void> {
     const database = db ?? (await getAppDatabase());
     const existing = await getClassificationSync(transactionId, database);
-    if (existing && !isReplaceableSyncStatus(existing.status)) {
+    if (existing && existing.decision.kind !== 'annotate' && !isReplaceableSyncStatus(existing.status)) {
         throw new ConflictError(
             `transaction ${transactionId} already has a ${existing.status} classification and cannot be replaced`,
         );
     }
     const now = new Date().toISOString();
-    const decisionJson = JSON.stringify(decision);
+    const decisionJson = JSON.stringify(withUnsentAnnotations(decision, existing));
     if (!existing) {
         await database
             .insertInto('classification_sync')
@@ -134,9 +148,33 @@ export async function enqueueClassificationDecision(
             batchId: null,
             lastError: null,
             updatedAt: now,
+            syncedAt: null,
+            confirmedAt: null,
         })
         .where('transactionId', '=', transactionId)
         .execute();
+}
+
+/**
+ * A memo or flag from an annotation that has not reached YNAB yet would be lost when a later
+ * decision replaces it, so fields the new decision leaves absent are carried forward.
+ */
+function withUnsentAnnotations(
+    decision: ClassificationDecision,
+    existing: ClassificationSyncRow | undefined,
+): ClassificationDecision {
+    if (existing?.decision.kind !== 'annotate' || existing.status === 'synced') {
+        return decision;
+    }
+    return {
+        ...decision,
+        ...(decision.memo === undefined && existing.decision.memo !== undefined
+            ? { memo: existing.decision.memo }
+            : {}),
+        ...(decision.flagColor === undefined && existing.decision.flagColor !== undefined
+            ? { flagColor: existing.decision.flagColor }
+            : {}),
+    };
 }
 
 export async function deleteRetractableClassification(
@@ -257,6 +295,10 @@ export async function revertClassificationBatchToPending(batchId: string, db?: A
         .execute();
 }
 
+/**
+ * Marks synced category/split rows confirmed once the mirror no longer lists them pending.
+ * Annotations are settled by `deleteSettledAnnotations` instead.
+ */
 export async function confirmSyncedAbsentFromPending(
     pendingIds: ReadonlySet<string>,
     db?: AppDatabaseClient,
@@ -265,10 +307,13 @@ export async function confirmSyncedAbsentFromPending(
     const now = new Date().toISOString();
     const synced = await database
         .selectFrom('classification_sync')
-        .select('transactionId')
+        .select(['transactionId', 'decisionJson'])
         .where('status', '=', 'synced')
         .execute();
-    const toConfirm = synced.map((row) => row.transactionId).filter((id) => !pendingIds.has(id));
+    const toConfirm = synced
+        .filter((row) => !isAnnotationRow(row))
+        .map((row) => row.transactionId)
+        .filter((id) => !pendingIds.has(id));
     if (toConfirm.length === 0) {
         return 0;
     }
@@ -310,6 +355,41 @@ export async function deleteConfirmedPresentInPending(
     return toDelete.length;
 }
 
+/**
+ * Deletes synced annotations the mirror has caught up with, or whose transaction left the
+ * pending set. `pending` maps each pending transaction id to its mirrored memo and flag.
+ */
+export async function deleteSettledAnnotations(
+    pending: ReadonlyMap<string, MirroredAnnotations>,
+    db?: AppDatabaseClient,
+): Promise<number> {
+    const database = db ?? (await getAppDatabase());
+    const synced = await database
+        .selectFrom('classification_sync')
+        .selectAll()
+        .where('status', '=', 'synced')
+        .execute();
+    const settledIds: string[] = [];
+    for (const row of synced.map(mapRow)) {
+        if (row.decision.kind !== 'annotate') {
+            continue;
+        }
+        const mirror = pending.get(row.transactionId);
+        if (!mirror || isAnnotationMirrored(row.decision, mirror)) {
+            settledIds.push(row.transactionId);
+        }
+    }
+    if (settledIds.length === 0) {
+        return 0;
+    }
+    await database
+        .deleteFrom('classification_sync')
+        .where('transactionId', 'in', settledIds)
+        .where('status', '=', 'synced')
+        .execute();
+    return settledIds.length;
+}
+
 type StoredRow = {
     transactionId: string;
     decisionJson: string;
@@ -348,14 +428,48 @@ function parseStoredDecision(raw: string, transactionId: string): Classification
     if (!parsed || typeof parsed !== 'object') {
         throw new Error(`classification_sync.decision_json is invalid for ${transactionId}`);
     }
-    const record = parsed as ClassificationDecision;
+    const decision = decisionFromRecord(parsed as Record<string, unknown>);
+    if (!decision) {
+        throw new Error(`classification_sync.decision_json has an unknown shape for ${transactionId}`);
+    }
+    return decision;
+}
+
+/**
+ * Rebuilds a stored decision field by field. `memo` / `flagColor` keep the absent-versus-null
+ * distinction: an absent key leaves YNAB alone, an explicit null clears it.
+ */
+function decisionFromRecord(record: Record<string, unknown>): ClassificationDecision | undefined {
+    const { memo, flagColor } = record;
+    if (!isStoredMemo(memo) || !isStoredFlagColor(flagColor)) {
+        return undefined;
+    }
+    const annotations: ClassificationAnnotations = {
+        ...(memo === undefined ? {} : { memo }),
+        ...(flagColor === undefined ? {} : { flagColor }),
+    };
+    const payee = typeof record.payeeName === 'string' && record.payeeName ? { payeeName: record.payeeName } : {};
     if (record.kind === 'category' && typeof record.categoryId === 'string' && record.categoryId) {
-        return record.payeeName
-            ? { kind: 'category', categoryId: record.categoryId, payeeName: record.payeeName }
-            : { kind: 'category', categoryId: record.categoryId };
+        return { kind: 'category', categoryId: record.categoryId, ...payee, ...annotations };
     }
     if (record.kind === 'split' && Array.isArray(record.lines) && record.lines.length > 0) {
-        return record.payeeName ? { kind: 'split', lines: record.lines, payeeName: record.payeeName } : record;
+        return { kind: 'split', lines: record.lines as ClassificationSplitLine[], ...payee, ...annotations };
     }
-    throw new Error(`classification_sync.decision_json has an unknown shape for ${transactionId}`);
+    const hasAnnotation = memo !== undefined || flagColor !== undefined;
+    if (record.kind === 'annotate' && typeof record.approved === 'boolean' && hasAnnotation) {
+        return { kind: 'annotate', approved: record.approved, ...annotations };
+    }
+    return undefined;
+}
+
+function isStoredMemo(value: unknown): value is string | null | undefined {
+    return value === undefined || value === null || typeof value === 'string';
+}
+
+function isStoredFlagColor(value: unknown): value is YnabFlagColor | null | undefined {
+    return value === undefined || value === null || isYnabFlagColor(value);
+}
+
+function isAnnotationRow(row: { transactionId: string; decisionJson: string }): boolean {
+    return parseStoredDecision(row.decisionJson, row.transactionId).kind === 'annotate';
 }

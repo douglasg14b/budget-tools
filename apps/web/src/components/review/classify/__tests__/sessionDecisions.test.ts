@@ -2,6 +2,7 @@ import type { CategorizationQueueItemDto } from '@budget-tools/web-sdk';
 import { describe, expect, it } from 'vitest';
 
 import {
+    annotateItem,
     applyDecision,
     approveSuggestion,
     decideCategory,
@@ -19,6 +20,7 @@ import {
     tallySession,
     undoLast,
 } from '../sessionDecisions';
+import type { SplitLine } from '../splitLines';
 
 describe('sessionDecisions', () => {
     const first = item('a', 'Groceries', 'cat-1');
@@ -41,6 +43,7 @@ describe('sessionDecisions', () => {
             decided: 2,
             rejected: 1,
             remaining: 1,
+            skipped: 0,
         });
 
         session = applyDecision(session, rejectItem(first));
@@ -138,6 +141,69 @@ describe('sessionDecisions', () => {
         expect(collapsed).toMatchObject({ kind: 'category', categoryId: 'cat-1', action: 'approved' });
     });
 
+    it('carries a one-line Amazon split memo onto the collapsed category decision', () => {
+        const amazon = decideSplit(first, [line('cat-1', 'USB-C cable')]);
+        expect(amazon).toMatchObject({ kind: 'category', categoryId: 'cat-1', memo: 'USB-C cable' });
+    });
+
+    it('joins collapsed line memos after the parent memo without duplicating it', () => {
+        const lines = [line('cat-1', ' Milk '), line('cat-1', null), line('cat-1', 'Eggs')];
+        expect(decideSplit(withMemo(first, 'Costco run'), lines)).toMatchObject({ memo: 'Costco run; Milk; Eggs' });
+        expect(decideSplit(withMemo(first, 'Costco run; Milk; Eggs'), lines)).not.toHaveProperty('memo');
+        expect(
+            decideSplit(withMemo(first, 'Weekly: Milk; Eggs'), lines, { memo: 'Weekly: Milk; Eggs!' }),
+        ).toMatchObject({ memo: 'Weekly: Milk; Eggs!' });
+        expect(decideSplit(withMemo(first, 'Costco run'), lines, { memo: null })).toMatchObject({
+            memo: 'Milk; Eggs',
+        });
+    });
+
+    it('leaves the memo out of a collapsed split with no line memos and an untouched note', () => {
+        expect(decideSplit(withMemo(first, 'Costco'), [line('cat-1', null), line('cat-1', '  ')])).not.toHaveProperty(
+            'memo',
+        );
+        expect(decideSplit(first, [line('cat-1', null)], { memo: 'Gift', flagColor: 'red' })).toMatchObject({
+            kind: 'category',
+            memo: 'Gift',
+            flagColor: 'red',
+        });
+    });
+
+    it('caps a collapsed memo at the YNAB limit with an ellipsis', () => {
+        const collapsed = decideSplit(withMemo(first, 'x'.repeat(490)), [line('cat-1', 'USB-C cable')]);
+        expect(collapsed.kind).toBe('category');
+        const memo = collapsed.kind === 'category' ? collapsed.memo : undefined;
+        expect(memo).toHaveLength(500);
+        expect(memo?.endsWith('…')).toBe(true);
+    });
+
+    it('keeps line memos on a real multi-category split and puts only the note on the parent', () => {
+        const split = decideSplit(first, [line('cat-1', 'Milk'), line('cat-2', 'Soap')], { memo: 'Costco' });
+        expect(split).toMatchObject({ kind: 'split', memo: 'Costco' });
+        expect(split.kind === 'split' ? split.lines.map((entry) => entry.memo) : []).toEqual(['Milk', 'Soap']);
+    });
+
+    it('annotates only when the note changes something, and tallies it as skipped', () => {
+        expect(annotateItem(first, {})).toBeUndefined();
+        const annotated = annotateItem(first, { flagColor: 'red' });
+        expect(annotated).toEqual({ kind: 'annotate', action: 'annotated', transactionId: 'a', flagColor: 'red' });
+        if (!annotated) {
+            return;
+        }
+        let session = applyDecision(emptySession(), annotated);
+        expect(tallySession(items, session)).toEqual({
+            accepted: 0,
+            changed: 0,
+            decided: 1,
+            rejected: 0,
+            remaining: 2,
+            skipped: 1,
+        });
+        expect(remainingItems(items, session).map((entry) => entry.transaction.id)).toEqual(['b', 'c']);
+        session = undoLast(session);
+        expect(session).toEqual(emptySession());
+    });
+
     it('keeps an in-list currentId when the URL id is stale', () => {
         expect(
             resolveClassifyFocus({
@@ -180,6 +246,20 @@ describe('sessionDecisions', () => {
     });
 });
 
+function line(categoryId: string, memo: string | null): SplitLine {
+    return {
+        amount: -500,
+        categoryId,
+        categoryName: categoryId === 'cat-1' ? 'Groceries' : 'Household',
+        categoryGroup: 'Needs',
+        memo,
+    };
+}
+
+function withMemo(source: CategorizationQueueItemDto, memo: string | null): CategorizationQueueItemDto {
+    return { ...source, transaction: { ...source.transaction, memo } };
+}
+
 function item(
     id: string,
     suggestedCategory: string | null,
@@ -193,6 +273,8 @@ function item(
             memo: null,
             cleared: 'cleared',
             approved: false,
+            flagColor: null,
+            flagName: null,
             accountId: 'acct-1',
             accountName: 'Checking',
             payeeId: null,

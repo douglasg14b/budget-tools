@@ -4,7 +4,7 @@ import { type DefaultError, queryOptions, type UseMutationOptions } from '@tanst
 
 import { client } from '../client.gen';
 import { Accounts, AmazonOrders, Auth, Categories, Categorization, Health, OperatingMode, type Options, PeriodicSeries, Receipts, TravelBias, TravelWindows } from '../sdk.gen';
-import type { AutoBindReceiptData, AutoBindReceiptResponse, BindReceiptData, BindReceiptResponse, CreateReceiptData, CreateReceiptResponse, CreateTravelWindowData, CreateTravelWindowResponse, DeleteClassificationDecisionData, DeleteClassificationDecisionResponse, DeleteReceiptData, DeleteReceiptResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, DetachReceiptData, DetachReceiptResponse, ExtractPreviewData, ExtractPreviewResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetMeData, GetMeResponse, GetOperatingModeData, GetOperatingModeResponse, GetOutboundSyncData, GetOutboundSyncResponse, GetReceiptData, GetReceiptImageData, GetReceiptImageResponse, GetReceiptResponse, GetTravelBiasData, GetTravelBiasResponse, ListAccountsData, ListAccountsResponse, ListPeriodicSeriesData, ListPeriodicSeriesResponse, ListReceiptsData, ListReceiptsResponse, ListTravelWindowsData, ListTravelWindowsResponse, LookupByReceiptData, LookupByReceiptResponse, LookupByTransactionData, LookupByTransactionResponse, MatchPreviewData, MatchPreviewResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchPasswordData, PatchPasswordResponse, PatchReceiptData, PatchReceiptResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostClassificationDecisionsData, PostClassificationDecisionsResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostLoginData, PostLoginResponse, PostLogoutData, PostLogoutResponse, PostOutboundSyncFlushData, PostOutboundSyncFlushResponse, PostPredictData, PostPredictResponse, RetryReceiptExtractData, RetryReceiptExtractResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
+import type { AutoBindReceiptData, AutoBindReceiptResponse, BindReceiptData, BindReceiptResponse, CreateReceiptData, CreateReceiptResponse, CreateTravelWindowData, CreateTravelWindowResponse, DeleteClassificationDecisionData, DeleteClassificationDecisionResponse, DeleteReceiptData, DeleteReceiptResponse, DeleteTravelWindowData, DeleteTravelWindowResponse, DetachReceiptData, DetachReceiptResponse, ExtractPreviewData, ExtractPreviewResponse, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponse, GetCategoriesData, GetCategoriesResponse, GetCategorizationQueueData, GetCategorizationQueueResponse, GetHealthData, GetHealthResponse, GetMeData, GetMeResponse, GetOperatingModeData, GetOperatingModeResponse, GetOutboundSyncData, GetOutboundSyncResponse, GetReceiptData, GetReceiptImageData, GetReceiptImageResponse, GetReceiptResponse, GetTravelBiasData, GetTravelBiasResponse, GetYnabFlagsData, GetYnabFlagsResponse, ListAccountsData, ListAccountsResponse, ListPeriodicSeriesData, ListPeriodicSeriesResponse, ListReceiptsData, ListReceiptsResponse, ListTravelWindowsData, ListTravelWindowsResponse, LookupByReceiptData, LookupByReceiptResponse, LookupByTransactionData, LookupByTransactionResponse, MatchPreviewData, MatchPreviewResponse, PatchOperatingModeData, PatchOperatingModeResponse, PatchPasswordData, PatchPasswordResponse, PatchReceiptData, PatchReceiptResponse, PatchTravelBiasData, PatchTravelBiasResponse, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponse, PostAmazonSuggestData, PostAmazonSuggestResponse, PostClassificationDecisionsData, PostClassificationDecisionsResponse, PostLlmSuggestData, PostLlmSuggestResponse, PostLoginData, PostLoginResponse, PostLogoutData, PostLogoutResponse, PostOutboundSyncFlushData, PostOutboundSyncFlushResponse, PostPredictData, PostPredictResponse, RetryReceiptExtractData, RetryReceiptExtractResponse, UpdateTravelWindowData, UpdateTravelWindowResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -635,6 +635,26 @@ export const postOutboundSyncFlushMutation = (options?: Partial<Options<PostOutb
     return mutationOptions;
 };
 
+export const getYnabFlagsQueryKey = (options?: Options<GetYnabFlagsData>) => createQueryKey('getYnabFlags', options);
+
+/**
+ * getYnabFlags
+ *
+ * Every YNAB flag color with its user-defined name, taken from mirrored transactions.
+ */
+export const getYnabFlagsOptions = (options?: Options<GetYnabFlagsData>) => queryOptions<GetYnabFlagsResponse, DefaultError, GetYnabFlagsResponse, ReturnType<typeof getYnabFlagsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await Categorization.request9({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getYnabFlagsQueryKey(options)
+});
+
 export const getCategoriesQueryKey = (options?: Options<GetCategoriesData>) => createQueryKey('getCategories', options);
 
 export const getCategoriesOptions = (options?: Options<GetCategoriesData>) => queryOptions<GetCategoriesResponse, DefaultError, GetCategoriesResponse, ReturnType<typeof getCategoriesQueryKey>>({
@@ -756,7 +776,8 @@ export const getAmazonOrdersStatusOptions = (options?: Options<GetAmazonOrdersSt
  * postAmazonOrdersSync
  *
  * Index Amazon payments from the oldest uncategorized Amazon charge through today,
- * then fetch invoices for order IDs in the requested classify window. Starts the MCP subprocess if needed.
+ * then fetch invoices for order IDs in the requested classify window. Uses amazon-sync when
+ * AMAZON_SYNC_URL is set, else starts the MCP subprocess if needed.
  */
 export const postAmazonOrdersSyncMutation = (options?: Partial<Options<PostAmazonOrdersSyncData>>): UseMutationOptions<PostAmazonOrdersSyncResponse, DefaultError, Options<PostAmazonOrdersSyncData>> => {
     const mutationOptions: UseMutationOptions<PostAmazonOrdersSyncResponse, DefaultError, Options<PostAmazonOrdersSyncData>> = {

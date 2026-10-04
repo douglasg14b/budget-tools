@@ -1,3 +1,4 @@
+import type { SaveTransactionWithIdOrImportId } from 'ynab';
 import { API } from 'ynab';
 
 import { getYnabApiKey, getYnabBudgetName } from '../../../environment';
@@ -50,13 +51,7 @@ export function createYnabTransactionsWriter(): YnabTransactionsWriter {
             const id = await getBudgetId(api);
             try {
                 await api.transactions.updateTransactions(id, {
-                    transactions: transactions.map((transaction) => ({
-                        id: transaction.id,
-                        approved: transaction.approved,
-                        category_id: transaction.category_id,
-                        ...(transaction.payee_name ? { payee_name: transaction.payee_name } : {}),
-                        ...(transaction.subtransactions ? { subtransactions: [...transaction.subtransactions] } : {}),
-                    })),
+                    transactions: transactions.map(toSaveTransaction),
                 });
             } catch (error) {
                 const retryAfterMs = ynabRetryAfterMs(error);
@@ -66,5 +61,21 @@ export function createYnabTransactionsWriter(): YnabTransactionsWriter {
                 throw new HttpError(502, ynabErrorMessage(error));
             }
         },
+    };
+}
+
+/**
+ * Maps one PATCH item onto the SDK shape. Absent fields stay absent so YNAB leaves them alone;
+ * explicit nulls are forwarded so YNAB clears them.
+ */
+export function toSaveTransaction(transaction: YnabPatchTransaction): SaveTransactionWithIdOrImportId {
+    return {
+        id: transaction.id,
+        approved: transaction.approved,
+        ...(transaction.category_id === undefined ? {} : { category_id: transaction.category_id }),
+        ...(transaction.payee_name ? { payee_name: transaction.payee_name } : {}),
+        ...(transaction.memo === undefined ? {} : { memo: transaction.memo }),
+        ...(transaction.flag_color === undefined ? {} : { flag_color: transaction.flag_color }),
+        ...(transaction.subtransactions ? { subtransactions: [...transaction.subtransactions] } : {}),
     };
 }

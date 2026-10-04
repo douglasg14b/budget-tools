@@ -86,7 +86,8 @@ export function ClassifySplitEditor({
                             size="xs"
                             value={line.memo ?? ''}
                             onChange={(event) => {
-                                const memo = event.currentTarget.value.trim() || null;
+                                // Stored raw so typing keeps its spaces; decisions trim on the way out.
+                                const memo = event.currentTarget.value || null;
                                 onChange(replaceLine(lines, index, { ...line, memo }));
                             }}
                         />

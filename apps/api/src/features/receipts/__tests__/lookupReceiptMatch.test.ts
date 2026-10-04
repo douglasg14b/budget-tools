@@ -135,6 +135,8 @@ function windowTransaction(overrides: Partial<TransactionDetailDto> = {}): Trans
         memo: null,
         cleared: 'cleared',
         approved: true,
+        flagColor: null,
+        flagName: null,
         accountId: 'acct',
         accountName: 'Checking',
         payeeId: 'payee',

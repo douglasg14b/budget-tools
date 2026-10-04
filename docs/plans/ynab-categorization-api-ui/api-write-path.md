@@ -22,7 +22,7 @@ When complete:
 - Changes to `transactions-retrieval`
 - Practice persistence of any kind
 - Reverse-PATCH undo after a successful flush
-- `GET /api/payees`, parent-memo edits, `markApprovedInYnab` checkbox
+- `GET /api/payees`, `markApprovedInYnab` checkbox
 
 ## Ownership
 
@@ -39,23 +39,30 @@ Migration: [2026-08-28-Classification_Sync.ts](../../../apps/api/src/data-persis
 | Column | Role |
 |---|---|
 | `transaction_id` | YNAB transaction id (PK) |
-| `decision_json` | Category `{ kind, categoryId, payeeName? }` or split `{ kind, lines, payeeName? }` |
+| `decision_json` | Category `{ kind, categoryId, payeeName?, memo?, flagColor? }`, split `{ kind, lines, payeeName?, memo?, flagColor? }`, or annotate `{ kind, memo?, flagColor?, approved }` |
 | `status` | `pending` → `syncing` → `synced` \| `failed`; later `confirmed` |
 | `batch_id` | Groups rows in one PATCH |
 | `attempt_count`, `last_error` | Retry / failure detail |
 | `created_at`, `updated_at`, `synced_at`, `confirmed_at` | Timestamps |
 
-Latest live decision **replaces** a `pending` or `failed` row. `syncing`, `synced`, and `confirmed` refuse replacement (409).
+Latest live decision **replaces** a `pending` or `failed` row. `syncing`, `synced`, and `confirmed` category/split rows refuse replacement (409). An annotate row is replaceable in any status; replacement clears `batch_id`, so an in-flight batch cannot mark the replacement `synced`. When an annotate row that is not yet `synced` is replaced, its `memo` / `flagColor` carry forward into any field the new decision leaves absent, so a flag set before the categorize is not lost.
 
 Rejects are not stored. They stay uncategorized in YNAB and remain in the review queue.
+
+### Memo, flag, and annotate
+
+Category and split decisions may carry a parent `memo` (at most 500 characters) and `flagColor` (`red` \| `orange` \| `yellow` \| `green` \| `blue` \| `purple`). An absent field leaves YNAB's value alone; `null` clears it; a blank memo is stored as `null`. Only fields the reviewer changed are sent, so concurrent YNAB-side edits are not overwritten.
+
+`annotate` sets memo and/or flag without categorizing ("flag it, move on"). It needs at least one of the two and rejects `categoryId`, `lines`, and `payeeName`. The server stores the transaction's mirrored `approved` value with the decision, because YNAB unapproves a PATCHed transaction that omits `approved`. Annotated transactions stay in the review queue.
 
 ## Stale-source reconciliation
 
 `listPendingTransactions` loads Postgres pending rows, then:
 
-1. `synced` ids **not** in that set → `confirmed` (mirror caught up)
+1. `synced` category/split ids **not** in that set → `confirmed` (mirror caught up)
 2. `confirmed` ids **in** that set again → delete the row (YNAB-side revert; re-enter the queue)
-3. Exclude ids with status `pending` \| `syncing` \| `synced` \| `failed`
+3. `synced` annotate rows → delete once the mirrored memo/flag match what was sent (absent fields ignored), or once the id leaves the set
+4. Exclude category/split ids with status `pending` \| `syncing` \| `synced` \| `failed`; annotate rows never exclude
 
 Failed rows stay out of classify (retry via outbound-sync) so the reviewer does not double-apply.
 
@@ -78,6 +85,10 @@ Body: `{ decisions: ClassificationDecisionDto[] }`. Array so Accept-all-certain 
 
 Retract while `pending` or `failed`. `syncing` / `synced` / `confirmed` → 409. Missing row is a no-op. Live `⌘Z` uses this.
 
+### `GET /api/categorization/ynab-flags`
+
+`{ flags: [{ color, name }] }` for all six YNAB flag colors. YNAB exposes flag names only on transactions, so `name` is the most recent non-empty `flag_name` on a non-deleted mirrored transaction with that color, or `null`. Queue transactions carry their own `flagColor` / `flagName`.
+
 ### `GET /api/categorization/outbound-sync`
 
 Counts: pending, syncing, failed, synced-but-unconfirmed, oldest pending timestamp, last error.
@@ -90,10 +101,10 @@ Manual flush; still honors the min interval and 429 backoff.
 
 One HTTP call per flush: `transactions.updateTransactions`. Credentials: `YNAB_API_KEY`, `YNAB_BUDGET_NAME` (lazy in [environment.ts](../../../apps/api/src/environment.ts); flush 503s if unset).
 
-Each item is `approved: true`.
-
-- Category: `category_id`, optional `payee_name`
-- Split: `category_id: null`, `subtransactions: [{ amount, category_id, memo }]`
+- Category: `approved: true`, `category_id`, optional `payee_name`
+- Split: `approved: true`, `category_id: null`, `subtransactions: [{ amount, category_id, memo }]`
+- Annotate: `approved` set to the stored mirrored value; no `category_id`
+- Any kind: `memo` / `flag_color` only when present in the decision (`null` clears)
 
 No GET-to-verify. The shared YNAB budget is 200 requests/hour with retrieval GETs; batching is the conservation strategy.
 

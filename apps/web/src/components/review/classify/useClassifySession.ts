@@ -3,6 +3,7 @@ import type {
     CategoryGroupDto,
     CategoryOptionDto,
     PayeeSuggestionDto,
+    YnabFlagColor,
 } from '@budget-tools/web-sdk';
 import { useHotkeys } from '@mantine/hooks';
 import type { MutableRefObject } from 'react';
@@ -10,8 +11,12 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { ALTERNATIVE_SHORTCUT_COUNT, alternativeOptions } from './alternativeOptions';
 import { CLASSIFY_DIALOG_ATTR, CLASSIFY_HOTKEYS } from './classifyKeys';
+import type { DecisionNote } from './decisionNote';
+import { withNote } from './decisionNote';
 import { categorySelectGroups, choiceById, flattenCategoryChoices } from './flattenCategoryChoices';
 import { isCertainProposal } from './isCertainProposal';
+import type { DisplayedNote, NoteDrafts } from './noteDrafts';
+import { decidedNote, displayedNote, noteChanges, setNoteFlag, setNoteMemo } from './noteDrafts';
 import type { PayeeEdits } from './payeeEdits';
 import {
     dismissPayeeRename,
@@ -22,6 +27,7 @@ import {
 } from './payeeEdits';
 import type { SessionDecision } from './sessionDecisions';
 import {
+    annotateItem,
     applyDecision,
     approveSuggestion,
     decideCategory,
@@ -67,6 +73,9 @@ export function useClassifySession(
     const [session, setSession] = useState(emptySession);
     const [payeeEdits, setPayeeEdits] = useState<PayeeEdits>(emptyPayeeEdits);
     const [splitDrafts, setSplitDrafts] = useState<Readonly<Record<string, readonly SplitLine[]>>>({});
+    // Kept after a decision so re-deciding (or undo) still carries the edits; the server replaces
+    // a transaction's earlier decision wholesale.
+    const [noteDrafts, setNoteDrafts] = useState<NoteDrafts>({});
     const [liveError, setLiveError] = useState<string | null>(null);
     const [currentId, setCurrentId] = useState<string | undefined>(options.requestedId ?? items[0]?.transaction.id);
 
@@ -147,6 +156,10 @@ export function useClassifySession(
         return current;
     }
 
+    function noteFor(item: CategorizationQueueItemDto): DecisionNote {
+        return noteChanges(item.transaction, noteDrafts[item.transaction.id]);
+    }
+
     function acceptCurrent(): void {
         const item = displayedCurrent();
         if (!item) {
@@ -157,10 +170,17 @@ export function useClassifySession(
             if (validateSplitLines(draft, item.transaction.amount, assignableIds)) {
                 return;
             }
-            commit(decideSplit(item, draft));
+            commit(decideSplit(item, draft, noteFor(item)));
             return;
         }
         const decision = approveSuggestion(item);
+        if (decision) {
+            commit(withNote(decision, noteFor(item)));
+        }
+    }
+
+    function annotateCurrent(): void {
+        const decision = current ? annotateItem(current, noteFor(current)) : undefined;
         if (decision) {
             commit(decision);
         }
@@ -215,11 +235,14 @@ export function useClassifySession(
             return;
         }
         commit(
-            decideCategory(current, {
-                categoryGroup: option.categoryGroup,
-                categoryId: option.categoryId,
-                categoryName: option.category,
-            }),
+            withNote(
+                decideCategory(current, {
+                    categoryGroup: option.categoryGroup,
+                    categoryId: option.categoryId,
+                    categoryName: option.category,
+                }),
+                noteFor(current),
+            ),
         );
     }
 
@@ -232,11 +255,14 @@ export function useClassifySession(
             return;
         }
         commit(
-            decideCategory(current, {
-                categoryGroup: choice.groupName,
-                categoryId: choice.id,
-                categoryName: choice.name,
-            }),
+            withNote(
+                decideCategory(current, {
+                    categoryGroup: choice.groupName,
+                    categoryId: choice.id,
+                    categoryName: choice.name,
+                }),
+                noteFor(current),
+            ),
         );
     }
 
@@ -265,10 +291,11 @@ export function useClassifySession(
         let lastId = currentId;
         const applied: SessionDecision[] = [];
         for (const item of certainRemaining) {
-            const decision = approveSuggestion(item);
-            if (!decision) {
+            const suggestion = approveSuggestion(item);
+            if (!suggestion) {
                 continue;
             }
+            const decision = withNote(suggestion, noteFor(item));
             nextSession = applyDecision(nextSession, decision);
             applied.push(decision);
             lastId = item.transaction.id;
@@ -325,6 +352,21 @@ export function useClassifySession(
         return visiblePayeeRename(item.proposal, item.transaction.id, payeeName(item), payeeEdits);
     }
 
+    function editMemo(transactionId: string, memo: string): void {
+        setNoteDrafts((drafts) => setNoteMemo(drafts, transactionId, memo));
+    }
+
+    function editFlag(transactionId: string, flagColor: YnabFlagColor | null): void {
+        setNoteDrafts((drafts) => setNoteFlag(drafts, transactionId, flagColor));
+    }
+
+    /** Memo / flag the card shows: the draft, or the session decision's values once decided. */
+    function note(item: CategorizationQueueItemDto): DisplayedNote {
+        const shown = displayedNote(item.transaction, noteDrafts[item.transaction.id]);
+        const decision = session.byId[item.transaction.id];
+        return decision ? decidedNote(shown, decision) : shown;
+    }
+
     const hotkeys: Array<[string, () => void]> = [
         [CLASSIFY_HOTKEYS.accept, acceptCurrent],
         [CLASSIFY_HOTKEYS.reject, rejectCurrent],
@@ -356,6 +398,7 @@ export function useClassifySession(
     return {
         acceptAllCertain,
         acceptCurrent,
+        annotateCurrent,
         assignableIds,
         beginSplit,
         canGoNext,
@@ -366,9 +409,13 @@ export function useClassifySession(
         commitPayee,
         current,
         dismissRename,
+        editFlag,
+        editMemo,
         goNext,
         goPrevious,
         liveError,
+        note,
+        noteFor,
         payeeName,
         payeeRename,
         pickCategoryId,

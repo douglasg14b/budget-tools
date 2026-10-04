@@ -1,4 +1,6 @@
 import type { CategorizationQueueItemDto, CategoryGroupDto } from '@budget-tools/web-sdk';
+import { getYnabFlagsOptions } from '@budget-tools/web-sdk';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 
 import { BackendErrorNotice } from '../../BackendErrorNotice';
@@ -14,6 +16,7 @@ import { ClassifyProgress } from './ClassifyProgress';
 import { ClassifyShortcuts } from './ClassifyShortcuts';
 import { ClassifyStage } from './ClassifyStage';
 import classes from './ClassifyWorkspace.module.css';
+import { hasNoteChanges } from './decisionNote';
 import { isAmazonTransaction } from './isAmazonTransaction';
 import { usePracticeReceipts } from './PracticeReceiptsContext';
 import { remainingItems } from './sessionDecisions';
@@ -25,6 +28,7 @@ import { useLlmOverlay } from './useLlmOverlay';
 import { usePredictWindow } from './usePredictWindow';
 import { useReceiptCapture } from './useReceiptCapture';
 import { useReceiptOverlay } from './useReceiptOverlay';
+import { ynabFlagOptions } from './ynabFlagOptions';
 
 type ClassifyWorkspaceProps = {
     categoryGroups: readonly CategoryGroupDto[];
@@ -102,6 +106,12 @@ export function ClassifyWorkspace({
                 row,
             ]);
         },
+    });
+    // A read like categories: Practice uses the same names, it only skips writes.
+    const flagsQuery = useQuery({
+        ...getYnabFlagsOptions(),
+        staleTime: Number.POSITIVE_INFINITY,
+        refetchOnWindowFocus: false,
     });
     const displayItem = overlay.item ?? current;
     displayedItemRef.current = displayItem;
@@ -191,7 +201,17 @@ export function ClassifyWorkspace({
                 categoryGroups={classify.selectGroups}
                 choicesById={classify.choicesById}
                 decision={classify.session.byId[currentId]}
+                flagOptions={ynabFlagOptions(flagsQuery.data?.flags, displayItem.transaction)}
                 item={displayItem}
+                note={classify.note(displayItem)}
+                noteDirty={hasNoteChanges(classify.noteFor(displayItem))}
+                onAnnotate={classify.annotateCurrent}
+                onChangeFlag={(flagColor) => {
+                    classify.editFlag(currentId, flagColor);
+                }}
+                onChangeMemo={(memo) => {
+                    classify.editMemo(currentId, memo);
+                }}
                 llmAsking={overlay.isPending}
                 llmError={overlay.errorMessage}
                 onRetryLlm={overlay.retry}

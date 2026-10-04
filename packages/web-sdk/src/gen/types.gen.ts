@@ -212,6 +212,11 @@ export type PeriodicCadence = 'Weekly' | 'Biweekly' | 'Monthly' | 'Quarterly' | 
  */
 export type TransactionClearedStatus = 'uncleared' | 'cleared' | 'reconciled';
 
+/**
+ * YNAB transaction `flag_color`. Kept as a literal union so tsoa can describe it.
+ */
+export type YnabFlagColor = 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple';
+
 export type TransactionDetailDto = {
     importPayeeNameOriginal: string | null;
     importPayeeName: string | null;
@@ -222,6 +227,14 @@ export type TransactionDetailDto = {
     payeeId: string | null;
     accountName: string;
     accountId: string;
+    /**
+     * YNAB's user-defined name for `flagColor`, when set.
+     */
+    flagName: string | null;
+    /**
+     * YNAB flag color, or null when unflagged. Unrelated to the ML `CategorizationFlagsDto`.
+     */
+    flagColor: YnabFlagColor | null;
     approved: boolean;
     cleared: TransactionClearedStatus;
     memo: string | null;
@@ -498,7 +511,11 @@ export type ClassificationDecisionsResponseDto = {
     accepted: number;
 };
 
-export type ClassificationDecisionKind = 'category' | 'split';
+/**
+ * `category` and `split` categorize and approve the transaction.
+ * `annotate` only sets the parent memo and/or YNAB flag; the transaction stays in the review queue.
+ */
+export type ClassificationDecisionKind = 'category' | 'split' | 'annotate';
 
 export type ClassificationDecisionLineDto = {
     memo?: string | null;
@@ -508,12 +525,24 @@ export type ClassificationDecisionLineDto = {
 
 export type ClassificationDecisionDto = {
     /**
-     * Required when kind is split.
+     * YNAB flag. Omit to leave YNAB's flag unchanged; null clears it. Annotate needs memo and/or flagColor.
+     */
+    flagColor?: YnabFlagColor | null;
+    /**
+     * Parent transaction memo, at most 500 characters. Omit to leave YNAB's memo unchanged;
+     * null or blank clears it. Annotate needs memo and/or flagColor.
+     */
+    memo?: string | null;
+    /**
+     * Required when kind is split. Not allowed for category or annotate.
      */
     lines?: Array<ClassificationDecisionLineDto>;
+    /**
+     * Not allowed for annotate.
+     */
     payeeName?: string;
     /**
-     * Required when kind is category.
+     * Required when kind is category. Not allowed for split or annotate.
      */
     categoryId?: string;
     kind: ClassificationDecisionKind;
@@ -539,6 +568,21 @@ export type OutboundSyncFlushDto = {
     failed: number;
     synced: number;
     attempted: number;
+};
+
+export type YnabFlagDto = {
+    /**
+     * Most recent YNAB name seen on a mirrored transaction with this color, or null.
+     */
+    name: string | null;
+    color: YnabFlagColor;
+};
+
+export type YnabFlagsDto = {
+    /**
+     * Every YNAB flag color, in YNAB's display order.
+     */
+    flags: Array<YnabFlagDto>;
 };
 
 export type CategoryDto = {
@@ -1421,6 +1465,22 @@ export type PostOutboundSyncFlushResponses = {
 };
 
 export type PostOutboundSyncFlushResponse = PostOutboundSyncFlushResponses[keyof PostOutboundSyncFlushResponses];
+
+export type GetYnabFlagsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/categorization/ynab-flags';
+};
+
+export type GetYnabFlagsResponses = {
+    /**
+     * Ok
+     */
+    200: YnabFlagsDto;
+};
+
+export type GetYnabFlagsResponse = GetYnabFlagsResponses[keyof GetYnabFlagsResponses];
 
 export type GetCategoriesData = {
     body?: never;

@@ -44,6 +44,7 @@ export function ClassifyProgress({
                     {tally.accepted > 0 ? ` · ${tally.accepted} accepted` : ''}
                     {tally.changed > 0 ? ` · ${tally.changed} changed` : ''}
                     {tally.rejected > 0 ? ` · ${tally.rejected} rejected` : ''}
+                    {tally.skipped > 0 ? ` · ${tally.skipped} skipped` : ''}
                 </p>
                 {showStepper ? (
                     <div className={classes.stepper}>

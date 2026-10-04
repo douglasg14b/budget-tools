@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AutoBindReceiptData, AutoBindReceiptErrors, AutoBindReceiptResponses, BindReceiptData, BindReceiptErrors, BindReceiptResponses, CreateReceiptData, CreateReceiptErrors, CreateReceiptResponses, CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteClassificationDecisionData, DeleteClassificationDecisionErrors, DeleteClassificationDecisionResponses, DeleteReceiptData, DeleteReceiptErrors, DeleteReceiptResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, DetachReceiptData, DetachReceiptErrors, DetachReceiptResponses, ExtractPreviewData, ExtractPreviewErrors, ExtractPreviewResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetMeData, GetMeResponses, GetOperatingModeData, GetOperatingModeResponses, GetOutboundSyncData, GetOutboundSyncResponses, GetReceiptData, GetReceiptErrors, GetReceiptImageData, GetReceiptImageErrors, GetReceiptImageResponses, GetReceiptResponses, GetTravelBiasData, GetTravelBiasResponses, ListAccountsData, ListAccountsResponses, ListPeriodicSeriesData, ListPeriodicSeriesErrors, ListPeriodicSeriesResponses, ListReceiptsData, ListReceiptsResponses, ListTravelWindowsData, ListTravelWindowsResponses, LookupByReceiptData, LookupByReceiptErrors, LookupByReceiptResponses, LookupByTransactionData, LookupByTransactionErrors, LookupByTransactionResponses, MatchPreviewData, MatchPreviewErrors, MatchPreviewResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchPasswordData, PatchPasswordResponses, PatchReceiptData, PatchReceiptErrors, PatchReceiptResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostClassificationDecisionsData, PostClassificationDecisionsErrors, PostClassificationDecisionsResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostLoginData, PostLoginResponses, PostLogoutData, PostLogoutResponses, PostOutboundSyncFlushData, PostOutboundSyncFlushErrors, PostOutboundSyncFlushResponses, PostPredictData, PostPredictResponses, RetryReceiptExtractData, RetryReceiptExtractErrors, RetryReceiptExtractResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
+import type { AutoBindReceiptData, AutoBindReceiptErrors, AutoBindReceiptResponses, BindReceiptData, BindReceiptErrors, BindReceiptResponses, CreateReceiptData, CreateReceiptErrors, CreateReceiptResponses, CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteClassificationDecisionData, DeleteClassificationDecisionErrors, DeleteClassificationDecisionResponses, DeleteReceiptData, DeleteReceiptErrors, DeleteReceiptResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, DetachReceiptData, DetachReceiptErrors, DetachReceiptResponses, ExtractPreviewData, ExtractPreviewErrors, ExtractPreviewResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetMeData, GetMeResponses, GetOperatingModeData, GetOperatingModeResponses, GetOutboundSyncData, GetOutboundSyncResponses, GetReceiptData, GetReceiptErrors, GetReceiptImageData, GetReceiptImageErrors, GetReceiptImageResponses, GetReceiptResponses, GetTravelBiasData, GetTravelBiasResponses, GetYnabFlagsData, GetYnabFlagsResponses, ListAccountsData, ListAccountsResponses, ListPeriodicSeriesData, ListPeriodicSeriesErrors, ListPeriodicSeriesResponses, ListReceiptsData, ListReceiptsResponses, ListTravelWindowsData, ListTravelWindowsResponses, LookupByReceiptData, LookupByReceiptErrors, LookupByReceiptResponses, LookupByTransactionData, LookupByTransactionErrors, LookupByTransactionResponses, MatchPreviewData, MatchPreviewErrors, MatchPreviewResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchPasswordData, PatchPasswordResponses, PatchReceiptData, PatchReceiptErrors, PatchReceiptResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostClassificationDecisionsData, PostClassificationDecisionsErrors, PostClassificationDecisionsResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostLoginData, PostLoginResponses, PostLogoutData, PostLogoutResponses, PostOutboundSyncFlushData, PostOutboundSyncFlushErrors, PostOutboundSyncFlushResponses, PostPredictData, PostPredictResponses, RetryReceiptExtractData, RetryReceiptExtractErrors, RetryReceiptExtractResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -376,6 +376,15 @@ export class Categorization {
     public static request8<ThrowOnError extends boolean = false>(options?: Options<PostOutboundSyncFlushData, ThrowOnError>): RequestResult<PostOutboundSyncFlushResponses, PostOutboundSyncFlushErrors, ThrowOnError> {
         return (options?.client ?? client).post<PostOutboundSyncFlushResponses, PostOutboundSyncFlushErrors, ThrowOnError>({ url: '/categorization/outbound-sync/flush', ...options });
     }
+    
+    /**
+     * getYnabFlags
+     *
+     * Every YNAB flag color with its user-defined name, taken from mirrored transactions.
+     */
+    public static request9<ThrowOnError extends boolean = false>(options?: Options<GetYnabFlagsData, ThrowOnError>): RequestResult<GetYnabFlagsResponses, unknown, ThrowOnError> {
+        return (options?.client ?? client).get<GetYnabFlagsResponses, unknown, ThrowOnError>({ url: '/categorization/ynab-flags', ...options });
+    }
 }
 
 export class Categories {
@@ -455,7 +464,8 @@ export class AmazonOrders {
      * postAmazonOrdersSync
      *
      * Index Amazon payments from the oldest uncategorized Amazon charge through today,
-     * then fetch invoices for order IDs in the requested classify window. Starts the MCP subprocess if needed.
+     * then fetch invoices for order IDs in the requested classify window. Uses amazon-sync when
+     * AMAZON_SYNC_URL is set, else starts the MCP subprocess if needed.
      */
     public static request2<ThrowOnError extends boolean = false>(options: Options<PostAmazonOrdersSyncData, ThrowOnError>): RequestResult<PostAmazonOrdersSyncResponses, unknown, ThrowOnError> {
         return (options.client ?? client).post<PostAmazonOrdersSyncResponses, unknown, ThrowOnError>({

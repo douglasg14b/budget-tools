@@ -94,6 +94,8 @@ function transaction(id: string): TransactionDetailDto {
         memo: null,
         cleared: 'cleared',
         approved: true,
+        flagColor: null,
+        flagName: null,
         accountId: 'acct-1',
         accountName: 'Checking',
         payeeId: null,

@@ -142,5 +142,7 @@ function decisionVerb(decision: SessionDecision): string {
             return 'Changed';
         case 'rejected':
             return 'Rejected';
+        case 'annotated':
+            return 'Skipped';
     }
 }

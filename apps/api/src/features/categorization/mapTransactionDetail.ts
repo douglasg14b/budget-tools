@@ -1,3 +1,4 @@
+import type { YnabFlagColor } from '../ynabSync/ynabFlagColor';
 import type { TransactionClearedStatus, TransactionDetailDto } from './categorizationDtos';
 
 export const TRANSACTION_DETAIL_COLUMNS = [
@@ -7,6 +8,8 @@ export const TRANSACTION_DETAIL_COLUMNS = [
     'memo',
     'cleared',
     'approved',
+    'flag_color',
+    'flag_name',
     'account_id',
     'account_name',
     'payee_id',
@@ -25,6 +28,8 @@ export type TransactionDetailRow = {
     memo: string | null;
     cleared: string;
     approved: boolean;
+    flag_color: YnabFlagColor | null;
+    flag_name: string | null;
     account_id: string;
     account_name: string;
     payee_id: string | null;
@@ -44,6 +49,8 @@ export function mapTransactionDetail(row: TransactionDetailRow): TransactionDeta
         memo: row.memo,
         cleared: parseTransactionClearedStatus(row.cleared),
         approved: row.approved,
+        flagColor: row.flag_color,
+        flagName: row.flag_name,
         accountId: row.account_id,
         accountName: row.account_name,
         payeeId: row.payee_id,

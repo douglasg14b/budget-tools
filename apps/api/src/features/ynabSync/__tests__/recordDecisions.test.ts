@@ -27,7 +27,7 @@ describe('recordDecisions', () => {
                 requireLive: async () => {
                     throw new HttpError(403, 'YNAB writes are disabled in practice mode');
                 },
-                loadTransactions: async () => [{ id: 'tx-1', amount: -1000 }],
+                loadTransactions: async () => [{ id: 'tx-1', amount: -1000, approved: false }],
                 loadAssignableCategoryIds: async () => new Set(['cat-1']),
                 onEnqueued: () => undefined,
             }),
@@ -59,6 +59,49 @@ describe('recordDecisions', () => {
             }),
         ).rejects.toMatchObject({ statusCode: 404 });
     });
+
+    it('stores an annotation with the mirrored approval', async () => {
+        await recordDecisions([{ transactionId: 'tx-1', kind: 'annotate', flagColor: 'red' }], {
+            ...liveContext(database),
+            loadTransactions: async () => [{ id: 'tx-1', amount: -1000, approved: true }],
+        });
+        expect(await getClassificationSync('tx-1', database)).toMatchObject({
+            status: 'pending',
+            decision: { kind: 'annotate', flagColor: 'red', approved: true },
+        });
+
+        await recordDecisions([{ transactionId: 'tx-1', kind: 'annotate', memo: 'Unknown charge' }], {
+            ...liveContext(database),
+            loadTransactions: async () => [{ id: 'tx-1', amount: -1000, approved: false }],
+        });
+        expect((await getClassificationSync('tx-1', database))?.decision).toStrictEqual({
+            kind: 'annotate',
+            memo: 'Unknown charge',
+            flagColor: 'red',
+            approved: false,
+        });
+    });
+
+    it('404s an annotation for a missing transaction', async () => {
+        await expect(
+            recordDecisions([{ transactionId: 'tx-1', kind: 'annotate', flagColor: 'red' }], {
+                ...liveContext(database),
+                loadTransactions: async () => [],
+            }),
+        ).rejects.toMatchObject({ statusCode: 404 });
+        expect(await getClassificationSync('tx-1', database)).toBeUndefined();
+    });
+
+    it('keeps memo and flag on a category decision', async () => {
+        await recordDecisions([{ ...categoryBody(), memo: 'Gift', flagColor: null }], liveContext(database));
+        expect((await getClassificationSync('tx-1', database))?.decision).toStrictEqual({
+            kind: 'category',
+            categoryId: 'cat-1',
+            payeeName: 'Costco',
+            memo: 'Gift',
+            flagColor: null,
+        });
+    });
 });
 
 describe('retractDecision', () => {
@@ -82,6 +125,15 @@ describe('retractDecision', () => {
         });
         expect(await getClassificationSync('tx-1', database)).toBeUndefined();
     });
+
+    it('deletes a pending annotation', async () => {
+        await recordDecisions([{ transactionId: 'tx-1', kind: 'annotate', flagColor: 'red' }], liveContext(database));
+        await retractDecision('tx-1', {
+            db: database,
+            requireLive: async () => undefined,
+        });
+        expect(await getClassificationSync('tx-1', database)).toBeUndefined();
+    });
 });
 
 function categoryBody() {
@@ -92,7 +144,7 @@ function liveContext(database: AppDatabaseClient, onEnqueued?: () => void) {
     return {
         db: database,
         requireLive: async () => undefined,
-        loadTransactions: async () => [{ id: 'tx-1', amount: -1000 }],
+        loadTransactions: async () => [{ id: 'tx-1', amount: -1000, approved: false }],
         loadAssignableCategoryIds: async () => new Set(['cat-1']),
         onEnqueued: onEnqueued ?? (() => undefined),
     };

@@ -80,6 +80,8 @@ function item(idValue: string): CategorizationQueueItemDto {
             memo: null,
             cleared: 'cleared',
             approved: false,
+            flagColor: null,
+            flagName: null,
             accountId: 'acct-1',
             accountName: 'Checking',
             payeeId: null,

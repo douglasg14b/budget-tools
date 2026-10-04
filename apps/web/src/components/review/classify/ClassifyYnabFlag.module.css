@@ -1,0 +1,78 @@
+.picker {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.swatch {
+    width: 1.05rem;
+    height: 1.05rem;
+    border-radius: 999px;
+    background: var(--flag-color);
+    opacity: 0.4;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-text-primary) 18%, transparent);
+    transition:
+        opacity 120ms ease,
+        transform 120ms ease;
+}
+
+.swatch:hover:not(:disabled) {
+    opacity: 0.85;
+    transform: scale(1.08);
+}
+
+.swatch[data-selected] {
+    opacity: 1;
+    outline: 2px solid var(--flag-color);
+    outline-offset: 2px;
+}
+
+.swatch:disabled {
+    cursor: default;
+}
+
+.swatch:disabled:not([data-selected]) {
+    opacity: 0.18;
+}
+
+.swatch[data-color="red"] {
+    --flag-color: var(--mantine-color-red-6);
+}
+
+.swatch[data-color="orange"] {
+    --flag-color: var(--mantine-color-orange-6);
+}
+
+.swatch[data-color="yellow"] {
+    --flag-color: var(--mantine-color-yellow-5);
+}
+
+.swatch[data-color="green"] {
+    --flag-color: var(--mantine-color-green-6);
+}
+
+.swatch[data-color="blue"] {
+    --flag-color: var(--mantine-color-blue-6);
+}
+
+.swatch[data-color="purple"] {
+    --flag-color: var(--mantine-color-grape-6);
+}
+
+.clear {
+    margin-left: 0.1rem;
+    color: var(--app-text-muted);
+}

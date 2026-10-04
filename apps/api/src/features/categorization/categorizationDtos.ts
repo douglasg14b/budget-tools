@@ -1,3 +1,5 @@
+import type { YnabFlagColor } from '../ynabSync/ynabFlagColor';
+
 export type ApprovalTier = 'AutoApply' | 'Suggested' | 'Review' | 'Blocked';
 
 export type CategorizationMethod =
@@ -146,6 +148,10 @@ export type TransactionDetailDto = {
     memo: string | null;
     cleared: TransactionClearedStatus;
     approved: boolean;
+    /** YNAB flag color, or null when unflagged. Unrelated to the ML `CategorizationFlagsDto`. */
+    flagColor: YnabFlagColor | null;
+    /** YNAB's user-defined name for `flagColor`, when set. */
+    flagName: string | null;
     accountId: string;
     accountName: string;
     payeeId: string | null;
@@ -155,6 +161,17 @@ export type TransactionDetailDto = {
     importId: string | null;
     importPayeeName: string | null;
     importPayeeNameOriginal: string | null;
+};
+
+export type YnabFlagDto = {
+    color: YnabFlagColor;
+    /** Most recent YNAB name seen on a mirrored transaction with this color, or null. */
+    name: string | null;
+};
+
+export type YnabFlagsDto = {
+    /** Every YNAB flag color, in YNAB's display order. */
+    flags: YnabFlagDto[];
 };
 
 export type CategorizationQueueItemDto = {

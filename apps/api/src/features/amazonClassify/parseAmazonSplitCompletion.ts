@@ -129,7 +129,7 @@ export function collapseAndBalance(lines: readonly SplitLine[], transactionAmoun
               {
                   ...collapsed,
                   amount: splitLinesTotal(lines),
-                  memo: lines.length === 1 ? collapsed.memo : null,
+                  memo: joinedLineMemos(lines),
               },
           ]
         : [...lines];
@@ -142,4 +142,12 @@ export function collapseAndBalance(lines: readonly SplitLine[], transactionAmoun
         return next;
     }
     return [...next.slice(0, -1), { ...last, amount: last.amount + diff }];
+}
+
+/**
+ * A collapsed split is sent to YNAB as one category, so every item memo has to survive on the single line.
+ */
+function joinedLineMemos(lines: readonly SplitLine[]): string | null {
+    const memos = lines.map((line) => line.memo?.trim()).filter((memo): memo is string => Boolean(memo));
+    return memos.length > 0 ? memos.join('; ') : null;
 }

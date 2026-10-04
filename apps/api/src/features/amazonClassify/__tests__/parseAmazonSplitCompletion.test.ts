@@ -125,6 +125,19 @@ describe('parseAmazonSplitCompletion', () => {
         expect(parsed.lines[0]?.memo).toBe('16-pack assorted beach balls');
     });
 
+    it('keeps every line memo when collapsing same-category lines', () => {
+        const collapsed = collapseAndBalance(
+            [
+                { amount: -4000, categoryId: 'cat-g', categoryName: 'Groceries', categoryGroup: 'Needs', memo: 'Milk' },
+                { amount: -1000, categoryId: 'cat-g', categoryName: 'Groceries', categoryGroup: 'Needs', memo: null },
+                { amount: -5000, categoryId: 'cat-g', categoryName: 'Groceries', categoryGroup: 'Needs', memo: 'Eggs' },
+            ],
+            -10000,
+        );
+        expect(collapsed).toHaveLength(1);
+        expect(collapsed[0]?.memo).toBe('Milk; Eggs');
+    });
+
     it('collapses same-category lines to one', () => {
         const collapsed = collapseAndBalance(
             [
@@ -151,7 +164,7 @@ describe('parseAmazonSplitCompletion', () => {
                 categoryId: 'cat-g',
                 categoryName: 'Groceries',
                 categoryGroup: 'Needs',
-                memo: null,
+                memo: 'Milk; Eggs',
             },
         ]);
     });

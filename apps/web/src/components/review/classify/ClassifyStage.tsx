@@ -3,6 +3,7 @@ import type {
     CategorizationQueueItemDto,
     CategoryOptionDto,
     PayeeSuggestionDto,
+    YnabFlagColor,
 } from '@budget-tools/web-sdk';
 import { ActionIcon, Button, Loader, Select, Tooltip, UnstyledButton } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
@@ -14,6 +15,7 @@ import { formatYnabAmount } from '../formatYnabAmount';
 import { ProposalDetails } from '../ProposalDetails';
 import { alternativeOptions } from './alternativeOptions';
 import { ClassifyAmazonContext } from './ClassifyAmazonContext';
+import { ClassifyNote } from './ClassifyNote';
 import { ClassifyPayee } from './ClassifyPayee';
 import { ClassifyReceiptCapture } from './ClassifyReceiptCapture';
 import { ClassifyReceiptContext } from './ClassifyReceiptContext';
@@ -24,26 +26,36 @@ import { CLASSIFY_KEY_LABELS } from './classifyKeys';
 import type { CategoryChoice, CategorySelectGroup } from './flattenCategoryChoices';
 import { formatCategoryLabel } from './formatCategoryLabel';
 import { CERTAIN_EXPLANATION, isCertainProposal } from './isCertainProposal';
+import type { DisplayedNote } from './noteDrafts';
 import { originalImportName } from './originalImportName';
 import { PeriodicBadge } from './PeriodicBadge';
-import type { SessionDecision } from './sessionDecisions';
+import type { AnnotateSessionDecision, SessionDecision } from './sessionDecisions';
 import { decisionCategoryId, decisionCategoryName, isSplitDecision } from './sessionDecisions';
 import type { SplitLine } from './splitLines';
 import { validateSplitLines } from './splitLines';
 import type { ReceiptCaptureState } from './useReceiptCapture';
 import type { ReceiptOverlayModel } from './useReceiptOverlay';
+import type { YnabFlagOption } from './ynabFlagOptions';
+import { ynabFlagLabel } from './ynabFlagOptions';
 
 type ClassifyStageProps = {
     assignableIds: ReadonlySet<string>;
     categoryGroups: readonly CategorySelectGroup[];
     choicesById: ReadonlyMap<string, CategoryChoice>;
     decision: SessionDecision | undefined;
+    flagOptions: readonly YnabFlagOption[];
     item: CategorizationQueueItemDto;
     llmAsking?: boolean;
     llmError?: string | null;
+    note: DisplayedNote;
+    /** The reviewer changed the memo or flag, so Flag & skip has something to save. */
+    noteDirty: boolean;
     onAccept: () => void;
+    onAnnotate: () => void;
     onBeginSplit: () => void;
     onCancelSplit: () => void;
+    onChangeFlag: (flagColor: YnabFlagColor | null) => void;
+    onChangeMemo: (memo: string) => void;
     onChangeSplit: (lines: readonly SplitLine[]) => void;
     onCommitPayee: (name: string) => void;
     onDismissRename: () => void;
@@ -79,12 +91,18 @@ export function ClassifyStage({
     categoryGroups,
     choicesById,
     decision,
+    flagOptions,
     item,
     llmAsking = false,
     llmError = null,
+    note,
+    noteDirty,
     onAccept,
+    onAnnotate,
     onBeginSplit,
     onCancelSplit,
+    onChangeFlag,
+    onChangeMemo,
     onChangeSplit,
     onCommitPayee,
     onDismissRename,
@@ -159,7 +177,13 @@ export function ClassifyStage({
                     {formatYnabAmount(transaction.amount)}
                 </p>
             </header>
-            {transaction.memo ? <p className={classes.memo}>{transaction.memo}</p> : null}
+            <ClassifyNote
+                flagOptions={flagOptions}
+                note={note}
+                readOnly={Boolean(decision)}
+                onChangeFlag={onChangeFlag}
+                onChangeMemo={onChangeMemo}
+            />
 
             {splitLines ? (
                 <ClassifySplitEditor
@@ -245,7 +269,7 @@ export function ClassifyStage({
 
             {decision ? (
                 <p className={classes.decision} data-action={decision.action}>
-                    {formatDecision(decision)}
+                    {formatDecision(decision, flagOptions)}
                     <UnstyledButton className={classes.undoInline} onClick={onUndo}>
                         Undo
                     </UnstyledButton>
@@ -261,6 +285,11 @@ export function ClassifyStage({
                     Reject
                     <kbd className={classes.kbd}>{CLASSIFY_KEY_LABELS.reject}</kbd>
                 </Button>
+                <Tooltip label="Save the memo and flag without categorizing. It stays in the queue.">
+                    <Button disabled={!noteDirty || Boolean(decision)} size="md" variant="subtle" onClick={onAnnotate}>
+                        Flag & skip
+                    </Button>
+                </Tooltip>
             </div>
 
             {alternatives.length > 0 ? (
@@ -342,7 +371,7 @@ export function ClassifyStage({
     );
 }
 
-function formatDecision(decision: SessionDecision): string {
+function formatDecision(decision: SessionDecision, flagOptions: readonly YnabFlagOption[]): string {
     if (isSplitDecision(decision)) {
         return `Split into ${decision.lines.length} lines`;
     }
@@ -353,5 +382,18 @@ function formatDecision(decision: SessionDecision): string {
             return `Changed to ${formatCategoryLabel(decision.categoryName, decision.categoryGroup) ?? 'a new category'}`;
         case 'rejected':
             return 'Rejected';
+        case 'annotated':
+            return formatAnnotation(decision, flagOptions);
     }
+}
+
+function formatAnnotation(decision: AnnotateSessionDecision, flagOptions: readonly YnabFlagOption[]): string {
+    const parts: string[] = [];
+    if (decision.flagColor !== undefined) {
+        parts.push(decision.flagColor ? `${ynabFlagLabel(flagOptions, decision.flagColor)} flag` : 'flag cleared');
+    }
+    if (decision.memo !== undefined) {
+        parts.push(decision.memo ? 'memo saved' : 'memo cleared');
+    }
+    return `Skipped · ${parts.join(', ')}`;
 }

@@ -23,6 +23,8 @@ describe('mapTransactionDetail', () => {
             memo: null,
             cleared: 'reconciled',
             approved: false,
+            flag_color: 'orange',
+            flag_name: 'Ask Sam',
             account_id: 'acct-1',
             account_name: 'Visa',
             payee_id: null,
@@ -35,5 +37,6 @@ describe('mapTransactionDetail', () => {
         });
 
         expect(detail.cleared).toBe('reconciled');
+        expect(detail).toMatchObject({ flagColor: 'orange', flagName: 'Ask Sam' });
     });
 });

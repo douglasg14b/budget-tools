@@ -93,12 +93,6 @@
     color: var(--app-amount-inflow);
 }
 
-.memo {
-    margin: -0.55rem 0 0;
-    font-size: 0.9375rem;
-    color: var(--app-text-secondary);
-}
-
 .splitToggle {
     align-self: flex-start;
     margin: -0.35rem 0 0;
@@ -227,6 +221,10 @@
 
 .decision[data-action="rejected"] {
     color: var(--app-status-error);
+}
+
+.decision[data-action="annotated"] {
+    color: var(--app-text-primary);
 }
 
 .undoInline {

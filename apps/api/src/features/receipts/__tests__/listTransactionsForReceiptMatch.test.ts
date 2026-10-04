@@ -12,6 +12,8 @@ function transaction(overrides: Partial<TransactionDetailDto>): TransactionDetai
         memo: null,
         cleared: 'cleared',
         approved: true,
+        flagColor: null,
+        flagName: null,
         accountId: 'acct',
         accountName: 'Checking',
         payeeId: 'payee',

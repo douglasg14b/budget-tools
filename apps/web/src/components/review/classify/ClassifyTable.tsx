@@ -331,6 +331,8 @@ function statusLabel(decision: SessionDecision | undefined): string {
             return 'Changed';
         case 'rejected':
             return 'Rejected';
+        case 'annotated':
+            return 'Skipped';
         default:
             return '';
     }

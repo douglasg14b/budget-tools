@@ -51,7 +51,7 @@ export async function listPendingTransactions(): Promise<PendingTransactionRow[]
             }),
         };
     });
-    const excluded = await reconcileClassificationSync(mapped.map((row) => row.id));
+    const excluded = await reconcileClassificationSync(mapped);
     return mapped.filter((row) => !excluded.has(row.id));
 }
 
@@ -63,6 +63,8 @@ export function toTransactionDetail(row: PendingTransactionRow): TransactionDeta
         memo: row.memo,
         cleared: row.cleared,
         approved: row.approved,
+        flagColor: row.flagColor,
+        flagName: row.flagName,
         accountId: row.accountId,
         accountName: row.accountName,
         payeeId: row.payeeId,

@@ -67,7 +67,8 @@
 }
 
 .item[data-action="approved"],
-.item[data-action="changed"] {
+.item[data-action="changed"],
+.item[data-action="annotated"] {
     opacity: 0.55;
 }
 

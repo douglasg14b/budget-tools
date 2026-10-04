@@ -767,6 +767,18 @@
 				],
 				"description": "YNAB `cleared` field. Uncleared transactions are excluded from the review queue."
 			},
+			"YnabFlagColor": {
+				"type": "string",
+				"enum": [
+					"red",
+					"orange",
+					"yellow",
+					"green",
+					"blue",
+					"purple"
+				],
+				"description": "YNAB transaction `flag_color`. Kept as a literal union so tsoa can describe it."
+			},
 			"TransactionDetailDto": {
 				"properties": {
 					"importPayeeNameOriginal": {
@@ -803,6 +815,20 @@
 					"accountId": {
 						"type": "string"
 					},
+					"flagName": {
+						"type": "string",
+						"nullable": true,
+						"description": "YNAB's user-defined name for `flagColor`, when set."
+					},
+					"flagColor": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/YnabFlagColor"
+							}
+						],
+						"nullable": true,
+						"description": "YNAB flag color, or null when unflagged. Unrelated to the ML `CategorizationFlagsDto`."
+					},
 					"approved": {
 						"type": "boolean"
 					},
@@ -834,6 +860,8 @@
 					"payeeId",
 					"accountName",
 					"accountId",
+					"flagName",
+					"flagColor",
 					"approved",
 					"cleared",
 					"memo",
@@ -1870,8 +1898,10 @@
 				"type": "string",
 				"enum": [
 					"category",
-					"split"
-				]
+					"split",
+					"annotate"
+				],
+				"description": "`category` and `split` categorize and approve the transaction.\n`annotate` only sets the parent memo and/or YNAB flag; the transaction stays in the review queue."
 			},
 			"ClassificationDecisionLineDto": {
 				"properties": {
@@ -1895,19 +1925,34 @@
 			},
 			"ClassificationDecisionDto": {
 				"properties": {
+					"flagColor": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/YnabFlagColor"
+							}
+						],
+						"nullable": true,
+						"description": "YNAB flag. Omit to leave YNAB's flag unchanged; null clears it. Annotate needs memo and/or flagColor."
+					},
+					"memo": {
+						"type": "string",
+						"nullable": true,
+						"description": "Parent transaction memo, at most 500 characters. Omit to leave YNAB's memo unchanged;\nnull or blank clears it. Annotate needs memo and/or flagColor."
+					},
 					"lines": {
 						"items": {
 							"$ref": "#/components/schemas/ClassificationDecisionLineDto"
 						},
 						"type": "array",
-						"description": "Required when kind is split."
+						"description": "Required when kind is split. Not allowed for category or annotate."
 					},
 					"payeeName": {
-						"type": "string"
+						"type": "string",
+						"description": "Not allowed for annotate."
 					},
 					"categoryId": {
 						"type": "string",
-						"description": "Required when kind is category."
+						"description": "Required when kind is category. Not allowed for split or annotate."
 					},
 					"kind": {
 						"$ref": "#/components/schemas/ClassificationDecisionKind"
@@ -1999,6 +2044,38 @@
 					"failed",
 					"synced",
 					"attempted"
+				],
+				"type": "object"
+			},
+			"YnabFlagDto": {
+				"properties": {
+					"name": {
+						"type": "string",
+						"nullable": true,
+						"description": "Most recent YNAB name seen on a mirrored transaction with this color, or null."
+					},
+					"color": {
+						"$ref": "#/components/schemas/YnabFlagColor"
+					}
+				},
+				"required": [
+					"name",
+					"color"
+				],
+				"type": "object"
+			},
+			"YnabFlagsDto": {
+				"properties": {
+					"flags": {
+						"items": {
+							"$ref": "#/components/schemas/YnabFlagDto"
+						},
+						"type": "array",
+						"description": "Every YNAB flag color, in YNAB's display order."
+					}
+				},
+				"required": [
+					"flags"
 				],
 				"type": "object"
 			},
@@ -3475,6 +3552,30 @@
 				"parameters": []
 			}
 		},
+		"/categorization/ynab-flags": {
+			"get": {
+				"operationId": "GetYnabFlags",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/YnabFlagsDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Every YNAB flag color with its user-defined name, taken from mirrored transactions.",
+				"summary": "getYnabFlags",
+				"tags": [
+					"categorization"
+				],
+				"security": [],
+				"parameters": []
+			}
+		},
 		"/categories": {
 			"get": {
 				"operationId": "GetCategories",
@@ -3652,7 +3753,7 @@
 						}
 					}
 				},
-				"description": "Index Amazon payments from the oldest uncategorized Amazon charge through today,\nthen fetch invoices for order IDs in the requested classify window. Uses amazon-sync when\nAMAZON_SYNC_URL is set, else starts the MCP subprocess if needed.",
+				"description": "Index Amazon payments from the oldest uncategorized Amazon charge through today,\r\nthen fetch invoices for order IDs in the requested classify window. Uses amazon-sync when\r\nAMAZON_SYNC_URL is set, else starts the MCP subprocess if needed.",
 				"summary": "postAmazonOrdersSync",
 				"tags": [
 					"amazon-orders"

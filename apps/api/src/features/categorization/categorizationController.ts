@@ -23,7 +23,9 @@ import type {
     CategorizationQueueDto,
     LlmSuggestOverlayDto,
     LlmSuggestRequestDto,
+    YnabFlagsDto,
 } from './categorizationDtos';
+import { listYnabFlags } from './listYnabFlags';
 import { suggestWithLlm } from './llm/suggestWithLlm';
 import { loadCategorizationQueue } from './loadCategorizationQueue';
 import { predictTransactions } from './predictTransactions';
@@ -154,6 +156,15 @@ export class CategorizationController {
     @Response(503, 'YNAB credentials missing')
     public async postOutboundSyncFlush(): Promise<OutboundSyncFlushDto> {
         return await flushOutboundSync();
+    }
+
+    /**
+     * Every YNAB flag color with its user-defined name, taken from mirrored transactions.
+     * @summary getYnabFlags
+     */
+    @Get('ynab-flags')
+    public async getYnabFlags(): Promise<YnabFlagsDto> {
+        return await listYnabFlags();
     }
 }
 

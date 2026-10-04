@@ -1,10 +1,13 @@
 import type { CategorizationQueueItemDto } from '@budget-tools/web-sdk';
+
+import type { DecisionNote } from './decisionNote';
+import { collapsedSplitMemo, hasNoteChanges, withNote } from './decisionNote';
 import type { SplitLine } from './splitLines';
 import { collapsedSplitCategory } from './splitLines';
 
 export type DecisionAction = 'approved' | 'rejected' | 'changed';
 
-export type CategorySessionDecision = {
+export type CategorySessionDecision = DecisionNote & {
     readonly kind: 'category';
     readonly action: DecisionAction;
     readonly categoryGroup: string | null;
@@ -13,14 +16,24 @@ export type CategorySessionDecision = {
     readonly transactionId: string;
 };
 
-export type SplitSessionDecision = {
+export type SplitSessionDecision = DecisionNote & {
     readonly kind: 'split';
     readonly action: DecisionAction;
     readonly transactionId: string;
     readonly lines: readonly SplitLine[];
 };
 
-export type SessionDecision = CategorySessionDecision | SplitSessionDecision;
+/**
+ * Memo and/or flag only ("Flag & skip"). Decided for this session, but the server keeps the
+ * transaction in the review queue, so it returns on the next load.
+ */
+export type AnnotateSessionDecision = DecisionNote & {
+    readonly kind: 'annotate';
+    readonly action: 'annotated';
+    readonly transactionId: string;
+};
+
+export type SessionDecision = CategorySessionDecision | SplitSessionDecision | AnnotateSessionDecision;
 
 export type SessionDecisions = {
     readonly byId: Readonly<Record<string, SessionDecision>>;
@@ -185,12 +198,15 @@ export type SessionTally = {
     readonly decided: number;
     readonly rejected: number;
     readonly remaining: number;
+    /** Flag & skip: annotated but left uncategorized. */
+    readonly skipped: number;
 };
 
 export function tallySession(items: readonly CategorizationQueueItemDto[], session: SessionDecisions): SessionTally {
     let accepted = 0;
     let changed = 0;
     let rejected = 0;
+    let skipped = 0;
     for (const item of items) {
         const decision = session.byId[item.transaction.id];
         if (!decision) {
@@ -206,16 +222,20 @@ export function tallySession(items: readonly CategorizationQueueItemDto[], sessi
             case 'rejected':
                 rejected += 1;
                 break;
+            case 'annotated':
+                skipped += 1;
+                break;
         }
     }
 
-    const decided = accepted + changed + rejected;
+    const decided = accepted + changed + rejected + skipped;
     return {
         accepted,
         changed,
         decided,
         rejected,
         remaining: items.length - decided,
+        skipped,
     };
 }
 
@@ -268,22 +288,53 @@ export function decideCategory(
     };
 }
 
-export function decideSplit(item: CategorizationQueueItemDto, lines: readonly SplitLine[]): SessionDecision {
+/**
+ * A split whose lines share one category is stored as a category decision. YNAB then keeps no
+ * line memos, so they move onto the parent memo (see `collapsedSplitMemo`).
+ */
+export function decideSplit(
+    item: CategorizationQueueItemDto,
+    lines: readonly SplitLine[],
+    note: DecisionNote = {},
+): SessionDecision {
     const collapsed = collapsedSplitCategory(lines);
     if (collapsed) {
-        return decideCategory(item, {
+        const category = decideCategory(item, {
             categoryGroup: collapsed.categoryGroup,
             categoryId: collapsed.categoryId,
             categoryName: collapsed.categoryName,
         });
+        return withNote(category, {
+            flagColor: note.flagColor,
+            memo: collapsedSplitMemo(item.transaction.memo, lines, note.memo),
+        });
     }
 
-    return {
-        kind: 'split',
-        action: 'changed',
-        transactionId: item.transaction.id,
-        lines,
-    };
+    return withNote<SplitSessionDecision>(
+        {
+            kind: 'split',
+            action: 'changed',
+            transactionId: item.transaction.id,
+            lines,
+        },
+        note,
+    );
+}
+
+/**
+ * Flag & skip. Undefined when the note changes nothing, since the server needs a memo or flag.
+ */
+export function annotateItem(
+    item: CategorizationQueueItemDto,
+    note: DecisionNote,
+): AnnotateSessionDecision | undefined {
+    if (!hasNoteChanges(note)) {
+        return undefined;
+    }
+    return withNote<AnnotateSessionDecision>(
+        { kind: 'annotate', action: 'annotated', transactionId: item.transaction.id },
+        note,
+    );
 }
 
 export function isSplitDecision(decision: SessionDecision | undefined): decision is SplitSessionDecision {
