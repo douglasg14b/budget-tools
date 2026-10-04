@@ -29,6 +29,8 @@ export type AmazonOrderRecord = {
     readonly shippingMilliunits: number | null;
     readonly taxMilliunits: number | null;
     readonly promotionMilliunits: number | null;
+    /** Amazon's "Item(s) Subtotal"; null for orders the legacy MCP fetched. */
+    readonly subtotalMilliunits: number | null;
     readonly items: readonly AmazonItemRecord[];
 };
 
@@ -46,11 +48,12 @@ export async function upsertAmazonPayments(
     if (payments.length === 0) {
         return 0;
     }
+    const ids = occurrencePaymentIds(payments);
     await database
         .insertInto('amazon_payments')
         .values(
-            payments.map((payment) => ({
-                id: amazonPaymentId(payment),
+            payments.map((payment, index) => ({
+                id: ids[index] as string,
                 paymentDate: payment.paymentDate,
                 amountMilliunits: payment.amountMilliunits,
                 currency: payment.currency,
@@ -77,6 +80,24 @@ export async function upsertAmazonPayments(
     return payments.length;
 }
 
+/**
+ * Amazon really does charge the same card the same amount for the same order twice in a
+ * day (two equal shipments), and amazon-sync only passes such pairs through after
+ * Amazon's own per-order list confirms both. They share every field, so the second and
+ * later copies get `#2`, `#3`. The first keeps the plain id that rows stored before this
+ * existed already use. Identical rows always share a date, so they arrive in the same
+ * batch and the numbering is stable across syncs.
+ */
+export function occurrencePaymentIds(payments: readonly ParsedAmazonPayment[]): string[] {
+    const seen = new Map<string, number>();
+    return payments.map((payment) => {
+        const id = amazonPaymentId(payment);
+        const occurrence = (seen.get(id) ?? 0) + 1;
+        seen.set(id, occurrence);
+        return occurrence === 1 ? id : `${id}#${occurrence}`;
+    });
+}
+
 export async function upsertAmazonOrder(order: ParsedAmazonOrder, db?: AppDatabaseClient): Promise<void> {
     const database = db ?? (await getAppDatabase());
     await database
@@ -88,6 +109,7 @@ export async function upsertAmazonOrder(order: ParsedAmazonOrder, db?: AppDataba
             shippingMilliunits: order.shippingMilliunits,
             taxMilliunits: order.taxMilliunits,
             promotionMilliunits: order.promotionMilliunits,
+            subtotalMilliunits: order.subtotalMilliunits,
             rawJson: order.rawJson,
         })
         .onConflict((conflict) =>
@@ -97,6 +119,7 @@ export async function upsertAmazonOrder(order: ParsedAmazonOrder, db?: AppDataba
                 shippingMilliunits: (eb) => eb.ref('excluded.shippingMilliunits'),
                 taxMilliunits: (eb) => eb.ref('excluded.taxMilliunits'),
                 promotionMilliunits: (eb) => eb.ref('excluded.promotionMilliunits'),
+                subtotalMilliunits: (eb) => eb.ref('excluded.subtotalMilliunits'),
                 rawJson: (eb) => eb.ref('excluded.rawJson'),
             }),
         )
@@ -198,6 +221,7 @@ export async function getOrderWithItems(
         shippingMilliunits: order.shippingMilliunits,
         taxMilliunits: order.taxMilliunits,
         promotionMilliunits: order.promotionMilliunits,
+        subtotalMilliunits: order.subtotalMilliunits,
         items: items.map((item) => ({
             asin: item.asin,
             title: item.title,

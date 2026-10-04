@@ -5,6 +5,7 @@ import * as apiAppTables from './migrations/2026-09-11-Api_App_Tables';
 import * as coreYnabTables from './migrations/2026-09-11-Core_Ynab_Tables';
 import * as authTables from './migrations/2026-09-13-Auth_Tables';
 import * as receiptExtractCost from './migrations/2026-09-14-Receipt_Extract_Cost';
+import * as amazonOrderSubtotal from './migrations/2026-10-03-Amazon_Order_Subtotal';
 import * as receiptBindTracking from './migrations/2026-10-03-Receipt_Bind_Tracking';
 
 /**
@@ -20,6 +21,7 @@ export const MIGRATIONS: Record<string, Migration> = {
     '2026-09-13-Auth_Tables': authTables,
     '2026-09-14-Receipt_Extract_Cost': receiptExtractCost,
     '2026-10-03-Receipt_Bind_Tracking': receiptBindTracking,
+    '2026-10-03-Amazon_Order_Subtotal': amazonOrderSubtotal,
 };
 
 class StaticMigrationProvider implements MigrationProvider {
@@ -39,6 +41,10 @@ export async function migrateToLatest<DB>(database: Kysely<DB>): Promise<Migrati
     const migrator = new Migrator({
         db: database,
         provider: new StaticMigrationProvider(),
+        // Parallel branches each add same-day migrations, so a branch's migration can sort
+        // before one another branch already applied. Every migration here is additive and
+        // idempotent, so run whatever is pending rather than refuse to start.
+        allowUnorderedMigrations: true,
     });
 
     const resultSet = await migrator.migrateToLatest();

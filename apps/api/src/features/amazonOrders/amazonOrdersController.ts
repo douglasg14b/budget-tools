@@ -1,7 +1,7 @@
 import { Body, Get, Post, Route, Tags } from 'tsoa';
 
-import { getAmazonOrdersSource } from './amazonMcpClient';
 import type { AmazonOrdersStatusDto, AmazonOrdersSyncDto, AmazonOrdersSyncRequestDto } from './amazonOrdersDtos';
+import { getAmazonOrdersSource } from './getAmazonOrdersSource';
 import { getAmazonOrdersStatus as loadAmazonOrdersStatus } from './getAmazonOrdersStatus';
 import { oldestUncategorizedAmazonDate } from './oldestUncategorizedAmazonDate';
 import { syncAmazonOrders } from './syncAmazonOrders';
@@ -20,7 +20,8 @@ export class AmazonOrdersController {
 
     /**
      * Index Amazon payments from the oldest uncategorized Amazon charge through today,
-     * then fetch invoices for order IDs in the requested classify window. Starts the MCP subprocess if needed.
+     * then fetch invoices for order IDs in the requested classify window. Uses amazon-sync when
+     * AMAZON_SYNC_URL is set, else starts the MCP subprocess if needed.
      * @summary postAmazonOrdersSync
      */
     @Post('sync')

@@ -17,6 +17,7 @@ export type AmazonOrdersTable = {
     shippingMilliunits: number | null;
     taxMilliunits: number | null;
     promotionMilliunits: number | null;
+    subtotalMilliunits: number | null;
     rawJson: string;
 };
 

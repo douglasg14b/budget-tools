@@ -1,6 +1,6 @@
 ---
 title: Migrate Amazon order scraping to the amazon-orders library
-status: proposed
+status: in-progress (Phases 1-3 and 7 built, 2026-10-03; 4, 5 and 8 remain)
 created: 2026-09-14
 ---
 
@@ -115,9 +115,11 @@ What has and has not been proven, so nobody mistakes the plan for tested.
 | 4 | Desktop-minted jar works from a Linux container (no browser) | **Proven** 2026-10-03 | `.spike/container/Dockerfile`, python:3.12-slim, 167 MB, no Playwright/Chromium. Identical to desktop: same 145 order numbers, 0 differing totals/item counts |
 | 5 | Library data fits the existing parser/splitter | **Proven offline** 2026-10-03 | Field mapping table in Phase 1; Σ price×qty = subtotal on 130/130 |
 | 6 | Jar works on the Coolify host / production IP | **Not tested — accepted risk** | Decided 2026-10-03 to let the first real deploy be the test. Likely fine (home-lan host, probably the desktop's public IP), but an IP mismatch would only surface after Phases 1-7 are built |
-| 7 | Refresh command pushes a jar to production | **Not built** | Phase 3 |
+| 7 | Refresh command pushes a jar to production | **Proven** 2026-10-03 | Real run: `pnpm provision:amazon-session-s3` created `budget-tools-amazon-session` on the production rust-fs and saved the credentials to `.env.local`; the user's interactive `pnpm amazon:refresh-cookies` logged in (email, password, SMS), passed the plain-HTTP check and uploaded `cookies.json`; the service, reading that object from the real bucket, answered `/auth` authenticated and returned a week of transactions. The production image (`docker compose … build amazon-sync`), run in Linux against the same bucket, also fetched it over HTTPS and answered `/auth` authenticated, so the container trusts the S3 certificate. Earlier, against a throwaway local rust-fs container (`rustfs/rustfs`, same server software as `s3.home.lan`): bad credentials stop before any login; a synthetic jar fails the plain-HTTP check and nothing is uploaded; the real jar (`--jar`) passes, uploads, and a second run copies it to `cookies.previous.json` (`CopyObject` works on rust-fs). The service read it from S3 (`authenticated: true`), picked up an overwrite without a restart, kept serving its last copy with S3 stopped, and reported `COOKIE_STORE_UNAVAILABLE` when it had no copy. The login path ran up to the email prompt (venv, Chromium download, auth-chain check) |
 | 8 | Per-order `get_order(order_id)` (the API's actual call pattern) works | **Proven** 2026-10-03 | Spike used bulk `get_order_history`; this is a separate code path. `111-4826676-5544239`: 7 items, subtotal 125.64, tax 10.53, `full_details=True`; `113-5130017-1225037`: qty 3 × 7.59, promo −1.14, total 21.63 |
-| 9 | Expired-jar failure mode | **Unobserved** | Only cold-no-jar (`JSAuthBlocker`) and warm-jar (works) have been seen. A stale jar likely hits `check_response()` → `AmazonOrdersAuthRedirectError` + `logout()` before any blocker. Phase 1 must catch **both** `AmazonOrdersAuthRedirectError` and `AmazonOrdersAuthError` as `COOKIES_EXPIRED`, and snapshot the jar before `login()` |
+| 9 | Expired-jar failure mode | **Proven** 2026-10-03 | Fed the service container a synthetic jar holding bogus `x-main`/`at-main` values. `login()` accepted it (it only checks that `x-main` exists); the first real page raised `AmazonOrdersAuthRedirectError`, reported as `COOKIES_EXPIRED` on `/auth` (200, `authenticated: false`) and on `/orders/…` (503). A missing jar reports `COOKIES_MISSING`. No prompt, no hang. Mitigation chosen: the library gets a private working copy of the jar, and `logout()` is overridden to do nothing but mark the session unusable, because the stock one GETs Amazon's sign-out URL (ending the session for the desktop copy too) and rewrites the jar without `x-main`. The real jar's mtime was unchanged afterwards |
+| 10 | The real API sync and splitter accept the service's data | **Proven** 2026-10-03 | Real `syncAmazonOrders` → `amazonSyncClient.ts` → live service, into a throwaway PGlite database (never the shared Postgres). 2026-01-01..09-30: 184 payments, 142 orders, 205 items. Second sync scraped nothing. Of 182 payments: 37 digital (no order id), 134 matched to one order, 6 partial orders (split shipments), 5 unmatched (two same-amount payments in one window), **136 splits summed exactly to the bank charge**, and 4 tripped `amazonItemsLookIncomplete`. The cause of those 4 is in Phase 2, "Completeness check ignores tax" |
+| 11 | The service itself runs in a Linux container with no browser | **Proven** 2026-10-03 | `apps/amazon-sync/Dockerfile`, 167 MB. `/auth`, `/transactions` and `/orders/…` gave results identical to the desktop run |
 
 Notes from #8: `Item.quantity` is `None` for single-quantity items (the parser
 already defaults to 1), and discount fields come back **negative** (`promotion_applied
@@ -162,8 +164,9 @@ Recorded so they are not re-litigated.
 
 - **Full swap.** The library replaces the vendored MCP; `third_party/` clone, the
   1005-line patch, and `scripts/setup-amazon-mcp.mjs` are retired.
-- **Own container** (`apps/amazon-sync`), following the `transactions-retrieval`
-  idle-container + `docker exec` cron pattern.
+- **Own container** (`apps/amazon-sync`): a long-running internal HTTP service like
+  `scorer`. (An earlier draft said idle container + `docker exec`; see the Architecture
+  correction.)
 - **Cookie delivery: both paths.** A repo command that mints and delivers the jar
   end-to-end, plus a web UI upload as fallback. The stated requirement is *not
   having to remember the process*.
@@ -209,6 +212,21 @@ changes. The Python service returns the **same JSON payload shapes** the current
 ## Phases
 
 ### Phase 1 — Python sync service
+
+**Built 2026-10-03.** `apps/amazon-sync/`: stdlib `ThreadingHTTPServer`, the only
+dependency is `amazon-orders==4.6.0`. `pnpm dev:amazon-sync` runs it locally (it
+creates its own venv on first run), `pnpm test:amazon-sync` runs its 30 tests. It
+departs from the bullets below in three places:
+
+- **Jar handling.** Phase 1 reads `AMAZON_COOKIE_JAR_PATH` and never writes it; the S3
+  download comes with Phase 3. Rather than snapshotting before `login()`, the library
+  gets a private working copy, and `logout()` is overridden (see Verification log
+  row 9). The wipe happens in `check_response()`, not in `login()`.
+- **`$0 grand_total` uses `get_transactions(order_id=…)`.** That call is scoped on
+  Amazon's side (`transactionTag`), so the fallback needs no date range and no join
+  against a separate scrape. It sums the purchase (negative) transactions only.
+- **One session is cached across requests**, and rebuilt when the jar's content hash
+  changes or after any auth error. `login()` costs two requests even with a warm jar.
 
 New `apps/amazon-sync/`, a small internal HTTP service (not a CLI — see the
 Architecture correction).
@@ -323,6 +341,66 @@ Short-circuit evaluation saves it today; any reordering raises `UnboundLocalErro
 
 ### Phase 2 — API adapter swap
 
+**Built 2026-10-03**, with the MCP still in place. `getAmazonOrdersSource.ts` returns the
+sync client when `AMAZON_SYNC_URL` is set and the MCP otherwise; `mcpConfigured` in the
+status DTO now means "either source is configured", which avoids regenerating the SDK.
+The not-authenticated message uses `auth.message` from the source and keeps the
+Chromium sentence only as the MCP's fallback. Deleting `amazonMcpClient.ts` and the
+rename moved to Phase 8, so the MCP stays usable until then.
+
+**Stop-refetching rule: not needed for missing totals.** Sync only fetches order ids
+taken from payments it has already stored, so every order it fetches has at least one
+transaction, and the order-scoped fallback recovers its total. The e2e run (row 10)
+left no order with a null total.
+
+**Completeness check compared items with the taxed total — fixed 2026-10-03.** Four
+orders were refetched on *every* sync and their splits were never offered. On all four,
+`total − Σ items` was exactly the tax (e.g. 136.17 − 125.64 = 10.53), because
+`amazonOrderLooksIncomplete` allowed $5 of slop against the grand total, which includes
+tax. The MCP fed the same check, so this predates the migration. Fix (chosen by the
+user over "add tax to the comparison"): migration `2026-10-03-Amazon_Order_Subtotal` adds
+`amazon_orders.subtotal_milliunits`, amazon-sync sends Amazon's own `subtotal`, and when
+it is known the items must reach it exactly, with no slop. `amazonItemsLookIncomplete`
+also skips its taxed bank-charge comparison when every order's items match their
+subtotal. Rows without a subtotal (MCP-fetched) keep the old rule until refetched. After
+the fix: 2026 e2e second sync refetched 0; 140/140 matched payments split exactly.
+
+**Migrations may now run out of order.** `migrateToLatest` sets
+`allowUnorderedMigrations: true`. Parallel branches add same-day migrations, and this
+one sorts before `2026-10-03-Receipt_Bind_Tracking`; Kysely's default would refuse it on
+any database that already ran the receipt migration. All migrations are additive and
+idempotent.
+
+**Production already has this branch's migration (2026-10-03).** `.env.local` points at
+the deployed database. Running the migration there recorded
+`2026-10-03-Amazon_Order_Subtotal` (and applied master's pending
+`2026-10-03-Receipt_Bind_Tracking`). Until this branch merges, a master deploy's
+migrator fails with "previously executed migration … is missing". Merge before the next
+master deploy.
+
+**Identical transactions: confirm against the per-order list.** The 2020–2026 history
+(1,043 rows) held two identical pairs, and the real sync failed on them (`ON CONFLICT …
+cannot affect row a second time`). Amazon's per-order list showed one pair was real (two
+−15.85 charges on one order and day) and the other a listing duplicate (one +31.98
+refund listed twice). amazon-sync now keeps identical rows only as often as the order's
+own list does (`reconcile_identical_transactions`). The API numbers surviving copies
+`#2`, `#3` (`occurrencePaymentIds`); the first keeps the plain id, so stored rows still
+match.
+
+**Digital charges carry their order id — fixed 2026-10-03.** The library leaves
+`order_number` blank for digital orders, but each row's `order_details_link` holds
+`orderID=D01-…`, and `get_order()` works for them (1 item and a total each, like the 7
+the MCP stored). amazon-sync now takes the id from the link. Before the fix the
+production sync stored 123 digital charges twice (blank-order row beside the MCP's
+D01 row); the user approved deleting those 123 (done in one guarded transaction). Six
+unique blank-order rows remain.
+
+**Promotion misses some discount lines (known gap, not fixed).** One order's summary
+shows 62.78 of items and 55.54 before tax, but the library parses only −1.60 coupon and
+−0.64 Subscribe & Save. A further −5.00 line goes unparsed, so `promotion` reports
+2.24, not 7.24. Totals are unaffected, and splits rescale to the bank charge anyway; only
+the displayed promotion is low. Don't derive the missing figure.
+
 - New `amazonSyncClient.ts` implementing `AmazonOrdersSource` as plain HTTP calls to
   `AMAZON_SYNC_URL` (new optional env var, mirroring
   `getCategorizationScorerUrl()`). Keep the `AMAZON_ORDERS_SYNC_TIMEOUT_MS` timeout.
@@ -372,6 +450,48 @@ credentials can't read the session and vice versa. Settings: `AMAZON_COOKIES_S3_
 
 Documented in `docs/amazon-cookie-refresh.md`, one page, command first.
 
+**Built (2026-10-03).**
+
+- `pnpm amazon:refresh-cookies` (`scripts/refresh-amazon-cookies.mjs`) checks the
+  settings and does a `HeadBucket` *before* asking for anything, so a config mistake never
+  costs an SMS code. Then login, cookie-name check, plain-HTTP check, `CopyObject` to
+  `cookies.previous.json`, `PutObject`. The temp directory is deleted on every exit path.
+  `--jar <path>` skips the login and checks and uploads an existing file.
+- Login: `apps/amazon-sync/tools/mint_cookie_jar.py` in `apps/amazon-sync/.venv-browser`
+  (`requirements-browser.txt`, plus `playwright install chromium`, both created on first
+  run). It checks the auth chain on a throwaway session before prompting. Neither ships in
+  the image (`.dockerignore`).
+- Check: `python -m amazon_sync.check_jar <jar>` in the service's own venv. It refuses to
+  run if Playwright is importable, since a pass would then prove nothing about the
+  browser-free server, and reuses `AmazonClient.check_auth`.
+- `pnpm provision:amazon-session-s3` provisions `budget-tools-amazon-session` and service
+  account `budget-tools-amazon-sync`, reading `RUSTFS_ADMIN_*` from `.env.local` and writing
+  the `AMAZON_COOKIES_S3_*` settings back into it (dotenvx `set`, update-or-append), so the
+  refresh command works straight after. It does nothing once those settings exist; `--force`
+  rotates (new account saved, then the old one deleted). `mc` downloads into `.tools/` on
+  first run. Credentials never reach the log: `mc svcacct add` echoes the secret, so its
+  output is captured, and every key id and secret is redacted from error text. The `mc` logic moved from
+  `provision-receipts-s3.mjs` into `scripts/lib/provisionS3Bucket.mjs`, shared by both.
+  Venv setup moved into `scripts/lib/pythonVenv.mjs`, shared with `run-amazon-sync.mjs`.
+- Service: `jar_source.py` reads from S3 when `AMAZON_COOKIES_S3_BUCKET` is set, else
+  from `AMAZON_COOKIE_JAR_PATH`. Each call sends the last ETag, so an unchanged jar costs a
+  304, and a new upload is picked up on the next call (the jar hash check rebuilds the
+  session). S3 is read with `boto3` (image 167 → 191 MB) rather than hand-rolled signing.
+- **New code `COOKIE_STORE_UNAVAILABLE` (503).** An S3 outage says nothing about the
+  session, so it must not tell anyone to log in again. If the service has fetched the jar
+  before, it keeps using that copy and logs a warning; otherwise it returns this code. The
+  API's refresh hint fires only for `COOKIES_*`, and the hint now names this command.
+- The service deletes its working copy of the jar on shutdown, including `docker stop`
+  (SIGTERM is turned into a normal exit). Earlier runs had left copies of the live session
+  in the desktop's temp directory.
+
+**Deviation: the server never writes the jar back.** The plan said the container
+"uploads it back if the library rewrote it". It doesn't, on purpose: a sync that started
+before a desktop refresh could overwrite the fresh jar with the old session. This matches
+Phase 1, where the library already gets a private working copy and the source is never
+written. Verification row 3 shows an unrefreshed jar lasting at least 19 days, so
+write-back isn't needed to keep the session alive.
+
 ### Phase 4 — Upload endpoint + UI (fallback; can slip until after Phase 7)
 
 - `POST /api/amazon-orders/cookies` — authenticated, validates the JSON is a cookie
@@ -391,8 +511,14 @@ Documented in `docs/amazon-cookie-refresh.md`, one page, command first.
 
 ### Phase 6 — Digital subscriptions
 
-~26% of transactions have a blank `order_number` — `Amazon Kids+`, `D01-*` prefixes.
-These are real charges with no retail order and no line items.
+**Mostly superseded (2026-10-03).** Digital charges do have orders: the id is in the
+transaction's order link, and their details page returns a line item and a total, so
+they now flow through the normal payment → invoice → split path (see Phase 2,
+"Digital charges carry their order id"). What remains: charges with no order link at
+all (6 rows in production), and whether Kids+ subscriptions deserve special handling.
+
+Original note: ~26% of transactions have a blank `order_number` — `Amazon Kids+`,
+`D01-*` prefixes. These are real charges with no retail order and no line items.
 
 - Ingest as payments with a `digital` flag; skip invoice fetching for them.
 - They cannot be split per-item, so surface them as single-line YNAB transactions.
@@ -417,6 +543,28 @@ These are real charges with no retail order and no line items.
   because that is a standalone one-shot script; this is not.
 - The amazon-sync container is a long-running service with a `/health` check, like
   `scorer`, not an idle `sleep infinity` container.
+
+**Built (2026-10-03).**
+
+- `docker-compose-prod.yml`: `amazon-sync` service, built from `./apps/amazon-sync` (the
+  one service not built from the repo root: plain Python, outside the pnpm workspace), with
+  the `AMAZON_COOKIES_S3_*` settings, a `/health` check and no published port. No
+  `depends_on` the migrator: it never touches the database. The API doesn't depend on it
+  either; an unreachable service is already a 503.
+- API: `AMAZON_SYNC_URL: http://amazon-sync:4022` and `AMAZON_SYNC_INTERVAL_MS` (compose
+  default 6 hours).
+- `startAmazonSyncScheduler.ts`: first run 2 minutes after boot, then every interval, never
+  overlapping itself. Range: the last 7 days, reaching back to 5 days before the oldest
+  uncategorized Amazon charge (the classify panel's window), so orders are cached before
+  anyone classifies. amazon-sync only, never the MCP (it opens a browser window). **Off
+  unless `AMAZON_SYNC_INTERVAL_MS` is set**, because `pnpm dev` points at the production
+  database and must not schedule syncs of its own. A failure, including an expired jar, is
+  logged with the service's message.
+- Fixed the stale "needs a headed Chromium" comments in the compose file and
+  `.env.compose.prod.example`, which now lists the `AMAZON_COOKIES_S3_*` settings.
+- Verified: the image builds through the prod compose file (191 MB), and that container,
+  given the real bucket's settings, authenticated against Amazon. Row 6 (the production
+  host's IP) is still the one thing only the deploy itself can prove.
 
 ### Phase 8 — Retire the MCP and update tests
 

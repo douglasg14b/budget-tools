@@ -14,7 +14,6 @@ import {
     API_PORT,
     API_TLS_ENABLED,
     CATEGORIZATION_QUEUE_CACHE_DIR,
-    getAmazonOrdersMcpEntry,
     getApiTlsCertPath,
     getApiTlsKeyPath,
     OPENROUTER_MODEL,
@@ -22,6 +21,8 @@ import {
     OPENROUTER_RECEIPT_RETRY_MODEL,
     RECEIPTS_JSON_BODY_LIMIT,
 } from './environment';
+import { describeAmazonOrdersSource } from './features/amazonOrders/getAmazonOrdersSource';
+import { startAmazonSyncScheduler } from './features/amazonOrders/startAmazonSyncScheduler';
 import { authMiddleware } from './features/auth/authMiddleware';
 import { deleteExpiredSessions } from './features/auth/data/authRepo';
 import { QueryValidationError } from './features/categorization/filterQueue';
@@ -149,6 +150,7 @@ async function start(): Promise<void> {
     startOutboundSyncFlusher();
     await sweepPendingReceiptExtracts();
     startReceiptBindingSweeper();
+    startAmazonSyncScheduler();
     listen();
 }
 
@@ -162,7 +164,7 @@ async function start(): Promise<void> {
 function listen(): void {
     const onReady = (scheme: string) => () => {
         console.log(`API listening on ${scheme}://${API_LISTEN_HOST}:${API_PORT}`);
-        console.log(`Amazon MCP entry ${getAmazonOrdersMcpEntry() ?? 'unset'}`);
+        console.log(`Amazon source ${describeAmazonOrdersSource()}`);
     };
 
     if (!API_TLS_ENABLED) {

@@ -1,0 +1,9 @@
+# The Windows venvs are useless in a Linux image. Cookie jars must never be baked in.
+# tools/ and the browser requirements are the desktop login, which the image never runs.
+.venv/
+.venv-browser/
+__pycache__/
+tests/
+tools/
+requirements-browser.txt
+*.json

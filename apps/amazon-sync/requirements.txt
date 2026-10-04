@@ -1,0 +1,5 @@
+# Deliberately no [browser] extra: this service never runs a browser. The desktop
+# cookie refresh is the only place Playwright is needed (requirements-browser.txt).
+amazon-orders==4.6.0
+# Reads the cookie jar from S3.
+boto3==1.43.108

@@ -26,6 +26,8 @@ export type ParsedAmazonOrder = {
     readonly shippingMilliunits: number | null;
     readonly taxMilliunits: number | null;
     readonly promotionMilliunits: number | null;
+    /** Amazon's "Item(s) Subtotal". Sent by amazon-sync; the legacy MCP never sent it. */
+    readonly subtotalMilliunits: number | null;
     readonly items: readonly ParsedAmazonItem[];
     readonly rawJson: string;
 };
@@ -129,6 +131,7 @@ export function parseAmazonOrderDetailsPayload(payload: unknown, requestedOrderI
         shippingMilliunits: moneyToMilliunits(order?.shipping),
         taxMilliunits: moneyToMilliunits(order?.tax ?? order?.vat),
         promotionMilliunits: scrapedMoneyToMilliunits(order?.promotion),
+        subtotalMilliunits: scrapedMoneyToMilliunits(order?.subtotal),
         items,
         rawJson: JSON.stringify(payload),
     };

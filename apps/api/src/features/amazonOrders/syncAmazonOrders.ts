@@ -80,10 +80,9 @@ export async function syncAmazonOrders(
     );
     if (!auth.authenticated) {
         const login = auth.loginUrl ? ` Log in at ${auth.loginUrl}.` : '';
-        throw new HttpError(
-            503,
-            `Amazon session is not authenticated.${login} Finish login in the Chromium window, then retry sync.`,
-        );
+        // amazon-sync explains what to do (refresh the cookie jar); the MCP's fix is its browser window.
+        const next = auth.message ?? 'Finish login in the Chromium window, then retry sync.';
+        throw new HttpError(503, `Amazon session is not authenticated.${login} ${next}`);
     }
 
     let nextCovered = state.coveredRanges;

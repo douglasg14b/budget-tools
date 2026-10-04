@@ -1,0 +1,3 @@
+# Desktop only: the venv `pnpm amazon:refresh-cookies` logs in with. Never installed in the
+# service image, and kept out of .venv so check_jar can prove a jar works without a browser.
+amazon-orders[browser]==4.6.0

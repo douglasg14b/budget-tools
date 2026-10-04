@@ -1,0 +1,4 @@
+# Created by scripts/run-amazon-sync.mjs and scripts/refresh-amazon-cookies.mjs on first run.
+.venv/
+.venv-browser/
+__pycache__/

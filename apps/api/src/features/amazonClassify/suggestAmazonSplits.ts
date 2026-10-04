@@ -1,14 +1,8 @@
-import {
-    AMAZON_ORDERS_REGION,
-    getAmazonOrdersMcpEntry,
-    getOpenRouterApiKey,
-    OPENROUTER_BASE_URL,
-    OPENROUTER_MODEL,
-} from '../../environment';
-import { getAmazonOrdersSource } from '../amazonOrders/amazonMcpClient';
+import { AMAZON_ORDERS_REGION, getOpenRouterApiKey, OPENROUTER_BASE_URL, OPENROUTER_MODEL } from '../../environment';
 import type { AmazonOrderRecord, AmazonPaymentRecord } from '../amazonOrders/data/amazonOrdersRepo';
 import { getAmazonSyncState, getOrderWithItems, listPaymentsInDateWindow } from '../amazonOrders/data/amazonOrdersRepo';
 import { fetchAmazonOrderInvoices } from '../amazonOrders/fetchAmazonOrderInvoices';
+import { amazonOrdersSourceConfigured, getAmazonOrdersSource } from '../amazonOrders/getAmazonOrdersSource';
 import { listCategories } from '../categories/listCategories';
 import { getScoredQueueItem } from '../categorization/llm/getScoredQueueItem';
 import { LlmSuggestError } from '../categorization/llm/LlmSuggestError';
@@ -75,7 +69,7 @@ export async function suggestAmazonSplits(transactionId: string, signal?: AbortS
         ordersById,
     });
 
-    if (match.kind !== 'unmatched' && getAmazonOrdersMcpEntry()) {
+    if (match.kind !== 'unmatched' && amazonOrdersSourceConfigured()) {
         const matchedForFetch = match.orderIds
             .map((orderId) => ordersById.get(orderId))
             .filter((order): order is AmazonOrderRecord => Boolean(order));

@@ -1,7 +1,8 @@
 name: budget-tools
 
-# Production stack for Coolify. Every service builds from the REPO ROOT context because this is a
-# pnpm workspace with a single root lockfile.
+# Production stack for Coolify. The Node and .NET services build from the REPO ROOT context
+# because this is a pnpm workspace with a single root lockfile. amazon-sync (plain Python) builds
+# from its own directory.
 #
 # Startup order is enforced, not hoped for: `migrator` runs the shared Postgres migrations to
 # completion, and only then do `api` and `transactions-retrieval` start. Exactly one service owns
@@ -59,8 +60,13 @@ services:
             RECEIPTS_S3_PREFIX: ${RECEIPTS_S3_PREFIX:-}
             RECEIPTS_S3_FORCE_PATH_STYLE: ${RECEIPTS_S3_FORCE_PATH_STYLE:-true}
 
-            # Amazon order sync needs a headed Chromium, which this image has no way to run.
-            # Left unset deliberately: those endpoints return 503 instead of hanging.
+            # Amazon orders come from the amazon-sync service below; no browser runs in this stack.
+            # The API also syncs on its own every AMAZON_SYNC_INTERVAL_MS (default 6 hours), so
+            # classify finds orders already cached. An expired session shows up as a 503 telling
+            # you to run `pnpm amazon:refresh-cookies` on the desktop.
+            AMAZON_SYNC_URL: http://amazon-sync:4022
+            AMAZON_SYNC_INTERVAL_MS: ${AMAZON_SYNC_INTERVAL_MS:-21600000}
+            AMAZON_ORDERS_SYNC_TIMEOUT_MS: ${AMAZON_ORDERS_SYNC_TIMEOUT_MS:-600000}
         # The browser does NOT use this port: the web client's API base URL is a relative `/api`,
         # so requests go to the web origin and nginx proxies them over the internal network.
         # Published only for direct access from the host - health checks, debugging, and running
@@ -126,6 +132,44 @@ services:
             timeout: 10s
             retries: 5
             start_period: 180s
+        restart: unless-stopped
+        networks:
+            - budget-tools
+
+    # Amazon order history over plain HTTP, for the API only (no published port). No browser:
+    # Amazon's login challenge is solved on the desktop by `pnpm amazon:refresh-cookies`, which
+    # uploads the session's cookie jar to S3. This reads it from there on each call, so a refresh
+    # takes effect without a redeploy. See docs/amazon-cookie-refresh.md.
+    #
+    # The one service built from its own directory rather than the repo root: it is plain Python,
+    # outside the pnpm workspace. No database, so it doesn't wait for the migrator.
+    amazon-sync:
+        build:
+            context: ./apps/amazon-sync
+            dockerfile: Dockerfile
+        environment:
+            # Its own bucket and service account, separate from receipts, because the jar is a
+            # live Amazon session. `pnpm provision:amazon-session-s3` creates both.
+            AMAZON_COOKIES_S3_ENDPOINT: ${AMAZON_COOKIES_S3_ENDPOINT}
+            AMAZON_COOKIES_S3_BUCKET: ${AMAZON_COOKIES_S3_BUCKET:-budget-tools-amazon-session}
+            AMAZON_COOKIES_S3_ACCESS_KEY_ID: ${AMAZON_COOKIES_S3_ACCESS_KEY_ID}
+            AMAZON_COOKIES_S3_SECRET_ACCESS_KEY: ${AMAZON_COOKIES_S3_SECRET_ACCESS_KEY}
+            AMAZON_COOKIES_S3_REGION: ${AMAZON_COOKIES_S3_REGION:-us-east-1}
+            AMAZON_COOKIES_S3_FORCE_PATH_STYLE: ${AMAZON_COOKIES_S3_FORCE_PATH_STYLE:-true}
+            AMAZON_DOMAIN: ${AMAZON_DOMAIN:-amazon.com}
+        # /health never touches Amazon or S3, so this only says the process is serving.
+        healthcheck:
+            test:
+                [
+                    'CMD',
+                    'python',
+                    '-c',
+                    "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4022/health', timeout=4)",
+                ]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
         restart: unless-stopped
         networks:
             - budget-tools

@@ -11,6 +11,7 @@ describe('matchAmazonPayment', () => {
         shippingMilliunits: 0,
         taxMilliunits: 0,
         promotionMilliunits: 0,
+        subtotalMilliunits: null,
         items: [{ asin: 'A', title: 'Soap', quantity: 1, itemTotalMilliunits: -50000 }],
     };
 

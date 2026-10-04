@@ -1,7 +1,8 @@
 import type { AppDatabaseClient } from '../../data-persistence/database';
 import { getAppDatabase } from '../../data-persistence/database';
-import { AMAZON_ORDERS_REGION, getAmazonOrdersMcpEntry } from '../../environment';
+import { AMAZON_ORDERS_REGION } from '../../environment';
 import { countAmazonCache, getAmazonSyncState } from './data/amazonOrdersRepo';
+import { amazonOrdersSourceConfigured } from './getAmazonOrdersSource';
 import type { IsoDateRange } from './isoDate';
 
 export type AmazonOrdersStatusResult = {
@@ -21,7 +22,8 @@ export async function getAmazonOrdersStatus(db?: AppDatabaseClient): Promise<Ama
     const counts = await countAmazonCache(database);
     return {
         region: AMAZON_ORDERS_REGION,
-        mcpConfigured: Boolean(getAmazonOrdersMcpEntry()),
+        // Field name predates amazon-sync; true when either source is configured.
+        mcpConfigured: amazonOrdersSourceConfigured(),
         lastAuthCheck: state.lastAuthCheck,
         lastAuthenticated: state.lastAuthenticated,
         coveredRanges: state.coveredRanges,

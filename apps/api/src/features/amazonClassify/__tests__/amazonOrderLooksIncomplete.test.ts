@@ -16,6 +16,7 @@ describe('amazonOrderLooksIncomplete', () => {
                 shippingMilliunits: null,
                 taxMilliunits: null,
                 promotionMilliunits: null,
+                subtotalMilliunits: null,
                 items: [
                     {
                         asin: 'B0H8JBNCSQ',
@@ -37,6 +38,7 @@ describe('amazonOrderLooksIncomplete', () => {
                 shippingMilliunits: 0,
                 taxMilliunits: 0,
                 promotionMilliunits: 0,
+                subtotalMilliunits: null,
                 items: [{ asin: null, title: 'One of four', quantity: 1, itemTotalMilliunits: 19990 }],
             }),
         ).toBe(true);
@@ -68,6 +70,7 @@ describe('amazonOrderLooksIncomplete', () => {
                         shippingMilliunits: null,
                         taxMilliunits: null,
                         promotionMilliunits: null,
+                        subtotalMilliunits: null,
                         items: [
                             { asin: 'B091J6NVS5', title: 'SAFESKIN gloves', quantity: 1, itemTotalMilliunits: 46990 },
                         ],
@@ -91,6 +94,7 @@ describe('amazonOrderLooksIncomplete', () => {
                         shippingMilliunits: null,
                         taxMilliunits: null,
                         promotionMilliunits: null,
+                        subtotalMilliunits: null,
                         items: [{ asin: 'B0GHQTLXVM', title: 'Beach balls', quantity: 1, itemTotalMilliunits: 19990 }],
                     },
                 ],
@@ -109,6 +113,7 @@ describe('amazonOrderLooksIncomplete', () => {
                 shippingMilliunits: 0,
                 taxMilliunits: 3920,
                 promotionMilliunits: 0,
+                subtotalMilliunits: null,
                 items: [
                     { asin: null, title: 'A', quantity: 1, itemTotalMilliunits: 19990 },
                     { asin: null, title: 'B', quantity: 1, itemTotalMilliunits: 20000 },
@@ -128,6 +133,7 @@ describe('amazonOrderLooksIncomplete', () => {
                 shippingMilliunits: null,
                 taxMilliunits: null,
                 promotionMilliunits: null,
+                subtotalMilliunits: null,
                 items: [{ asin: 'B091J6NVS5', title: 'SAFESKIN gloves', quantity: 1, itemTotalMilliunits: 46990 }],
             }),
         ).toBe(true);
@@ -139,6 +145,7 @@ describe('amazonOrderLooksIncomplete', () => {
                 shippingMilliunits: null,
                 taxMilliunits: null,
                 promotionMilliunits: null,
+                subtotalMilliunits: null,
                 items: [{ asin: 'B091J6NVS5', title: 'SAFESKIN gloves', quantity: 1, itemTotalMilliunits: 46990 }],
             }),
         ).toBe(false);
@@ -153,6 +160,7 @@ describe('amazonOrderLooksIncomplete', () => {
                 shippingMilliunits: 0,
                 taxMilliunits: 3920,
                 promotionMilliunits: 0,
+                subtotalMilliunits: null,
                 items: [
                     { asin: null, title: 'A', quantity: 1, itemTotalMilliunits: 19990 },
                     { asin: null, title: 'B', quantity: 1, itemTotalMilliunits: 20000 },
@@ -161,5 +169,46 @@ describe('amazonOrderLooksIncomplete', () => {
                 ],
             }),
         ).toBe(false);
+    });
+});
+
+describe('completeness against the Amazon item subtotal', () => {
+    // Synthetic: items 125.64, tax 10.53, total 136.17. The taxed total is more than $5
+    // above the items, which the grand-total rule reads as a missing line, forever.
+    const taxedOrder = {
+        orderId: '111-0000000-0000001',
+        orderDate: '2026-03-08',
+        totalMilliunits: 136170,
+        shippingMilliunits: 0,
+        taxMilliunits: 10530,
+        promotionMilliunits: null,
+        subtotalMilliunits: 125640,
+        items: [
+            { asin: null, title: 'A', quantity: 1, itemTotalMilliunits: 100000 },
+            { asin: null, title: 'B', quantity: 1, itemTotalMilliunits: 25640 },
+        ],
+    };
+
+    it('treats items that match the subtotal as complete, whatever the tax', () => {
+        expect(amazonOrderLooksIncomplete(taxedOrder)).toBe(false);
+        expect(amazonOrderNeedsRefetch(taxedOrder)).toBe(false);
+    });
+
+    it('does not compare the items against the taxed bank charge either', () => {
+        expect(amazonItemsLookIncomplete(taxedOrder.items, [taxedOrder], [taxedOrder.orderId], -136170)).toBe(false);
+    });
+
+    it('flags any shortfall against the subtotal, with no slop', () => {
+        const missingALine = { ...taxedOrder, items: taxedOrder.items.slice(0, 1) };
+        expect(amazonOrderLooksIncomplete(missingALine)).toBe(true);
+        const shortByOneCent = {
+            ...taxedOrder,
+            items: [{ asin: null, title: 'A', quantity: 1, itemTotalMilliunits: 125630 }],
+        };
+        expect(amazonOrderLooksIncomplete(shortByOneCent)).toBe(true);
+    });
+
+    it('falls back to the grand-total rule when the subtotal is unknown', () => {
+        expect(amazonOrderLooksIncomplete({ ...taxedOrder, subtotalMilliunits: null })).toBe(true);
     });
 });

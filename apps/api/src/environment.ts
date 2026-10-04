@@ -183,9 +183,24 @@ export function getAmazonOrdersMcpEntry(): string | undefined {
     return value ? resolveFromRepoRoot(value) : undefined;
 }
 
+/**
+ * Base URL of the `apps/amazon-sync` Python service. When set it replaces the MCP as the
+ * Amazon source; when unset the MCP (if configured) is used, else Amazon endpoints 503.
+ */
+export function getAmazonSyncUrl(): string | undefined {
+    const value = env.get('AMAZON_SYNC_URL').default('').asString().trim();
+    return value ? value.replace(/\/+$/, '') : undefined;
+}
+
 export const AMAZON_ORDERS_REGION = env.get('AMAZON_ORDERS_REGION').default('us').asString();
 
 export const AMAZON_ORDERS_SYNC_TIMEOUT_MS = env.get('AMAZON_ORDERS_SYNC_TIMEOUT_MS').default('600000').asIntPositive();
+
+/**
+ * How often the API syncs Amazon by itself, through amazon-sync. 0 (the default) means never:
+ * production compose turns it on, and `pnpm dev` stays off because its database is shared.
+ */
+export const AMAZON_SYNC_INTERVAL_MS = env.get('AMAZON_SYNC_INTERVAL_MS').default('0').asIntPositive();
 
 export const YNAB_FLUSH_BATCH_SIZE = env.get('YNAB_FLUSH_BATCH_SIZE').default('25').asIntPositive();
 

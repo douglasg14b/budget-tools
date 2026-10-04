@@ -3652,7 +3652,7 @@
 						}
 					}
 				},
-				"description": "Index Amazon payments from the oldest uncategorized Amazon charge through today,\nthen fetch invoices for order IDs in the requested classify window. Starts the MCP subprocess if needed.",
+				"description": "Index Amazon payments from the oldest uncategorized Amazon charge through today,\nthen fetch invoices for order IDs in the requested classify window. Uses amazon-sync when\nAMAZON_SYNC_URL is set, else starts the MCP subprocess if needed.",
 				"summary": "postAmazonOrdersSync",
 				"tags": [
 					"amazon-orders"

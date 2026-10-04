@@ -163,6 +163,7 @@ const sampleOrder: ParsedAmazonOrder = {
     shippingMilliunits: 0,
     taxMilliunits: 0,
     promotionMilliunits: 0,
+    subtotalMilliunits: null,
     items: [
         {
             asin: 'B00SOAP',

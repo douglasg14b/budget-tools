@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { occurrencePaymentIds } from '../data/amazonOrdersRepo';
 import {
     amazonPaymentId,
     parseAmazonAuthPayload,
@@ -139,5 +140,21 @@ describe('parseAmazonMcp', () => {
             message: 'Not logged in',
             loginUrl: 'https://www.amazon.com/ap/signin',
         });
+    });
+
+    it('numbers identical payments so two equal shipments are both stored', () => {
+        const { payments } = parseAmazonTransactionsPayload({
+            paginationComplete: true,
+            transactions: [
+                { date: '2022-12-28', amount: -15.85, orderIds: ['114-0000000-0000003'], cardInfo: '0042' },
+                { date: '2022-12-28', amount: -18.93, orderIds: ['114-0000000-0000003'], cardInfo: '0042' },
+                { date: '2022-12-28', amount: -15.85, orderIds: ['114-0000000-0000003'], cardInfo: '0042' },
+            ],
+        });
+        expect(occurrencePaymentIds(payments)).toEqual([
+            '2022-12-28|-15850|114-0000000-0000003|0042',
+            '2022-12-28|-18930|114-0000000-0000003|0042',
+            '2022-12-28|-15850|114-0000000-0000003|0042#2',
+        ]);
     });
 });
