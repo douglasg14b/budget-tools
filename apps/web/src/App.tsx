@@ -9,6 +9,7 @@ import { diagnoseAuthStall } from './auth/authStallDiagnosis';
 import { useStallTimeout } from './auth/useStallTimeout';
 import { AccountMenu } from './components/AccountMenu';
 import { AppNav } from './components/AppNav';
+import { AppUpdatePrompt } from './components/AppUpdatePrompt';
 import { NavbarHealthBadge } from './components/NavbarHealthBadge';
 import { OperatingModeToggle } from './components/OperatingModeToggle';
 import { OutboundSyncChip } from './components/OutboundSyncChip';
@@ -34,6 +35,8 @@ export function App() {
                     </PracticeReceiptsProvider>
                 </AuthProvider>
             </BrowserRouter>
+            {/* Outside AuthGate so a stale bundle can be replaced from the login or stalled-auth screens too. */}
+            <AppUpdatePrompt />
         </MantineProvider>
     );
 }

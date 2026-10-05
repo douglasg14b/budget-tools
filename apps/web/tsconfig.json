@@ -7,7 +7,7 @@
     "moduleResolution": "Bundler",
     "rootDir": "src",
     "outDir": "dist",
-    "types": ["vite/client"]
+    "types": ["vite/client", "vite-plugin-pwa/react"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

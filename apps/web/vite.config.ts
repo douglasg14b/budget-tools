@@ -12,7 +12,11 @@ export default defineConfig({
         basicSsl(),
         scanicNativeEsmPlugin(),
         VitePWA({
-            registerType: 'autoUpdate',
+            // 'prompt' leaves a new service worker waiting until the user accepts the reload, so a
+            // deploy never yanks the page out from under an in-progress classification. Registration
+            // happens in React (components/AppUpdatePrompt.tsx), not via an injected registerSW.js.
+            registerType: 'prompt',
+            injectRegister: false,
             includeAssets: ['icons/budget-tools.svg', 'icons/apple-touch-icon.png'],
             manifest: {
                 id: '/',
@@ -47,6 +51,9 @@ export default defineConfig({
                 ],
             },
             workbox: {
+                // skipWaiting stays off (the update prompt triggers it); claiming clients on activation
+                // guarantees the controllerchange the prompt's reload waits on.
+                clientsClaim: true,
                 cleanupOutdatedCaches: true,
                 navigateFallback: '/index.html',
                 navigateFallbackDenylist: [/^\/api(?:\/|$)/],
