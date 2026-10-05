@@ -17,12 +17,13 @@ describe('parseReceiptExtract', () => {
             ocrPrintedMilliunits: null,
             taxMilliunits: 0,
             discountMilliunits: 0,
+            tipMilliunits: 0,
             lines: [],
             error: null,
         });
     });
 
-    it('reads lines, tax, discount, and error', () => {
+    it('reads lines, tax, discount, tip, and error', () => {
         const parsed = parseReceiptExtract(
             JSON.stringify({
                 repaired: true,
@@ -31,6 +32,7 @@ describe('parseReceiptExtract', () => {
                 ocrPrintedMilliunits: 8120,
                 taxMilliunits: 620,
                 discountMilliunits: 200,
+                tipMilliunits: 1500,
                 error: 'vision down',
                 lines: [
                     { name: 'Latte', amountMilliunits: 4500, quantity: 1 },
@@ -44,6 +46,7 @@ describe('parseReceiptExtract', () => {
             gated: true,
             taxMilliunits: 620,
             discountMilliunits: 200,
+            tipMilliunits: 1500,
             error: 'vision down',
             lines: [
                 { name: 'Latte', amountMilliunits: 4500, quantity: 1 },
@@ -54,7 +57,7 @@ describe('parseReceiptExtract', () => {
 });
 
 describe('formatReceiptExtractDump', () => {
-    it('joins named amounts with tax and discount rows', () => {
+    it('joins named amounts with tax, discount, and tip rows', () => {
         expect(
             formatReceiptExtractDump(
                 [
@@ -63,7 +66,8 @@ describe('formatReceiptExtractDump', () => {
                 ],
                 620,
                 200,
+                1000,
             ),
-        ).toBe('Latte 4.50\nNote\nTax 0.62\nDiscount 0.20');
+        ).toBe('Latte 4.50\nNote\nTax 0.62\nDiscount 0.20\nTip 1.00');
     });
 });

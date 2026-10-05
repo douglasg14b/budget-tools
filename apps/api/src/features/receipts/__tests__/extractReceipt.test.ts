@@ -10,7 +10,7 @@ function headerContent(overrides: Record<string, unknown> = {}): string {
     return JSON.stringify({
         vendor: 'Cafe Rio',
         purchaseDate: '2026-08-01',
-        printedTotalDollars: 8.12,
+        grandTotalDollars: 8.12,
         ...overrides,
     });
 }
@@ -19,7 +19,7 @@ function linesContent(overrides: Record<string, unknown> = {}): string {
     return JSON.stringify({
         vendor: 'Cafe Rio',
         purchaseDate: '2026-08-01',
-        printedTotalDollars: 8.12,
+        grandTotalDollars: 8.12,
         taxDollars: 0.62,
         discountDollars: 0.2,
         lines: [
@@ -170,6 +170,133 @@ describe('extractReceipt', () => {
         expect(JSON.parse(result.extractJson)).toMatchObject({ repaired: true, gated: false });
     });
 
+    it('settles a signed card slip: verified tip, raised-cents total resolved by arithmetic, gated', async () => {
+        const slip = completeJsonReturning({
+            receipt_headers: headerContent({
+                vendor: 'Riverside Hotel',
+                grandTotalDollars: 17,
+                hasHandwrittenAmounts: true,
+            }),
+            receipt_lines: linesContent({
+                vendor: 'Riverside Hotel',
+                grandTotalDollars: 17,
+                taxDollars: null,
+                discountDollars: null,
+                tipDollars: 5,
+                lines: [],
+            }),
+            receipt_totals_block: JSON.stringify({
+                rows: [
+                    { role: 'subtotal', label: 'Subtotal', writtenText: 'USD 12.66', medium: 'printed' },
+                    { role: 'tip', label: 'Tip', writtenText: '5.00', medium: 'handwritten' },
+                    { role: 'total', label: 'Total', writtenText: '17.66', medium: 'handwritten' },
+                ],
+            }),
+            // Blind row reads: the tip is clear, the raised cents of the total are missed.
+            receipt_row_read: JSON.stringify({ marksPresent: true, writtenText: '5.00' }),
+        });
+        const completeJson: CompleteOpenRouterJson = async (input) => {
+            if (input.schemaName === 'receipt_row_read' && input.system.includes('grand total')) {
+                return { content: JSON.stringify({ marksPresent: true, writtenText: '17' }), usage: null };
+            }
+            if (input.schemaName === 'receipt_total_choice') {
+                const letter = /^([ABC])\) \$17\.66$/m.exec(input.user)?.[1] ?? 'D';
+                return { content: JSON.stringify({ observation: 'raised 66', choice: letter }), usage: null };
+            }
+            return slip(input);
+        };
+        const result = await extractReceipt({
+            frames: [processed],
+            apiKey: 'test-key',
+            prep: async () => processed,
+            completeJson,
+        });
+        expect(result.kind).toBe('complete');
+        if (result.kind !== 'complete') {
+            return;
+        }
+        expect(result.extractStatus).toBe('gated');
+        expect(result.printedMilliunits).toBe(17_660);
+        expect(result.totalsDisagree).toBe(false);
+        expect(result.rawText).toBe('Tip 5.00');
+        expect(JSON.parse(result.extractJson)).toMatchObject({
+            gated: true,
+            tipMilliunits: 5000,
+            handwrittenTotals: { totalSource: 'reconciled', consistent: true },
+        });
+    });
+
+    it('stores no tip when the line read reports one but the handwritten-totals pass fails', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const result = await extractReceipt({
+            frames: [processed],
+            apiKey: 'test-key',
+            prep: async () => processed,
+            // No settle answers registered, so every settle call throws.
+            completeJson: completeJsonReturning({
+                receipt_headers: headerContent({ grandTotalDollars: 17 }),
+                receipt_lines: linesContent({ grandTotalDollars: 17, tipDollars: 4.34 }),
+            }),
+        });
+        warn.mockRestore();
+        expect(result.kind).toBe('complete');
+        if (result.kind !== 'complete') {
+            return;
+        }
+        expect(result.printedMilliunits).toBe(17_000);
+        const payload = JSON.parse(result.extractJson);
+        expect(payload.tipMilliunits).toBe(0);
+        expect(payload.error).toContain('handwritten totals');
+    });
+
+    it('counts the cost of settle reads that answered when another settle read fails', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const paid = completeJsonReturning({
+            receipt_headers: headerContent({ grandTotalDollars: 17, hasHandwrittenAmounts: true }),
+            receipt_lines: linesContent({ grandTotalDollars: 17, tipDollars: 5 }),
+            receipt_totals_block: JSON.stringify({
+                rows: [{ role: 'subtotal', label: 'Subtotal', writtenText: '12.66', medium: 'printed' }],
+            }),
+            receipt_row_read: JSON.stringify({ marksPresent: true, writtenText: '5.00' }),
+        });
+        const result = await extractReceipt({
+            frames: [processed],
+            apiKey: 'test-key',
+            prep: async () => processed,
+            completeJson: async (input) => {
+                if (input.schemaName === 'receipt_row_read' && input.system.includes('grand total')) {
+                    throw new Error('timed out');
+                }
+                return paid(input);
+            },
+        });
+        warn.mockRestore();
+        expect(result.kind).toBe('complete');
+        if (result.kind !== 'complete') {
+            return;
+        }
+        expect(JSON.parse(result.extractJson).error).toContain('handwritten totals: timed out');
+        // Header, lines, totals block, and tip row each answered and were billed.
+        expect(result.extractCostUsd).toBeCloseTo(0.004);
+        expect(result.extractPromptTokens).toBe(400);
+    });
+
+    it('counts the cost of a reply that was billed but could not be parsed', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const result = await extractReceipt({
+            frames: [processed],
+            apiKey: 'test-key',
+            prep: async () => processed,
+            completeJson: completeJsonReturning({ receipt_headers: 'not json' }),
+        });
+        warn.mockRestore();
+        expect(result.kind).toBe('complete');
+        if (result.kind === 'complete') {
+            expect(result.extractStatus).toBe('failed');
+            expect(result.extractCostUsd).toBeCloseTo(0.001);
+        }
+    });
+
     it('sets totalsDisagree when header and line-vision totals differ', async () => {
         const result = await extractReceipt({
             frames: [processed],
@@ -177,7 +304,7 @@ describe('extractReceipt', () => {
             prep: async () => processed,
             completeJson: completeJsonReturning({
                 receipt_headers: headerContent(),
-                receipt_lines: linesContent({ printedTotalDollars: 9 }),
+                receipt_lines: linesContent({ grandTotalDollars: 9 }),
             }),
         });
         expect(result.kind).toBe('complete');
@@ -197,12 +324,12 @@ describe('extractReceipt', () => {
                 receipt_headers: headerContent({
                     vendor: null,
                     purchaseDate: null,
-                    printedTotalDollars: null,
+                    grandTotalDollars: null,
                 }),
                 receipt_lines: linesContent({
                     vendor: null,
                     purchaseDate: null,
-                    printedTotalDollars: null,
+                    grandTotalDollars: null,
                     lines: [],
                     taxDollars: 0,
                     discountDollars: 0,

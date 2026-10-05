@@ -1,3 +1,4 @@
+import type { OpenRouterUsage } from '../../categorization/llm/openRouterClient';
 import type { ReceiptExtractLine } from './arithmeticGate';
 import type { CompleteDecisions, NoulQuestion } from './decisionsClient';
 import { completeDecisions } from './decisionsClient';
@@ -21,7 +22,7 @@ export type ReceiptVerifyResult = {
     readonly flags: readonly ReceiptVerifyFlag[];
     /** Raw probabilities, kept so a reviewer can see how close a call was. */
     readonly scores: Readonly<Record<string, number>>;
-    readonly costUsd: number | null;
+    readonly usage: OpenRouterUsage | null;
 };
 
 const QUESTIONS: Readonly<Record<string, NoulQuestion>> = {
@@ -53,6 +54,7 @@ export type VerifyReceiptExtractInput = {
     readonly lines: readonly ReceiptExtractLine[];
     readonly taxMilliunits: number;
     readonly discountMilliunits: number;
+    readonly tipMilliunits?: number;
     readonly timeoutMs?: number;
     readonly completeDecisionsImpl?: CompleteDecisions;
 };
@@ -65,9 +67,11 @@ function dollars(milliunits: number | null): string {
  * State deliberately omits any arithmetic verdict. Handing the model the gate
  * result inflated agreement from 12/20 to 20/20 in evaluation because it simply
  * read the answer back. The value here is structural judgement, not arithmetic.
+ * The tip row appears only when there is a tip, so untipped state is unchanged.
  */
 export function buildVerifyState(input: VerifyReceiptExtractInput): string {
     const lines = input.lines.map((line) => `  - ${line.name}: $${dollars(line.amountMilliunits)}`).join('\n');
+    const tip = input.tipMilliunits ? [`Tip recorded separately: $${dollars(input.tipMilliunits)}`] : [];
     return [
         'A receipt was photographed and an AI vision model extracted the following.',
         '',
@@ -79,6 +83,7 @@ export function buildVerifyState(input: VerifyReceiptExtractInput): string {
         '',
         `Tax recorded separately: $${dollars(input.taxMilliunits)}`,
         `Discount recorded separately: $${dollars(input.discountMilliunits)}`,
+        ...tip,
     ].join('\n');
 }
 
@@ -106,5 +111,5 @@ export async function verifyReceiptExtract(input: VerifyReceiptExtractInput): Pr
     if (discountScore != null && discountScore >= RECEIPT_VERIFY_THRESHOLD) {
         flags.push('discount-double-counted');
     }
-    return { flags, scores: result.nouls, costUsd: result.usage?.costUsd ?? null };
+    return { flags, scores: result.nouls, usage: result.usage };
 }

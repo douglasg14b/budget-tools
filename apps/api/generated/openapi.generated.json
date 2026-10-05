@@ -705,6 +705,11 @@
 						},
 						"type": "array"
 					},
+					"tipMilliunits": {
+						"type": "number",
+						"format": "double",
+						"description": "Omit to keep the previously extracted tip."
+					},
 					"discountMilliunits": {
 						"type": "number",
 						"format": "double"

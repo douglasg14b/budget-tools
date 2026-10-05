@@ -20,6 +20,7 @@ export async function patchReceipt(id: string, body: PatchReceiptDto, db?: AppDa
         printedMilliunits: body.printedMilliunits,
         taxMilliunits: body.taxMilliunits,
         discountMilliunits: body.discountMilliunits,
+        tipMilliunits: body.tipMilliunits,
         lines: body.lines.map(toExtractLine),
     };
     const result = applyReceiptExtractEdit({ previousExtractJson: row.extractJson, edit });

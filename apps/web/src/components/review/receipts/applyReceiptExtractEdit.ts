@@ -13,6 +13,7 @@ export type ReceiptExtractEdit = {
     readonly printedMilliunits: number | null;
     readonly taxMilliunits: number;
     readonly discountMilliunits: number;
+    readonly tipMilliunits: number;
     readonly lines: readonly ReceiptExtractLine[];
 };
 
@@ -62,6 +63,7 @@ export function applyReceiptExtractEdit(input: {
             ocrPrintedMilliunits: previous?.ocrPrintedMilliunits ?? null,
             taxMilliunits: input.edit.taxMilliunits,
             discountMilliunits: input.edit.discountMilliunits,
+            tipMilliunits: input.edit.tipMilliunits,
             lines: [...input.edit.lines],
             error: null,
         }),
@@ -87,7 +89,7 @@ function printedMatchesLines(edit: ReceiptExtractEdit): boolean {
     if (edit.printedMilliunits == null) {
         return false;
     }
-    let sum = edit.taxMilliunits - edit.discountMilliunits;
+    let sum = edit.taxMilliunits - edit.discountMilliunits + edit.tipMilliunits;
     for (const line of edit.lines) {
         if (line.amountMilliunits == null) {
             return false;
@@ -109,6 +111,9 @@ function formatDump(edit: ReceiptExtractEdit): string | null {
     }
     if (edit.discountMilliunits !== 0) {
         rows.push(`Discount ${(edit.discountMilliunits / 1000).toFixed(2)}`);
+    }
+    if (edit.tipMilliunits !== 0) {
+        rows.push(`Tip ${(edit.tipMilliunits / 1000).toFixed(2)}`);
     }
     return rows.length > 0 ? rows.join('\n') : null;
 }

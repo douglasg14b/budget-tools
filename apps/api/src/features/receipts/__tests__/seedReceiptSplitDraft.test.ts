@@ -28,6 +28,27 @@ describe('seedReceiptSplitDraft', () => {
         });
     });
 
+    it('adds a tip row so a tipped gated receipt still sums to the bank charge', () => {
+        const draft = seedReceiptSplitDraft({
+            extractStatus: 'gated',
+            totalsDisagree: false,
+            bankMilliunits: -17_660,
+            extractJson: JSON.stringify({
+                taxMilliunits: 0,
+                discountMilliunits: 0,
+                tipMilliunits: 5000,
+                lines: [{ name: 'Subtotal', amountMilliunits: 12_660, quantity: null }],
+            }),
+        });
+        expect(draft).toEqual({
+            kind: 'split',
+            lines: [
+                { amountMilliunits: -12_660, memo: 'Subtotal' },
+                { amountMilliunits: -5000, memo: 'Tip' },
+            ],
+        });
+    });
+
     it('falls back to equal bank shares when gated amounts do not match the bank', () => {
         const draft = seedReceiptSplitDraft({
             extractStatus: 'gated',

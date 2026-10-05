@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { formatTransactionDate } from '../formatTransactionDate';
 import { formatYnabAmount } from '../formatYnabAmount';
 import type { ReceiptExtractEdit } from './applyReceiptExtractEdit';
-import type { ReceiptVerifyFlag } from './parseReceiptExtract';
+import type { ParsedReceiptExtract, ReceiptVerifyFlag } from './parseReceiptExtract';
 import { parseReceiptExtract } from './parseReceiptExtract';
 import { ReceiptBindPanel } from './ReceiptBindPanel';
 import classes from './ReceiptDetail.module.css';
@@ -188,15 +188,13 @@ export function ReceiptDetail({
                             ) : (
                                 <p className={classes.quiet}>No line items were extracted.</p>
                             )}
-                            {extract && (extract.taxMilliunits !== 0 || extract.discountMilliunits !== 0) ? (
+                            {extract && adjustmentSummary(extract) ? (
+                                <p className={classes.meta}>{adjustmentSummary(extract)}</p>
+                            ) : null}
+                            {extract?.totalReconciled ? (
                                 <p className={classes.meta}>
-                                    {extract.taxMilliunits !== 0
-                                        ? `Tax ${formatYnabAmount(extract.taxMilliunits)}`
-                                        : null}
-                                    {extract.taxMilliunits !== 0 && extract.discountMilliunits !== 0 ? ' · ' : null}
-                                    {extract.discountMilliunits !== 0
-                                        ? `Discount ${formatYnabAmount(extract.discountMilliunits)}`
-                                        : null}
+                                    Handwritten total was hard to read — taken as subtotal plus tip after checking it
+                                    against the writing.
                                 </p>
                             ) : null}
                         </section>
@@ -375,6 +373,7 @@ function ExtractEditor({ receipt, saveError, saving, onCancel, onSave }: Extract
     const [printed, setPrinted] = useState(milliunitsToInput(receipt.printedMilliunits));
     const [tax, setTax] = useState(milliunitsToInput(parsed?.taxMilliunits ?? 0));
     const [discount, setDiscount] = useState(milliunitsToInput(parsed?.discountMilliunits ?? 0));
+    const [tip, setTip] = useState(milliunitsToInput(parsed?.tipMilliunits ?? 0));
     const [lines, setLines] = useState(
         (parsed?.lines.length ? parsed.lines : [{ name: '', amountMilliunits: null, quantity: null }]).map((line) => ({
             name: line.name,
@@ -394,6 +393,7 @@ function ExtractEditor({ receipt, saveError, saving, onCancel, onSave }: Extract
                     printedMilliunits: inputToMilliunits(printed),
                     taxMilliunits: inputToMilliunits(tax) ?? 0,
                     discountMilliunits: inputToMilliunits(discount) ?? 0,
+                    tipMilliunits: inputToMilliunits(tip) ?? 0,
                     lines: lines.map((line) => ({
                         name: line.name,
                         amountMilliunits: inputToMilliunits(line.amount),
@@ -409,13 +409,10 @@ function ExtractEditor({ receipt, saveError, saving, onCancel, onSave }: Extract
                 value={purchaseDate}
                 onChange={(event) => setPurchaseDate(event.currentTarget.value)}
             />
-            <TextInput
-                label="Printed total"
-                value={printed}
-                onChange={(event) => setPrinted(event.currentTarget.value)}
-            />
+            <TextInput label="Total" value={printed} onChange={(event) => setPrinted(event.currentTarget.value)} />
             <TextInput label="Tax" value={tax} onChange={(event) => setTax(event.currentTarget.value)} />
             <TextInput label="Discount" value={discount} onChange={(event) => setDiscount(event.currentTarget.value)} />
+            <TextInput label="Tip" value={tip} onChange={(event) => setTip(event.currentTarget.value)} />
             <ul className={classes.editLines}>
                 {lines.map((line, index) => (
                     // biome-ignore lint/suspicious/noArrayIndexKey: lines are edited by position
@@ -472,6 +469,16 @@ function ExtractEditor({ receipt, saveError, saving, onCancel, onSave }: Extract
             </div>
         </form>
     );
+}
+
+/** "Tax · Discount · Tip" for whichever are non-zero; null when none are. */
+function adjustmentSummary(extract: ParsedReceiptExtract): string | null {
+    const parts = [
+        extract.taxMilliunits !== 0 ? `Tax ${formatYnabAmount(extract.taxMilliunits)}` : null,
+        extract.discountMilliunits !== 0 ? `Discount ${formatYnabAmount(extract.discountMilliunits)}` : null,
+        extract.tipMilliunits !== 0 ? `Tip ${formatYnabAmount(extract.tipMilliunits)}` : null,
+    ].filter((part): part is string => part != null);
+    return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 function parseQuantity(value: string): number | null {

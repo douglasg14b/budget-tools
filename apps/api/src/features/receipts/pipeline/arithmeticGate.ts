@@ -8,30 +8,34 @@ export type ArithmeticGateInput = {
     readonly lines: readonly ReceiptExtractLine[];
     readonly taxMilliunits: number;
     readonly discountMilliunits: number;
+    readonly tipMilliunits: number;
     readonly printedMilliunits: number;
 };
 
 export type ArithmeticGateResult = {
     readonly gated: boolean;
-    readonly linesPlusTaxMinusDiscounts: number | null;
+    readonly computedTotalMilliunits: number | null;
 };
 
 /**
- * Lines + tax − discounts must equal the printed total exactly. Any null line amount fails the gate.
+ * Lines + tax − discounts + tip must equal the grand total exactly. Any null line amount fails the gate.
  */
 export function arithmeticGate(input: ArithmeticGateInput): ArithmeticGateResult {
     const amounts: number[] = [];
     for (const line of input.lines) {
         if (line.amountMilliunits == null) {
-            return { gated: false, linesPlusTaxMinusDiscounts: null };
+            return { gated: false, computedTotalMilliunits: null };
         }
         amounts.push(line.amountMilliunits);
     }
-    const linesPlusTaxMinusDiscounts =
-        amounts.reduce((sum, amount) => sum + amount, 0) + input.taxMilliunits - input.discountMilliunits;
+    const computedTotalMilliunits =
+        amounts.reduce((sum, amount) => sum + amount, 0) +
+        input.taxMilliunits -
+        input.discountMilliunits +
+        input.tipMilliunits;
     return {
-        gated: linesPlusTaxMinusDiscounts === input.printedMilliunits,
-        linesPlusTaxMinusDiscounts,
+        gated: computedTotalMilliunits === input.printedMilliunits,
+        computedTotalMilliunits,
     };
 }
 

@@ -52,6 +52,8 @@ export type PatchReceiptDto = {
     printedMilliunits: number | null;
     taxMilliunits: number;
     discountMilliunits: number;
+    /** Omit to keep the previously extracted tip. */
+    tipMilliunits?: number;
     lines: PatchReceiptLineDto[];
 };
 

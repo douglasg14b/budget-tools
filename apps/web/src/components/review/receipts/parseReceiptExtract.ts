@@ -14,10 +14,17 @@ export type ParsedReceiptExtract = {
     readonly ocrPrintedMilliunits: number | null;
     readonly taxMilliunits: number;
     readonly discountMilliunits: number;
+    /** Printed or handwritten tip; 0 on extracts written before tips were read. */
+    readonly tipMilliunits: number;
     readonly lines: readonly ReceiptExtractLine[];
     readonly error: string | null;
     /** Undefined when the extract predates the check or it did not run. */
     readonly verifyFlags?: readonly ReceiptVerifyFlag[];
+    /**
+     * The handwritten total was hard to read and was settled as subtotal + tip, after the model
+     * confirmed that amount against the marks. Worth a glance before trusting.
+     */
+    readonly totalReconciled: boolean;
 };
 
 /**
@@ -39,9 +46,11 @@ export function parseReceiptExtract(extractJson: string | null): ParsedReceiptEx
             ocrPrintedMilliunits?: unknown;
             taxMilliunits?: unknown;
             discountMilliunits?: unknown;
+            tipMilliunits?: unknown;
             lines?: unknown;
             error?: unknown;
             verifyFlags?: unknown;
+            handwrittenTotals?: { totalSource?: unknown } | null;
         };
         const verifyFlags = parseVerifyFlags(record.verifyFlags);
         return {
@@ -53,8 +62,10 @@ export function parseReceiptExtract(extractJson: string | null): ParsedReceiptEx
             ocrPrintedMilliunits: typeof record.ocrPrintedMilliunits === 'number' ? record.ocrPrintedMilliunits : null,
             taxMilliunits: typeof record.taxMilliunits === 'number' ? record.taxMilliunits : 0,
             discountMilliunits: typeof record.discountMilliunits === 'number' ? record.discountMilliunits : 0,
+            tipMilliunits: typeof record.tipMilliunits === 'number' ? record.tipMilliunits : 0,
             lines: parseLines(record.lines),
             error: typeof record.error === 'string' ? record.error : null,
+            totalReconciled: record.handwrittenTotals?.totalSource === 'reconciled',
         };
     } catch {
         return null;

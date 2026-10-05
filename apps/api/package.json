@@ -10,6 +10,7 @@
     "provision-user": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx apps/api/src/scripts/provisionUser.ts",
     "verify-auth": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx apps/api/src/scripts/verifyAuthLoop.ts",
     "migrate:data": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx apps/api/src/scripts/migrateSqliteToPostgres.ts",
+    "eval:receipts": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx apps/api/src/scripts/evalReceiptExtract.ts",
     "clear:amazon-cache": "dotenvx run -f ../../.env.local -f .env.local --ignore=MISSING_ENV_FILE -- pnpm --dir ../.. exec tsx apps/api/src/features/amazonOrders/clearAmazonOrderCache.ts",
     "prebuild": "pnpm tsoa",
     "build": "tsc -p tsconfig.json --noEmit",

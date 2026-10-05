@@ -17,9 +17,21 @@ describe('parseReceiptExtract', () => {
             ocrPrintedMilliunits: null,
             taxMilliunits: 0,
             discountMilliunits: 0,
+            tipMilliunits: 0,
             lines: [],
             error: null,
+            totalReconciled: false,
         });
+        expect(parseReceiptExtract('{"tipMilliunits":5000}')?.tipMilliunits).toBe(5000);
+    });
+
+    it('flags a total settled from subtotal plus tip', () => {
+        expect(
+            parseReceiptExtract(JSON.stringify({ handwrittenTotals: { totalSource: 'reconciled' } }))?.totalReconciled,
+        ).toBe(true);
+        expect(
+            parseReceiptExtract(JSON.stringify({ handwrittenTotals: { totalSource: 'read' } }))?.totalReconciled,
+        ).toBe(false);
     });
 
     it('reads named lines and skips rows without a name', () => {

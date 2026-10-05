@@ -9,14 +9,43 @@ describe('parseHeaderCompletion', () => {
                 JSON.stringify({
                     vendor: 'Cafe Rio',
                     purchaseDate: '2026-08-01',
-                    printedTotalDollars: 12.34,
+                    grandTotalDollars: 12.34,
                 }),
             ),
         ).toEqual({
             vendor: 'Cafe Rio',
             purchaseDate: '2026-08-01',
             printedMilliunits: 12340,
+            hasHandwrittenAmounts: false,
         });
+    });
+
+    it('reads the handwritten-amounts flag', () => {
+        expect(
+            parseHeaderCompletion(
+                JSON.stringify({
+                    vendor: 'Riverside Hotel',
+                    purchaseDate: '2026-09-30',
+                    grandTotalDollars: 17.66,
+                    hasHandwrittenAmounts: true,
+                }),
+            ).hasHandwrittenAmounts,
+        ).toBe(true);
+    });
+
+    it('unwraps the JSON-schema envelope qwen3.7-plus sometimes echoes around its answer', () => {
+        expect(
+            parseHeaderCompletion(
+                JSON.stringify([
+                    {
+                        type: 'object',
+                        additionalProperties: false,
+                        properties: { vendor: 'Cafe Rio', purchaseDate: '2026-08-01', grandTotalDollars: 8.12 },
+                        required: ['vendor', 'purchaseDate', 'grandTotalDollars'],
+                    },
+                ]),
+            ),
+        ).toMatchObject({ vendor: 'Cafe Rio', purchaseDate: '2026-08-01', printedMilliunits: 8120 });
     });
 
     it('drops a non-ISO purchase date instead of inventing one', () => {
@@ -25,13 +54,14 @@ describe('parseHeaderCompletion', () => {
                 JSON.stringify({
                     vendor: 'Cafe',
                     purchaseDate: '08/01/2026',
-                    printedTotalDollars: null,
+                    grandTotalDollars: null,
                 }),
             ),
         ).toEqual({
             vendor: 'Cafe',
             purchaseDate: null,
             printedMilliunits: null,
+            hasHandwrittenAmounts: false,
         });
     });
 
@@ -41,7 +71,7 @@ describe('parseHeaderCompletion', () => {
                 JSON.stringify({
                     vendor: 'Cafe',
                     purchaseDate: '2026-08-01T00:00:00Z',
-                    printedTotalDollars: 1,
+                    grandTotalDollars: 1,
                 }),
             ).purchaseDate,
         ).toBe('2026-08-01');
@@ -49,24 +79,26 @@ describe('parseHeaderCompletion', () => {
 });
 
 describe('parseLinesCompletion', () => {
-    it('maps lines, tax, and discount to milliunits', () => {
+    it('maps lines, tax, discount, and tip to milliunits', () => {
         expect(
             parseLinesCompletion(
                 JSON.stringify({
                     vendor: 'Cafe Rio',
                     purchaseDate: '2026-08-01',
-                    printedTotalDollars: 8.12,
+                    grandTotalDollars: 9.62,
                     taxDollars: 0.62,
                     discountDollars: -0.2,
+                    tipDollars: 1.5,
                     lines: [{ name: 'Latte', amountDollars: 4.5, quantity: 1 }],
                 }),
             ),
         ).toEqual({
             vendor: 'Cafe Rio',
             purchaseDate: '2026-08-01',
-            printedMilliunits: 8120,
+            printedMilliunits: 9620,
             taxMilliunits: 620,
             discountMilliunits: 200,
+            tipMilliunits: 1500,
             lines: [{ name: 'Latte', amountMilliunits: 4500, quantity: 1 }],
         });
     });
@@ -78,7 +110,7 @@ describe('parseLinesCompletion', () => {
                     {
                         vendor: 'SAVE MART SUPERMARKETS',
                         purchaseDate: '2010-10-23',
-                        printedTotalDollars: 3.99,
+                        grandTotalDollars: 3.99,
                         taxDollars: 0,
                         discountDollars: 0,
                         lines: [{ name: 'APPLES FUJI BAG OR', amountDollars: 3.99, quantity: 1 }],
@@ -91,6 +123,7 @@ describe('parseLinesCompletion', () => {
             printedMilliunits: 3990,
             taxMilliunits: 0,
             discountMilliunits: 0,
+            tipMilliunits: 0,
             lines: [{ name: 'APPLES FUJI BAG OR', amountMilliunits: 3990, quantity: 1 }],
         });
     });

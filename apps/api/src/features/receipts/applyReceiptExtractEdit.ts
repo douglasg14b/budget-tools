@@ -11,6 +11,8 @@ export type ReceiptExtractEdit = {
     readonly printedMilliunits: number | null;
     readonly taxMilliunits: number;
     readonly discountMilliunits: number;
+    /** Omitted by older clients; the previously extracted tip is kept so the edit can't silently drop it. */
+    readonly tipMilliunits?: number;
     readonly lines: readonly ReceiptExtractLine[];
 };
 
@@ -41,12 +43,14 @@ export function applyReceiptExtractEdit(input: {
     const purchaseDate = emptyToNull(input.edit.purchaseDate);
     const printedMilliunits = input.edit.printedMilliunits;
     const previous = parseReceiptExtract(input.previousExtractJson);
+    const tipMilliunits = input.edit.tipMilliunits ?? previous?.tipMilliunits ?? 0;
     const gated =
         printedMilliunits != null &&
         arithmeticGate({
             lines: input.edit.lines,
             taxMilliunits: input.edit.taxMilliunits,
             discountMilliunits: input.edit.discountMilliunits,
+            tipMilliunits,
             printedMilliunits,
         }).gated;
     const hasKeys = Boolean(vendor && purchaseDate && printedMilliunits != null);
@@ -58,6 +62,7 @@ export function applyReceiptExtractEdit(input: {
         ocrPrintedMilliunits: previous?.ocrPrintedMilliunits ?? null,
         taxMilliunits: input.edit.taxMilliunits,
         discountMilliunits: input.edit.discountMilliunits,
+        tipMilliunits,
         lines: [...input.edit.lines],
         error: null,
     };
@@ -69,7 +74,12 @@ export function applyReceiptExtractEdit(input: {
         printedMilliunits,
         totalsDisagree: false,
         extractJson: JSON.stringify(payload),
-        rawText: formatReceiptExtractDump(input.edit.lines, input.edit.taxMilliunits, input.edit.discountMilliunits),
+        rawText: formatReceiptExtractDump(
+            input.edit.lines,
+            input.edit.taxMilliunits,
+            input.edit.discountMilliunits,
+            tipMilliunits,
+        ),
     };
 }
 

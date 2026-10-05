@@ -15,6 +15,7 @@ export type SeedReceiptSplitDraftInput = {
 type ParsedExtract = {
     readonly taxMilliunits: number;
     readonly discountMilliunits: number;
+    readonly tipMilliunits: number;
     readonly lines: ReceiptExtractLine[];
 };
 
@@ -76,6 +77,12 @@ function gatedSplitLines(
         rows.push({
             amountMilliunits: -alignAmountToBank(parsed.discountMilliunits, bankMilliunits),
             memo: 'Discount',
+        });
+    }
+    if (parsed.tipMilliunits !== 0) {
+        rows.push({
+            amountMilliunits: alignAmountToBank(parsed.tipMilliunits, bankMilliunits),
+            memo: 'Tip',
         });
     }
     const sum = rows.reduce((total, row) => total + row.amountMilliunits, 0);

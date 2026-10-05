@@ -13,7 +13,7 @@ import { completeOpenRouterJson } from '../categorization/llm/openRouterClient';
 import type { ReceiptExtractStatus } from './data/receiptsSchema';
 import type { ReceiptExtractPayload } from './parseReceiptExtract';
 import { formatReceiptExtractDump } from './parseReceiptExtract';
-import type { ReceiptExtractLine } from './pipeline/arithmeticGate';
+import type { ArithmeticGateInput, ReceiptExtractLine } from './pipeline/arithmeticGate';
 import { arithmeticGate, printedTotalsDisagree } from './pipeline/arithmeticGate';
 import { jpegDataUrl, prepReceiptImage } from './pipeline/prepReceiptImage';
 import type { CompleteOpenRouterJson, ReceiptHeaderVision, ReceiptLinesVision } from './pipeline/receiptHeaderVision';
@@ -23,6 +23,8 @@ import {
     readReceiptHeaders,
     readReceiptLines,
 } from './pipeline/receiptHeaderVision';
+import type { HandwrittenTotalsSettlement } from './pipeline/settleHandwrittenTotals';
+import { RECEIPT_SETTLE_TIMEOUT_MS, settleHandwrittenTotals } from './pipeline/settleHandwrittenTotals';
 import type { ReceiptVerifyFlag } from './pipeline/verifyReceiptExtract';
 import { verifyReceiptExtract } from './pipeline/verifyReceiptExtract';
 
@@ -84,14 +86,14 @@ export function isAmazonReceiptVendor(vendor: string | null): boolean {
  */
 export async function extractReceipt(input: ExtractReceiptInput): Promise<ReceiptExtractResult> {
     const apiKey = input.apiKey ?? requireOpenRouterApiKey();
-    const completeJson = input.completeJson ?? completeOpenRouterJson;
+    const meter = meterUsage(input.completeJson ?? completeOpenRouterJson);
     const prep = input.prep ?? defaultPrep;
     const processed = await prep(input.frames);
     const processedDataUrl = jpegDataUrl(processed);
     const visionBase = {
         apiKey,
         baseUrl: input.baseUrl ?? OPENROUTER_BASE_URL,
-        completeJson,
+        completeJson: meter.completeJson,
         processedDataUrl,
     };
 
@@ -104,16 +106,13 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
         return { kind: 'amazon' };
     }
     if (input.headerOnly) {
-        return completeHeaderOnly(headerAttempt);
+        return completeHeaderOnly(headerAttempt, meter.usages);
     }
 
     const header = headerAttempt.header ?? emptyHeader();
     let error = headerAttempt.error;
     let linesVision: ReceiptLinesVision | null = null;
     let repaired = false;
-    let costUsd = headerAttempt.usage?.costUsd ?? null;
-    let promptTokens = headerAttempt.usage?.promptTokens ?? null;
-    let completionTokens = headerAttempt.usage?.completionTokens ?? null;
 
     if (headerAttempt.error == null) {
         const linesAttempt = await tryReadLines({
@@ -123,9 +122,6 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
             expectedPrintedMilliunits: header.printedMilliunits,
         });
         error = joinErrors(error, linesAttempt.error);
-        costUsd = sumNullable(costUsd, linesAttempt.usage?.costUsd ?? null);
-        promptTokens = sumNullable(promptTokens, linesAttempt.usage?.promptTokens ?? null);
-        completionTokens = sumNullable(completionTokens, linesAttempt.usage?.completionTokens ?? null);
         if (linesAttempt.lines) {
             repaired = true;
             linesVision = linesAttempt.lines;
@@ -137,20 +133,43 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
 
     const vendor = header.vendor ?? linesVision?.vendor ?? null;
     const purchaseDate = header.purchaseDate ?? linesVision?.purchaseDate ?? null;
-    const printedMilliunits = header.printedMilliunits ?? linesVision?.printedMilliunits ?? null;
+    const readMilliunits = header.printedMilliunits ?? linesVision?.printedMilliunits ?? null;
     const lines = linesVision?.lines ?? [];
     const taxMilliunits = linesVision?.taxMilliunits ?? 0;
     const discountMilliunits = linesVision?.discountMilliunits ?? 0;
     if (isAmazonReceiptVendor(vendor)) {
         return { kind: 'amazon' };
     }
+    const readTotalsDisagree = printedTotalsDisagree(header.printedMilliunits, linesVision?.printedMilliunits ?? null);
 
-    const gated = gateMatches(lines, taxMilliunits, discountMilliunits, printedMilliunits);
-    const totalsDisagree = printedTotalsDisagree(header.printedMilliunits, linesVision?.printedMilliunits ?? null);
+    // The line read's tip is only a signal that a tip exists. The stored tip always comes from the
+    // settle pass, which requires marks on the tip row — so a tip is never invented.
+    const settleAttempt =
+        linesVision && ((linesVision.tipMilliunits ?? 0) > 0 || header.hasHandwrittenAmounts || readTotalsDisagree)
+            ? await trySettle({
+                  ...visionBase,
+                  model: input.repairModel ?? OPENROUTER_RECEIPT_REPAIR_MODEL,
+                  timeoutMs: input.repairTimeoutMs ?? RECEIPT_SETTLE_TIMEOUT_MS,
+              })
+            : null;
+    const settlement = settleAttempt?.settlement ?? null;
+    if (settleAttempt) {
+        error = joinErrors(error, settleAttempt.error);
+    }
+    // A settled total replaces the first read only when its own arithmetic closes.
+    const settledTotal = settlement?.consistent ? settlement.totalMilliunits : null;
+    const printedMilliunits = settledTotal ?? readMilliunits;
+    const tipMilliunits = settlement?.tipMilliunits ?? 0;
+
+    const gated =
+        gateMatches({ lines, taxMilliunits, discountMilliunits, tipMilliunits }, printedMilliunits) ||
+        // Card slips often have no item lines at all; then the totals block is the arithmetic.
+        (settledTotal != null && lines.length === 0);
+    const totalsDisagree = settledTotal == null && readTotalsDisagree;
     const hasKeys = Boolean(vendor && purchaseDate && printedMilliunits != null);
     const extractStatus: ReceiptExtractStatus = !hasKeys ? 'failed' : gated && !totalsDisagree ? 'gated' : 'ungated';
 
-    const verifyFlags = await tryVerify({
+    const verifyFlags = await tryVerify(meter.usages, {
         enabled: input.verify ?? RECEIPT_VERIFY_ENABLED,
         apiKey,
         model: input.verifyModel ?? OPENROUTER_DECISIONS_MODEL,
@@ -159,6 +178,7 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
         lines,
         taxMilliunits,
         discountMilliunits,
+        tipMilliunits,
     });
 
     const payload: ReceiptExtractPayload = {
@@ -168,9 +188,11 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
         ocrPrintedMilliunits: linesVision?.printedMilliunits ?? null,
         taxMilliunits,
         discountMilliunits,
+        tipMilliunits,
         lines,
         error,
         ...(verifyFlags ? { verifyFlags } : {}),
+        ...(settlement ? { handwrittenTotals: settlement } : {}),
     };
 
     return {
@@ -181,10 +203,8 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
         printedMilliunits,
         totalsDisagree,
         extractJson: JSON.stringify(payload),
-        rawText: formatReceiptExtractDump(lines, taxMilliunits, discountMilliunits),
-        extractCostUsd: costUsd,
-        extractPromptTokens: promptTokens,
-        extractCompletionTokens: completionTokens,
+        rawText: formatReceiptExtractDump(lines, taxMilliunits, discountMilliunits, tipMilliunits),
+        ...totalUsage(meter.usages),
     };
 }
 
@@ -199,6 +219,7 @@ export function buildFailedReceiptExtract(message: string): ReceiptExtractComple
         ocrPrintedMilliunits: null,
         taxMilliunits: 0,
         discountMilliunits: 0,
+        tipMilliunits: 0,
         lines: [],
         error: message,
     };
@@ -217,7 +238,7 @@ export function buildFailedReceiptExtract(message: string): ReceiptExtractComple
     };
 }
 
-function completeHeaderOnly(attempt: HeaderAttempt): ReceiptExtractComplete {
+function completeHeaderOnly(attempt: HeaderAttempt, usages: Usages): ReceiptExtractComplete {
     const header = attempt.header ?? emptyHeader();
     const hasKeys = Boolean(header.vendor && header.purchaseDate && header.printedMilliunits != null);
     const payload: ReceiptExtractPayload = {
@@ -227,6 +248,7 @@ function completeHeaderOnly(attempt: HeaderAttempt): ReceiptExtractComplete {
         ocrPrintedMilliunits: null,
         taxMilliunits: 0,
         discountMilliunits: 0,
+        tipMilliunits: 0,
         lines: [],
         error: attempt.error,
     };
@@ -239,32 +261,70 @@ function completeHeaderOnly(attempt: HeaderAttempt): ReceiptExtractComplete {
         totalsDisagree: false,
         extractJson: JSON.stringify(payload),
         rawText: null,
-        extractCostUsd: attempt.usage?.costUsd ?? null,
-        extractPromptTokens: attempt.usage?.promptTokens ?? null,
-        extractCompletionTokens: attempt.usage?.completionTokens ?? null,
+        ...totalUsage(usages),
     };
+}
+
+type Usages = (OpenRouterUsage | null)[];
+
+/**
+ * Records the usage of every answered call. A reply that fails to parse, or a call whose sibling
+ * throws, was still billed, so cost is counted here rather than from the calls that succeeded.
+ */
+function meterUsage(completeJson: CompleteOpenRouterJson): {
+    readonly completeJson: CompleteOpenRouterJson;
+    readonly usages: Usages;
+} {
+    const usages: Usages = [];
+    return {
+        usages,
+        completeJson: async (request) => {
+            const result = await completeJson(request);
+            usages.push(result.usage);
+            return result;
+        },
+    };
+}
+
+function totalUsage(
+    usages: Usages,
+): Pick<ReceiptExtractComplete, 'extractCostUsd' | 'extractPromptTokens' | 'extractCompletionTokens'> {
+    let costUsd: number | null = null;
+    let promptTokens: number | null = null;
+    let completionTokens: number | null = null;
+    for (const usage of usages) {
+        costUsd = sumNullable(costUsd, usage?.costUsd ?? null);
+        promptTokens = sumNullable(promptTokens, usage?.promptTokens ?? null);
+        completionTokens = sumNullable(completionTokens, usage?.completionTokens ?? null);
+    }
+    return { extractCostUsd: costUsd, extractPromptTokens: promptTokens, extractCompletionTokens: completionTokens };
 }
 
 /**
  * Advisory only. A verification failure must never cost us a good extract, so
  * every error path returns undefined — which parseReceiptExtract keeps distinct
- * from an empty flag list.
+ * from an empty flag list. Its usage joins the receipt's total like any other call.
  */
-async function tryVerify(input: {
-    readonly enabled: boolean;
-    readonly apiKey: string;
-    readonly model: string;
-    readonly vendor: string | null;
-    readonly printedMilliunits: number | null;
-    readonly lines: readonly ReceiptExtractLine[];
-    readonly taxMilliunits: number;
-    readonly discountMilliunits: number;
-}): Promise<readonly ReceiptVerifyFlag[] | undefined> {
+async function tryVerify(
+    usages: Usages,
+    input: {
+        readonly enabled: boolean;
+        readonly apiKey: string;
+        readonly model: string;
+        readonly vendor: string | null;
+        readonly printedMilliunits: number | null;
+        readonly lines: readonly ReceiptExtractLine[];
+        readonly taxMilliunits: number;
+        readonly discountMilliunits: number;
+        readonly tipMilliunits: number;
+    },
+): Promise<readonly ReceiptVerifyFlag[] | undefined> {
     if (!input.enabled || !input.vendor) {
         return undefined;
     }
     try {
         const result = await verifyReceiptExtract(input);
+        usages.push(result.usage);
         return result.flags;
     } catch (error) {
         console.warn('receipt extract verification failed', errorMessage(error));
@@ -289,15 +349,13 @@ function emptyHeader(): ReceiptHeaderVision {
 }
 
 function gateMatches(
-    lines: readonly ReceiptExtractLine[],
-    taxMilliunits: number,
-    discountMilliunits: number,
+    amounts: Omit<ArithmeticGateInput, 'printedMilliunits'>,
     printedMilliunits: number | null,
 ): boolean {
     if (printedMilliunits == null) {
         return false;
     }
-    return arithmeticGate({ lines, taxMilliunits, discountMilliunits, printedMilliunits }).gated;
+    return arithmeticGate({ ...amounts, printedMilliunits }).gated;
 }
 
 function joinErrors(left: string | null, right: string | null): string | null {
@@ -322,33 +380,48 @@ function sumNullable(left: number | null, right: number | null): number | null {
 type HeaderAttempt = {
     header: ReceiptHeaderVision | null;
     error: string | null;
-    usage: OpenRouterUsage | null;
 };
 
 async function tryReadHeaders(input: Parameters<typeof readReceiptHeaders>[0]): Promise<HeaderAttempt> {
     try {
         const result = await readReceiptHeaders(input);
-        return { header: result.header, error: null, usage: result.usage };
+        return { header: result.header, error: null };
     } catch (error) {
         const message = errorMessage(error);
         console.warn('receipt header vision failed', message);
-        return { header: null, error: message, usage: null };
+        return { header: null, error: message };
+    }
+}
+
+type SettleAttempt = {
+    settlement: HandwrittenTotalsSettlement | null;
+    error: string | null;
+};
+
+/** A failed settle stores no tip: an unverified tip is exactly what the pass exists to keep out. */
+async function trySettle(input: Parameters<typeof settleHandwrittenTotals>[0]): Promise<SettleAttempt> {
+    try {
+        const result = await settleHandwrittenTotals(input);
+        return { settlement: result.settlement, error: null };
+    } catch (error) {
+        const message = errorMessage(error);
+        console.warn('receipt handwritten totals failed', message);
+        return { settlement: null, error: `handwritten totals: ${message}` };
     }
 }
 
 type LinesAttempt = {
     lines: ReceiptLinesVision | null;
     error: string | null;
-    usage: OpenRouterUsage | null;
 };
 
 async function tryReadLines(input: Parameters<typeof readReceiptLines>[0]): Promise<LinesAttempt> {
     try {
         const result = await readReceiptLines(input);
-        return { lines: result.lines, error: null, usage: result.usage };
+        return { lines: result.lines, error: null };
     } catch (error) {
         const message = errorMessage(error);
         console.warn('receipt line vision failed', message);
-        return { lines: null, error: message, usage: null };
+        return { lines: null, error: message };
     }
 }

@@ -222,6 +222,7 @@ function emptyExtractPayload() {
         ocrPrintedMilliunits: null,
         taxMilliunits: 0,
         discountMilliunits: 0,
+        tipMilliunits: 0,
         lines: [],
     };
 }

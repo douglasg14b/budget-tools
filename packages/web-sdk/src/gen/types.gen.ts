@@ -194,6 +194,10 @@ export type PatchReceiptLineDto = {
 
 export type PatchReceiptDto = {
     lines: Array<PatchReceiptLineDto>;
+    /**
+     * Omit to keep the previously extracted tip.
+     */
+    tipMilliunits?: number;
     discountMilliunits: number;
     taxMilliunits: number;
     printedMilliunits: number | null;

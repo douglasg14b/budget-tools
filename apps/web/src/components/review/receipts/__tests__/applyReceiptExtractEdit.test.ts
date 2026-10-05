@@ -12,6 +12,7 @@ const cafeEdit = {
     printedMilliunits: 8120,
     taxMilliunits: 620,
     discountMilliunits: 200,
+    tipMilliunits: 0,
     lines: [
         { name: 'Latte', amountMilliunits: 4500, quantity: 1 },
         { name: 'Muffin', amountMilliunits: 3200, quantity: 1 },
@@ -53,6 +54,16 @@ describe('applyReceiptExtractEdit', () => {
                 edit: { ...cafeEdit, vendor: '' },
             }).extractStatus,
         ).toBe('failed');
+    });
+
+    it('counts the tip toward the total', () => {
+        const applied = applyReceiptExtractEdit({
+            previousExtractJson: null,
+            edit: { ...cafeEdit, printedMilliunits: 9620, tipMilliunits: 1500 },
+        });
+        expect(applied.extractStatus).toBe('gated');
+        expect(JSON.parse(applied.extractJson)).toMatchObject({ gated: true, tipMilliunits: 1500 });
+        expect(applied.rawText).toContain('Tip 1.50');
     });
 
     it('refuses Amazon vendors', () => {

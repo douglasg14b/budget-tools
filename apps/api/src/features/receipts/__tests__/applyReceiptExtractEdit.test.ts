@@ -40,6 +40,33 @@ describe('applyReceiptExtractEdit', () => {
         expect(JSON.parse(result.extractJson)).toMatchObject({ gated: false });
     });
 
+    it('keeps the previously extracted tip when the edit omits it', () => {
+        const result = applyReceiptExtractEdit({
+            previousExtractJson: JSON.stringify({ tipMilliunits: 1500 }),
+            edit: { ...cafeEdit, printedMilliunits: 9620 },
+        });
+        expect(result.kind).toBe('applied');
+        if (result.kind !== 'applied') {
+            return;
+        }
+        expect(result.extractStatus).toBe('gated');
+        expect(JSON.parse(result.extractJson)).toMatchObject({ gated: true, tipMilliunits: 1500 });
+        expect(result.rawText).toContain('Tip 1.50');
+    });
+
+    it('lets the reviewer clear a tip explicitly', () => {
+        const result = applyReceiptExtractEdit({
+            previousExtractJson: JSON.stringify({ tipMilliunits: 1500 }),
+            edit: { ...cafeEdit, tipMilliunits: 0 },
+        });
+        expect(result.kind).toBe('applied');
+        if (result.kind !== 'applied') {
+            return;
+        }
+        expect(result.extractStatus).toBe('gated');
+        expect(JSON.parse(result.extractJson)).toMatchObject({ tipMilliunits: 0 });
+    });
+
     it('marks failed when a match key is missing', () => {
         const result = applyReceiptExtractEdit({
             previousExtractJson: null,

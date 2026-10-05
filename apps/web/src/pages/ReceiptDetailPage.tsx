@@ -232,6 +232,7 @@ export function ReceiptDetailPage() {
                     printedMilliunits: edit.printedMilliunits,
                     taxMilliunits: edit.taxMilliunits,
                     discountMilliunits: edit.discountMilliunits,
+                    tipMilliunits: edit.tipMilliunits,
                     lines: edit.lines.map((line) => ({
                         name: line.name,
                         amountMilliunits: line.amountMilliunits,

@@ -15,11 +15,14 @@ export type ReceiptHeaderVision = {
     readonly vendor: string | null;
     readonly purchaseDate: string | null;
     readonly printedMilliunits: number | null;
+    /** Header read only: a tip or total is written by hand. Triggers the handwritten-totals pass. */
+    readonly hasHandwrittenAmounts?: boolean;
 };
 
 export type ReceiptLinesVision = ReceiptHeaderVision & {
     readonly taxMilliunits: number;
     readonly discountMilliunits: number;
+    readonly tipMilliunits: number;
     readonly lines: ReceiptExtractLine[];
 };
 
@@ -54,10 +57,15 @@ const HEADER_SCHEMA = {
     properties: {
         vendor: { type: ['string', 'null'] },
         purchaseDate: { type: ['string', 'null'] },
-        printedTotalDollars: { type: ['number', 'null'] },
+        grandTotalDollars: { type: ['number', 'null'] },
+        hasHandwrittenAmounts: { type: 'boolean' },
     },
-    required: ['vendor', 'purchaseDate', 'printedTotalDollars'],
+    required: ['vendor', 'purchaseDate', 'grandTotalDollars', 'hasHandwrittenAmounts'],
 };
+
+/** Signed card slips print a subtotal and leave tip and total to be written in by hand. */
+const HANDWRITTEN_TOTAL_RULE =
+    'On a signed card slip where the tip and total are written in by hand, grandTotalDollars is the handwritten total, not the printed subtotal.';
 
 const REPAIR_LINE_SCHEMA = {
     type: 'object',
@@ -76,16 +84,17 @@ const REPAIR_SCHEMA = {
     properties: {
         vendor: { type: ['string', 'null'] },
         purchaseDate: { type: ['string', 'null'] },
-        printedTotalDollars: { type: ['number', 'null'] },
+        grandTotalDollars: { type: ['number', 'null'] },
         taxDollars: { type: ['number', 'null'] },
         discountDollars: { type: ['number', 'null'] },
+        tipDollars: { type: ['number', 'null'] },
         lines: { type: 'array', items: REPAIR_LINE_SCHEMA },
     },
-    required: ['vendor', 'purchaseDate', 'printedTotalDollars', 'taxDollars', 'discountDollars', 'lines'],
+    required: ['vendor', 'purchaseDate', 'grandTotalDollars', 'taxDollars', 'discountDollars', 'tipDollars', 'lines'],
 };
 
 /**
- * Cheap vision JSON for vendor, purchase date, and printed total.
+ * Cheap vision JSON for vendor, purchase date, and grand total (handwritten on signed card slips).
  */
 export async function readReceiptHeaders(input: ReceiptHeaderVisionInput): Promise<ReceiptHeaderVisionResult> {
     const { content, usage } = await input.completeJson({
@@ -95,23 +104,23 @@ export async function readReceiptHeaders(input: ReceiptHeaderVisionInput): Promi
         timeoutMs: input.timeoutMs,
         schemaName: 'receipt_headers',
         schema: HEADER_SCHEMA,
-        system: 'Extract receipt match keys from the photo. purchaseDate must be an ISO calendar date YYYY-MM-DD with no time (example 2026-08-01). Convert printed dates such as 08/01/2026 or Aug 1, 2026 into YYYY-MM-DD. Do not invent unreadable fields — use null instead. printedTotalDollars is the grand total the customer paid, not subtotal, tax-only, or a line item.',
-        user: 'Read vendor name, purchase date as YYYY-MM-DD, and printed grand total from this receipt image. Do not invent values.',
+        system: `Extract receipt match keys from the photo. purchaseDate must be an ISO calendar date YYYY-MM-DD with no time (example 2026-08-01). Convert printed dates such as 08/01/2026 or Aug 1, 2026 into YYYY-MM-DD. Do not invent unreadable fields — use null instead. grandTotalDollars is the grand total the customer paid, not subtotal, tax-only, or a line item. ${HANDWRITTEN_TOTAL_RULE} hasHandwrittenAmounts is true when any money amount (such as a tip or total) is written by hand.`,
+        user: 'Read vendor name, purchase date as YYYY-MM-DD, and grand total from this receipt image. Do not invent values.',
         images: [input.processedDataUrl],
     });
     return { header: parseHeaderCompletion(content), usage };
 }
 
 /**
- * Schema-constrained line items, tax, and discount. Printed total is locked when headers already read it.
+ * Schema-constrained line items, tax, discount, and tip. Grand total is locked when headers already read it.
  */
 export async function readReceiptLines(input: ReceiptLinesVisionInput): Promise<ReceiptLinesVisionResult> {
     const expectedDollars =
         input.expectedPrintedMilliunits == null ? null : (input.expectedPrintedMilliunits / 1000).toFixed(2);
     const lockTotal =
         expectedDollars == null
-            ? 'Read the printed grand total the customer paid. Do not invent a total that is not on the tape.'
-            : `Printed grand total must stay ${expectedDollars} dollars. Do not change that total.`;
+            ? `Read the grand total the customer paid. ${HANDWRITTEN_TOTAL_RULE} Do not invent a total that is not on the receipt.`
+            : `Grand total must stay ${expectedDollars} dollars. Do not change that total.`;
     const { content, usage } = await input.completeJson({
         apiKey: input.apiKey,
         baseUrl: input.baseUrl,
@@ -119,7 +128,7 @@ export async function readReceiptLines(input: ReceiptLinesVisionInput): Promise<
         timeoutMs: input.timeoutMs,
         schemaName: 'receipt_lines',
         schema: REPAIR_SCHEMA,
-        system: 'Extract receipt line items from the photo. purchaseDate must be YYYY-MM-DD. Do not invent products or amounts. If you cannot make the math work, return the best readable lines without fabricating.',
+        system: 'Extract receipt line items from the photo. purchaseDate must be YYYY-MM-DD. Do not invent products or amounts. tipDollars is a tip or gratuity added to the bill, printed or handwritten; read it from the receipt, never compute it from other amounts; use null when there is none, and never list the tip as a line item. If you cannot make the math work, return the best readable lines without fabricating.',
         user: [lockTotal, 'Return purchaseDate as YYYY-MM-DD if readable.'].join('\n'),
         images: [input.processedDataUrl],
     });
@@ -131,7 +140,8 @@ export function parseHeaderCompletion(content: string): ReceiptHeaderVision {
     return {
         vendor: optionalText(record.vendor),
         purchaseDate: optionalIsoDate(record.purchaseDate),
-        printedMilliunits: moneyToMilliunits(record.printedTotalDollars),
+        printedMilliunits: moneyToMilliunits(record.grandTotalDollars),
+        hasHandwrittenAmounts: record.hasHandwrittenAmounts === true,
     };
 }
 
@@ -144,9 +154,10 @@ export function parseLinesCompletion(content: string): ReceiptLinesVision {
     return {
         vendor: optionalText(record.vendor),
         purchaseDate: optionalIsoDate(record.purchaseDate),
-        printedMilliunits: moneyToMilliunits(record.printedTotalDollars),
+        printedMilliunits: moneyToMilliunits(record.grandTotalDollars),
         taxMilliunits: moneyToMilliunits(record.taxDollars) ?? 0,
         discountMilliunits: Math.abs(moneyToMilliunits(record.discountDollars) ?? 0),
+        tipMilliunits: Math.abs(moneyToMilliunits(record.tipDollars) ?? 0),
         lines,
     };
 }
@@ -167,7 +178,7 @@ function parseRepairLine(entry: unknown): ReceiptExtractLine | null {
     };
 }
 
-function parseObjectContent(content: string, label: string): Record<string, unknown> {
+export function parseObjectContent(content: string, label: string): Record<string, unknown> {
     let parsed: unknown;
     try {
         parsed = JSON.parse(content);
@@ -185,7 +196,20 @@ function parseObjectContent(content: string, label: string): Record<string, unkn
     if (!parsed || typeof parsed !== 'object') {
         throw new LlmSuggestError(503, `OpenRouter ${label} was not an object`);
     }
-    return parsed as Record<string, unknown>;
+    return unwrapSchemaEnvelope(parsed as Record<string, unknown>);
+}
+
+/**
+ * qwen3.7-plus sometimes echoes the JSON-schema wrapper around its answer:
+ * `{"type":"object","properties":{…answer…},"required":[…]}`. None of our schemas has a
+ * top-level `properties` key, so an object-typed `properties` here is always that envelope.
+ */
+function unwrapSchemaEnvelope(record: Record<string, unknown>): Record<string, unknown> {
+    const inner = record.properties;
+    if (record.type === 'object' && inner && typeof inner === 'object' && !Array.isArray(inner)) {
+        return inner as Record<string, unknown>;
+    }
+    return record;
 }
 
 function optionalText(value: unknown): string | null {
