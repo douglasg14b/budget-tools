@@ -1,0 +1,16 @@
+---
+description: Tests must never reach production or any remote service
+globs: **/__tests__/**,**/*.test.*,**/vitest*.ts,**/package.json
+alwaysApply: false
+paths: ["**/__tests__/**", "**/*.test.*", "**/vitest*.ts", "**/package.json"]
+---
+
+# Test isolation
+
+`.env.local` is the production database, S3 and YNAB. Tests never load it.
+
+- Default test scripts run plain `vitest run`. They load `.env.test` (committed, no secrets), never `.env.local` or `dotenvx`. `testSafety.test.ts` enforces this.
+- Use `createTestAppDatabase()` (PGlite) for Postgres. It routes both `getDatabase()` and `getAppDatabase()` to the test database.
+- Inject or mock every remote client (OpenRouter, YNAB, S3, Amazon, the scorer). The Vitest setup blocks non-loopback sockets, so a missed mock fails loudly rather than calling out.
+- A test that must call a real remote API is named `*.live.test.ts`. It runs only through the explicit `test:live` script, which allows exactly that host.
+- Never weaken a guard to make a test pass. Fix the test.

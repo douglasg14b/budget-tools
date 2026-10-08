@@ -12,7 +12,7 @@ import { setDatabaseForTests } from '../data/database';
 import { FilesystemReceiptStorage } from '../features/receipts/storage/filesystemReceiptStorage';
 import { getReceiptStorage, setReceiptStorageForTests } from '../features/receipts/storage/getReceiptStorage';
 import type { AppDatabaseClient } from './database';
-import { createAppDatabaseFromDialect } from './database';
+import { createAppDatabaseFromDialect, setAppDatabaseForTests } from './database';
 
 /**
  * A fully-migrated, isolated Postgres database for tests, backed by in-process PGlite
@@ -42,9 +42,10 @@ export async function createTestAppDatabase(): Promise<TestAppDatabase> {
     const receiptsDir = await mkdtemp(join(tmpdir(), 'api-receipts-'));
     const storage = new FilesystemReceiptStorage(receiptsDir);
     setReceiptStorageForTests(storage);
-    // Core YNAB tables share the same PGlite, so code that reaches for `getDatabase()`
-    // (e.g. auto-bind after extract) never touches the configured Postgres in tests.
+    // Both clients resolve to this PGlite, so code that reaches for `getDatabase()` or
+    // `getAppDatabase()` without being handed `db` never touches the configured Postgres.
     setDatabaseForTests(new Kysely<Database>({ dialect: new PGliteDialect(pglite) }));
+    setAppDatabaseForTests(db);
 
     return {
         db,
@@ -56,6 +57,7 @@ export async function createTestAppDatabase(): Promise<TestAppDatabase> {
             await db.destroy();
             setReceiptStorageForTests(undefined);
             setDatabaseForTests(undefined);
+            setAppDatabaseForTests(undefined);
             await rm(receiptsDir, { recursive: true, force: true });
         },
     };

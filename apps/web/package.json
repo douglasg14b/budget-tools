@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@budget-tools/config-typescript": "workspace:^",
+    "@budget-tools/shared-node": "workspace:^",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-basic-ssl": "^2.3.0",

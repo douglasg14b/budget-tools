@@ -55,6 +55,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [original],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             completeJson,
             prep: async (frames) => {
                 expect(frames[0]?.equals(original)).toBe(true);
@@ -81,6 +83,8 @@ describe('extractReceipt', () => {
         await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             completeJson,
             headerModel: 'test/frontier-vision',
@@ -98,6 +102,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             completeJson,
             headerOnly: true,
@@ -114,6 +120,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             completeJson,
         });
@@ -126,6 +134,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             completeJson: completeJsonReturning({
                 receipt_headers: headerContent(),
@@ -152,6 +162,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             completeJson: completeJsonReturning({
                 receipt_headers: headerContent(),
@@ -208,6 +220,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             completeJson,
         });
@@ -231,6 +245,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             // No settle answers registered, so every settle call throws.
             completeJson: completeJsonReturning({
@@ -262,6 +278,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             completeJson: async (input) => {
                 if (input.schemaName === 'receipt_row_read' && input.system.includes('grand total')) {
@@ -286,6 +304,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             completeJson: completeJsonReturning({ receipt_headers: 'not json' }),
         });
@@ -301,6 +321,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             completeJson: completeJsonReturning({
                 receipt_headers: headerContent(),
@@ -319,6 +341,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             completeJson: completeJsonReturning({
                 receipt_headers: headerContent({
@@ -351,6 +375,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             completeJson: completeJsonReturning({
                 receipt_headers: headerContent({ vendor: null }),
@@ -365,6 +391,8 @@ describe('extractReceipt', () => {
         const result = await extractReceipt({
             frames: [processed],
             apiKey: 'test-key',
+            // The advisory verify pass calls OpenRouter directly; it has its own tests.
+            verify: false,
             prep: async () => processed,
             completeJson: async () => {
                 throw new Error('vision down');

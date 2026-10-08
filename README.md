@@ -1,5 +1,15 @@
 # budget-tools
 
+## Tests
+
+`.env.local` points at production: the Postgres database, S3, YNAB. Tests never load it.
+
+- `pnpm test` runs Vitest with the committed, secret-free `.env.test`. Postgres is in-process PGlite (`createTestAppDatabase` in `apps/api`).
+- A Vitest setup file (`vitest.setup.ts` in each app, from `@budget-tools/shared-node`) runs before every test file. It deletes remote-pointing variables (`DB_CONNECTION_STRING`, `*_S3_*`, `YNAB_API_KEY`, `OPENROUTER_API_KEY`, and the rest) and makes any connection to a non-loopback host throw. This holds even if the shell exports them, or the run is wrapped in `dotenvx run -f .env.local`.
+- Every real Postgres factory (`createDatabase`, `createAppDatabase`, `getDbConnectionString`) throws under Vitest.
+- `apps/api/src/__tests__/testSafety.test.ts` proves each guard. It also fails if any default test script mentions `.env.local` or `dotenvx`.
+- `pnpm --filter @budget-tools/api test:live` is the one explicit exception. It runs only `*.live.test.ts`, with `.env.local` loaded. Only the OpenRouter key and `openrouter.ai` get through; the database and everything else stay blocked.
+
 ## Amazon order data
 
 Payment/order history is scraped by a local Playwright MCP, not a workspace package.

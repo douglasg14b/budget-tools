@@ -1,6 +1,7 @@
 import { isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { assertNotInTestRun } from '@budget-tools/db';
 import env from 'env-var';
 
 export const API_PORT = env.get('API_PORT').default('4020').asPortNumber();
@@ -95,8 +96,10 @@ export function getCategorizationScorerUrl(): string | undefined {
 
 /**
  * Postgres connection string. Read lazily so OpenAPI generation can load the process without a database.
+ * Throws inside tests: the configured database is production.
  */
 export function getDbConnectionString(): string {
+    assertNotInTestRun('read DB_CONNECTION_STRING');
     return env.get('DB_CONNECTION_STRING').required().asString();
 }
 

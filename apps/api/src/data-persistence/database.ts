@@ -1,3 +1,4 @@
+import { assertNotInTestRun } from '@budget-tools/db';
 import type { Dialect } from 'kysely';
 import { CamelCasePlugin, Kysely, PostgresDialect } from 'kysely';
 import pg from 'pg';
@@ -61,8 +62,9 @@ export function createAppDatabaseFromDialect(dialect: Dialect): AppDatabaseClien
     });
 }
 
-/** Production client: a pg pool against the shared Postgres connection string. */
+/** Production client: a pg pool against the shared Postgres connection string. Throws inside tests. */
 export function createAppDatabase(connectionString: string): AppDatabaseClient {
+    assertNotInTestRun('open a Postgres connection pool');
     return createAppDatabaseFromDialect(
         new PostgresDialect({
             pool: new Pool({ connectionString, max: 10 }),
@@ -80,4 +82,9 @@ export async function getAppDatabase(): Promise<AppDatabaseClient> {
         cached = createAppDatabase(getDbConnectionString());
     }
     return cached;
+}
+
+/** Points the app-tables client at a test database (PGlite); `undefined` restores lazy creation. */
+export function setAppDatabaseForTests(client: AppDatabaseClient | undefined): void {
+    cached = client;
 }
