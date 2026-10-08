@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AutoBindReceiptData, AutoBindReceiptErrors, AutoBindReceiptResponses, BindReceiptData, BindReceiptErrors, BindReceiptResponses, CreateReceiptData, CreateReceiptErrors, CreateReceiptResponses, CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteClassificationDecisionData, DeleteClassificationDecisionErrors, DeleteClassificationDecisionResponses, DeleteReceiptData, DeleteReceiptErrors, DeleteReceiptResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, DetachReceiptData, DetachReceiptErrors, DetachReceiptResponses, ExtractPreviewData, ExtractPreviewErrors, ExtractPreviewResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetMeData, GetMeResponses, GetOperatingModeData, GetOperatingModeResponses, GetOutboundSyncData, GetOutboundSyncResponses, GetReceiptData, GetReceiptErrors, GetReceiptImageData, GetReceiptImageErrors, GetReceiptImageResponses, GetReceiptResponses, GetTravelBiasData, GetTravelBiasResponses, GetYnabFlagsData, GetYnabFlagsResponses, ListAccountsData, ListAccountsResponses, ListPeriodicSeriesData, ListPeriodicSeriesErrors, ListPeriodicSeriesResponses, ListReceiptsData, ListReceiptsResponses, ListTravelWindowsData, ListTravelWindowsResponses, LookupByReceiptData, LookupByReceiptErrors, LookupByReceiptResponses, LookupByTransactionData, LookupByTransactionErrors, LookupByTransactionResponses, MatchPreviewData, MatchPreviewErrors, MatchPreviewResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchPasswordData, PatchPasswordResponses, PatchReceiptData, PatchReceiptErrors, PatchReceiptResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostClassificationDecisionsData, PostClassificationDecisionsErrors, PostClassificationDecisionsResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostLoginData, PostLoginResponses, PostLogoutData, PostLogoutResponses, PostOutboundSyncFlushData, PostOutboundSyncFlushErrors, PostOutboundSyncFlushResponses, PostPredictData, PostPredictResponses, RetryReceiptExtractData, RetryReceiptExtractErrors, RetryReceiptExtractResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
+import type { AutoBindReceiptData, AutoBindReceiptErrors, AutoBindReceiptResponses, BindReceiptData, BindReceiptErrors, BindReceiptResponses, CreateReceiptData, CreateReceiptErrors, CreateReceiptResponses, CreateTravelWindowData, CreateTravelWindowErrors, CreateTravelWindowResponses, DeleteClassificationDecisionData, DeleteClassificationDecisionErrors, DeleteClassificationDecisionResponses, DeleteReceiptData, DeleteReceiptErrors, DeleteReceiptResponses, DeleteTravelWindowData, DeleteTravelWindowResponses, DetachReceiptData, DetachReceiptErrors, DetachReceiptResponses, ExtractPreviewData, ExtractPreviewErrors, ExtractPreviewResponses, GetAmazonOrdersStatusData, GetAmazonOrdersStatusResponses, GetCategoriesData, GetCategoriesResponses, GetCategorizationQueueData, GetCategorizationQueueResponses, GetHealthData, GetHealthResponses, GetMeData, GetMeResponses, GetOperatingModeData, GetOperatingModeResponses, GetOutboundSyncData, GetOutboundSyncResponses, GetReceiptData, GetReceiptErrors, GetReceiptImageData, GetReceiptImageErrors, GetReceiptImageResponses, GetReceiptResponses, GetSpendChartData, GetSpendChartResponses, GetTravelBiasData, GetTravelBiasResponses, GetYnabFlagsData, GetYnabFlagsResponses, ListAccountsData, ListAccountsResponses, ListPeriodicSeriesData, ListPeriodicSeriesErrors, ListPeriodicSeriesResponses, ListReceiptsData, ListReceiptsResponses, ListTravelWindowsData, ListTravelWindowsResponses, LookupByReceiptData, LookupByReceiptErrors, LookupByReceiptResponses, LookupByTransactionData, LookupByTransactionErrors, LookupByTransactionResponses, MatchPreviewData, MatchPreviewErrors, MatchPreviewResponses, PatchOperatingModeData, PatchOperatingModeResponses, PatchPasswordData, PatchPasswordResponses, PatchReceiptData, PatchReceiptErrors, PatchReceiptResponses, PatchTravelBiasData, PatchTravelBiasResponses, PostAmazonOrdersSyncData, PostAmazonOrdersSyncResponses, PostAmazonSuggestData, PostAmazonSuggestResponses, PostClassificationDecisionsData, PostClassificationDecisionsErrors, PostClassificationDecisionsResponses, PostLlmSuggestData, PostLlmSuggestResponses, PostLoginData, PostLoginResponses, PostLogoutData, PostLogoutResponses, PostOutboundSyncFlushData, PostOutboundSyncFlushErrors, PostOutboundSyncFlushResponses, PostPredictData, PostPredictResponses, PutCategorySmoothingData, PutCategorySmoothingResponses, RetryReceiptExtractData, RetryReceiptExtractErrors, RetryReceiptExtractResponses, UpdateTravelWindowData, UpdateTravelWindowErrors, UpdateTravelWindowResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -93,6 +93,33 @@ export class Accounts {
      */
     public static request<ThrowOnError extends boolean = false>(options?: Options<ListAccountsData, ThrowOnError>): RequestResult<ListAccountsResponses, unknown, ThrowOnError> {
         return (options?.client ?? client).get<ListAccountsResponses, unknown, ThrowOnError>({ url: '/accounts', ...options });
+    }
+}
+
+export class SpendChart {
+    /**
+     * getSpendChart
+     *
+     * Daily spend per category, with smoothed categories spread over their window.
+     */
+    public static request<ThrowOnError extends boolean = false>(options: Options<GetSpendChartData, ThrowOnError>): RequestResult<GetSpendChartResponses, unknown, ThrowOnError> {
+        return (options.client ?? client).get<GetSpendChartResponses, unknown, ThrowOnError>({ url: '/spend-chart', ...options });
+    }
+    
+    /**
+     * putCategorySmoothing
+     *
+     * Sets how many days each purchase in a category is spread over. 1 turns smoothing off.
+     */
+    public static request2<ThrowOnError extends boolean = false>(options: Options<PutCategorySmoothingData, ThrowOnError>): RequestResult<PutCategorySmoothingResponses, unknown, ThrowOnError> {
+        return (options.client ?? client).put<PutCategorySmoothingResponses, unknown, ThrowOnError>({
+            url: '/spend-chart/smoothing/{categoryId}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
     }
 }
 

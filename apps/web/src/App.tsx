@@ -22,6 +22,7 @@ import { ReceiptDetailPage } from './pages/ReceiptDetailPage';
 import { ReceiptsPage } from './pages/ReceiptsPage';
 import { RepeatingPage } from './pages/RepeatingPage';
 import { ReviewQueuePage } from './pages/ReviewQueuePage';
+import { SpendingPage } from './pages/SpendingPage';
 import { TripsPage } from './pages/TripsPage';
 import { theme } from './theme';
 
@@ -125,6 +126,7 @@ function AppLayout() {
                             <Route path="/receipts/:receiptId" element={<ReceiptDetailPage />} />
                             <Route path="/repeating" element={<RepeatingPage />} />
                             <Route path="/trips" element={<TripsPage />} />
+                            <Route path="/spending" element={<SpendingPage />} />
                         </Routes>
                     </div>
                 </AppShell.Main>

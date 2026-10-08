@@ -14,6 +14,7 @@ import type {
 import type { SessionsTable, UsersTable } from '../features/auth/data/authSchema';
 import type { OperatingModeTable } from '../features/operatingMode/data/operatingModeSchema';
 import type { ReceiptBindRejectionsTable, ReceiptsTable } from '../features/receipts/data/receiptsSchema';
+import type { CategorySmoothingTable } from '../features/spendChart/data/categorySmoothingSchema';
 import type { TravelBiasConfigTable } from '../features/travelWindows/data/travelBiasConfigSchema';
 import type { TravelWindowAccountsTable, TravelWindowsTable } from '../features/travelWindows/data/travelWindowsSchema';
 import type { ClassificationSyncTable } from '../features/ynabSync/data/classificationSyncSchema';
@@ -42,6 +43,7 @@ export type AppDatabase = {
     classification_sync: ClassificationSyncTable;
     receipts: ReceiptsTable;
     receipt_bind_rejections: ReceiptBindRejectionsTable;
+    category_smoothing: CategorySmoothingTable;
     users: UsersTable;
     sessions: SessionsTable;
 };

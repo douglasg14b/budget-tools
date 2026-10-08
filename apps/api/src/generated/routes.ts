@@ -10,6 +10,8 @@ import { TravelBiasController } from './../features/travelWindows/travelBiasCont
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AccountsController } from './../features/travelWindows/accountsController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { SpendChartController } from './../features/spendChart/spendChartController';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { ReceiptsController } from './../features/receipts/receiptsController';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { PeriodicSeriesController } from './../features/periodicSeries/periodicSeriesController';
@@ -70,6 +72,26 @@ const models: TsoaRoute.Models = {
     "AccountsDto": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"accounts":{"dataType":"array","array":{"dataType":"refAlias","ref":"AccountDto"},"required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SpendChartCategoryDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"dailyMilliunits":{"dataType":"array","array":{"dataType":"double"},"required":true},"totalMilliunits":{"dataType":"double","required":true},"windowDays":{"dataType":"double","required":true},"groupName":{"dataType":"string","required":true},"categoryName":{"dataType":"string","required":true},"categoryId":{"dataType":"string","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SpendChartDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"categories":{"dataType":"array","array":{"dataType":"refAlias","ref":"SpendChartCategoryDto"},"required":true},"days":{"dataType":"array","array":{"dataType":"string"},"required":true},"endDate":{"dataType":"string","required":true},"startDate":{"dataType":"string","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CategorySmoothingDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"windowDays":{"dataType":"double","required":true},"categoryId":{"dataType":"string","required":true}},"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CategorySmoothingWriteDto": {
+        "dataType": "refAlias",
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"windowDays":{"dataType":"integer","required":true,"validators":{"minimum":{"value":1},"maximum":{"value":365}}}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ReceiptExtractStatus": {
@@ -681,6 +703,68 @@ export function RegisterRoutes(app: Router) {
 
               await templateService.apiHandler({
                 methodName: 'listAccounts',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsSpendChartController_getSpendChart: Record<string, TsoaRoute.ParameterSchema> = {
+                start: {"in":"query","name":"start","required":true,"dataType":"string"},
+                end: {"in":"query","name":"end","required":true,"dataType":"string"},
+        };
+        app.get('/api/spend-chart',
+            ...(fetchMiddlewares<RequestHandler>(SpendChartController)),
+            ...(fetchMiddlewares<RequestHandler>(SpendChartController.prototype.getSpendChart)),
+
+            async function SpendChartController_getSpendChart(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsSpendChartController_getSpendChart, request, response });
+
+                const controller = new SpendChartController();
+
+              await templateService.apiHandler({
+                methodName: 'getSpendChart',
+                controller,
+                response,
+                next,
+                validatedArgs,
+                successStatus: undefined,
+              });
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        const argsSpendChartController_putCategorySmoothing: Record<string, TsoaRoute.ParameterSchema> = {
+                categoryId: {"in":"path","name":"categoryId","required":true,"dataType":"string"},
+                body: {"in":"body","name":"body","required":true,"ref":"CategorySmoothingWriteDto"},
+        };
+        app.put('/api/spend-chart/smoothing/:categoryId',
+            ...(fetchMiddlewares<RequestHandler>(SpendChartController)),
+            ...(fetchMiddlewares<RequestHandler>(SpendChartController.prototype.putCategorySmoothing)),
+
+            async function SpendChartController_putCategorySmoothing(request: ExRequest, response: ExResponse, next: any) {
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = templateService.getValidatedArgs({ args: argsSpendChartController_putCategorySmoothing, request, response });
+
+                const controller = new SpendChartController();
+
+              await templateService.apiHandler({
+                methodName: 'putCategorySmoothing',
                 controller,
                 response,
                 next,

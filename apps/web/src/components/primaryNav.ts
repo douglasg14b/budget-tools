@@ -14,6 +14,7 @@ export const PRIMARY_NAV: readonly PrimaryNavItem[] = [
     { label: 'Receipts', pathname: '/receipts', keepSearch: true },
     { label: 'Repeating', pathname: '/repeating' },
     { label: 'Trips', pathname: '/trips' },
+    { label: 'Spending', pathname: '/spending' },
 ];
 
 export function navTarget(

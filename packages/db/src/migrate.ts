@@ -7,6 +7,7 @@ import * as authTables from './migrations/2026-09-13-Auth_Tables';
 import * as receiptExtractCost from './migrations/2026-09-14-Receipt_Extract_Cost';
 import * as amazonOrderSubtotal from './migrations/2026-10-03-Amazon_Order_Subtotal';
 import * as receiptBindTracking from './migrations/2026-10-03-Receipt_Bind_Tracking';
+import * as categorySmoothing from './migrations/2026-10-06-Category_Smoothing';
 
 /**
  * Explicit migration registry for the shared Budget Tools Postgres schema.
@@ -22,6 +23,7 @@ export const MIGRATIONS: Record<string, Migration> = {
     '2026-09-14-Receipt_Extract_Cost': receiptExtractCost,
     '2026-10-03-Receipt_Bind_Tracking': receiptBindTracking,
     '2026-10-03-Amazon_Order_Subtotal': amazonOrderSubtotal,
+    '2026-10-06-Category_Smoothing': categorySmoothing,
 };
 
 class StaticMigrationProvider implements MigrationProvider {

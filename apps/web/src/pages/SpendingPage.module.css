@@ -1,0 +1,125 @@
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 64rem;
+    margin: 0 auto;
+}
+
+.header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.kicker {
+    margin: 0;
+    font-family: var(--app-font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--app-text-muted);
+}
+
+.title {
+    margin: 0;
+    font-family: var(--app-font-display);
+    font-size: 2.35rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: var(--app-text-primary);
+}
+
+.lede {
+    margin: 0.35rem 0 0;
+    max-width: 40rem;
+    font-size: 1.05rem;
+    line-height: 1.45;
+    color: var(--app-text-secondary);
+}
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    transition: opacity 120ms ease;
+}
+
+.content[data-refetching] {
+    opacity: 0.55;
+}
+
+.chartCard,
+.tableCard {
+    padding: 1rem 1rem 0.75rem;
+    border: 1px solid var(--app-border);
+    border-radius: 0.75rem;
+    background: var(--app-bg-surface);
+}
+
+.tableHint {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: var(--app-text-secondary);
+}
+
+.chartCol {
+    width: 4.5rem;
+}
+
+.chartToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.lineKey {
+    display: inline-block;
+    width: 1rem;
+    height: 2px;
+    border-radius: 1px;
+}
+
+.categoryName {
+    display: block;
+    color: var(--app-text-primary);
+}
+
+.groupName {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--app-text-muted);
+}
+
+.numberCol {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.spreadCol {
+    width: 7.5rem;
+}
+
+.empty {
+    margin: 0;
+    padding: 1.25rem 1rem;
+    color: var(--app-text-muted);
+    font-size: 1rem;
+}
+
+@media (max-width: 40rem) {
+    .title {
+        font-size: 1.7rem;
+    }
+}

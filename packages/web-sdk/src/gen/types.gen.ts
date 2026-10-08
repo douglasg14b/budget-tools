@@ -47,6 +47,49 @@ export type AccountsDto = {
     accounts: Array<AccountDto>;
 };
 
+export type SpendChartCategoryDto = {
+    /**
+     * One value per entry in `SpendChartDto.days`, in milliunits, after smoothing.
+     */
+    dailyMilliunits: Array<number>;
+    /**
+     * Net spend dated inside the range, in milliunits, before any smoothing.
+     */
+    totalMilliunits: number;
+    /**
+     * 1 when the category is charted as spent; otherwise each purchase is spread over this many days.
+     */
+    windowDays: number;
+    groupName: string;
+    categoryName: string;
+    categoryId: string;
+};
+
+export type SpendChartDto = {
+    /**
+     * Categories with any spend touching the range, largest total first.
+     */
+    categories: Array<SpendChartCategoryDto>;
+    /**
+     * Every day from `startDate` to `endDate` inclusive, as `YYYY-MM-DD`.
+     */
+    days: Array<string>;
+    endDate: string;
+    startDate: string;
+};
+
+export type CategorySmoothingDto = {
+    /**
+     * 1 turns smoothing off.
+     */
+    windowDays: number;
+    categoryId: string;
+};
+
+export type CategorySmoothingWriteDto = {
+    windowDays: number;
+};
+
 export type ReceiptExtractStatus = 'pending' | 'gated' | 'ungated' | 'failed';
 
 /**
@@ -808,6 +851,49 @@ export type ListAccountsResponses = {
 };
 
 export type ListAccountsResponse = ListAccountsResponses[keyof ListAccountsResponses];
+
+export type GetSpendChartData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * First day, `YYYY-MM-DD`.
+         */
+        start: string;
+        /**
+         * Last day, `YYYY-MM-DD`, inclusive.
+         */
+        end: string;
+    };
+    url: '/spend-chart';
+};
+
+export type GetSpendChartResponses = {
+    /**
+     * Ok
+     */
+    200: SpendChartDto;
+};
+
+export type GetSpendChartResponse = GetSpendChartResponses[keyof GetSpendChartResponses];
+
+export type PutCategorySmoothingData = {
+    body: CategorySmoothingWriteDto;
+    path: {
+        categoryId: string;
+    };
+    query?: never;
+    url: '/spend-chart/smoothing/{categoryId}';
+};
+
+export type PutCategorySmoothingResponses = {
+    /**
+     * Ok
+     */
+    200: CategorySmoothingDto;
+};
+
+export type PutCategorySmoothingResponse = PutCategorySmoothingResponses[keyof PutCategorySmoothingResponses];
 
 export type ListReceiptsData = {
     body?: never;

@@ -14,6 +14,7 @@ describe('primaryNav', () => {
         expect(currentPrimaryNav('/receipts').label).toBe('Receipts');
         expect(currentPrimaryNav('/repeating').label).toBe('Repeating');
         expect(currentPrimaryNav('/trips').label).toBe('Trips');
+        expect(currentPrimaryNav('/spending').label).toBe('Spending');
     });
 
     it('preserves search on Queue through Receipts, not Repeating or Trips', () => {

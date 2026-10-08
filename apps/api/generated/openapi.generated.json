@@ -157,6 +157,108 @@
 				],
 				"type": "object"
 			},
+			"SpendChartCategoryDto": {
+				"properties": {
+					"dailyMilliunits": {
+						"items": {
+							"type": "number",
+							"format": "double"
+						},
+						"type": "array",
+						"description": "One value per entry in `SpendChartDto.days`, in milliunits, after smoothing."
+					},
+					"totalMilliunits": {
+						"type": "number",
+						"format": "double",
+						"description": "Net spend dated inside the range, in milliunits, before any smoothing."
+					},
+					"windowDays": {
+						"type": "number",
+						"format": "double",
+						"description": "1 when the category is charted as spent; otherwise each purchase is spread over this many days."
+					},
+					"groupName": {
+						"type": "string"
+					},
+					"categoryName": {
+						"type": "string"
+					},
+					"categoryId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"dailyMilliunits",
+					"totalMilliunits",
+					"windowDays",
+					"groupName",
+					"categoryName",
+					"categoryId"
+				],
+				"type": "object"
+			},
+			"SpendChartDto": {
+				"properties": {
+					"categories": {
+						"items": {
+							"$ref": "#/components/schemas/SpendChartCategoryDto"
+						},
+						"type": "array",
+						"description": "Categories with any spend touching the range, largest total first."
+					},
+					"days": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array",
+						"description": "Every day from `startDate` to `endDate` inclusive, as `YYYY-MM-DD`."
+					},
+					"endDate": {
+						"type": "string"
+					},
+					"startDate": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"categories",
+					"days",
+					"endDate",
+					"startDate"
+				],
+				"type": "object"
+			},
+			"CategorySmoothingDto": {
+				"properties": {
+					"windowDays": {
+						"type": "number",
+						"format": "double",
+						"description": "1 turns smoothing off."
+					},
+					"categoryId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"windowDays",
+					"categoryId"
+				],
+				"type": "object"
+			},
+			"CategorySmoothingWriteDto": {
+				"properties": {
+					"windowDays": {
+						"type": "integer",
+						"format": "int32",
+						"minimum": 1,
+						"maximum": 365
+					}
+				},
+				"required": [
+					"windowDays"
+				],
+				"type": "object"
+			},
 			"ReceiptExtractStatus": {
 				"type": "string",
 				"enum": [
@@ -2582,6 +2684,92 @@
 				],
 				"security": [],
 				"parameters": []
+			}
+		},
+		"/spend-chart": {
+			"get": {
+				"operationId": "GetSpendChart",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/SpendChartDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Daily spend per category, with smoothed categories spread over their window.",
+				"summary": "getSpendChart",
+				"tags": [
+					"spend-chart"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"description": "First day, `YYYY-MM-DD`.",
+						"in": "query",
+						"name": "start",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"description": "Last day, `YYYY-MM-DD`, inclusive.",
+						"in": "query",
+						"name": "end",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/spend-chart/smoothing/{categoryId}": {
+			"put": {
+				"operationId": "PutCategorySmoothing",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/CategorySmoothingDto"
+								}
+							}
+						}
+					}
+				},
+				"description": "Sets how many days each purchase in a category is spread over. 1 turns smoothing off.",
+				"summary": "putCategorySmoothing",
+				"tags": [
+					"spend-chart"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "categoryId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/CategorySmoothingWriteDto"
+							}
+						}
+					}
+				}
 			}
 		},
 		"/receipts": {
