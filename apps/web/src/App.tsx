@@ -1,7 +1,8 @@
 import { getOperatingModeOptions } from '@budget-tools/web-sdk';
 import { Alert, AppShell, Button, Loader, MantineProvider, Stack } from '@mantine/core';
+import { IconChevronLeft } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import classes from './App.module.css';
 import { AuthProvider, useAuth } from './auth/AuthContext';
@@ -10,13 +11,18 @@ import { useStallTimeout } from './auth/useStallTimeout';
 import { AccountMenu } from './components/AccountMenu';
 import { AppNav } from './components/AppNav';
 import { AppUpdatePrompt } from './components/AppUpdatePrompt';
+import { MobileTabBar } from './components/MobileTabBar';
 import { NavbarHealthBadge } from './components/NavbarHealthBadge';
 import { OperatingModeToggle } from './components/OperatingModeToggle';
 import { OutboundSyncChip } from './components/OutboundSyncChip';
+import { currentMobileTab } from './components/primaryNav';
 import { PracticeReceiptsProvider } from './components/review/classify/PracticeReceiptsContext';
+import { MobileReviewPage } from './components/review/mobile/MobileReviewPage';
+import { useIsNarrow } from './components/useIsNarrow';
 import { cssVariablesResolver } from './cssVariablesResolver';
 import type { OperatingMode } from './operatingMode/operatingModeCopy';
 import { ClassifyPage } from './pages/ClassifyPage';
+import { ConfigurePage } from './pages/ConfigurePage';
 import { LoginPage } from './pages/LoginPage';
 import { ReceiptDetailPage } from './pages/ReceiptDetailPage';
 import { ReceiptsPage } from './pages/ReceiptsPage';
@@ -92,45 +98,99 @@ function AuthGate() {
 function AppLayout() {
     const modeQuery = useQuery(getOperatingModeOptions());
     const mode: OperatingMode = modeQuery.data?.mode ?? 'practice';
+    const isNarrow = useIsNarrow();
 
     return (
         <div className={classes.frame} data-mode={mode}>
-            <AppShell header={{ height: 60 }} padding={0} classNames={{ header: classes.header, main: classes.main }}>
-                <AppShell.Header withBorder={false}>
-                    <div className={classes.headerInner}>
-                        <div className={classes.brand}>
-                            <span className={classes.wordmark}>Budget Tools</span>
-                            {mode === 'live' ? (
-                                <span className={classes.liveStamp} aria-hidden="true">
-                                    Live
-                                </span>
-                            ) : null}
-                            <AppNav />
-                        </div>
-                        <div className={classes.headerEnd}>
-                            <OutboundSyncChip />
-                            <OperatingModeToggle />
-                            <NavbarHealthBadge />
-                            <AccountMenu />
-                        </div>
-                    </div>
-                </AppShell.Header>
-                <AppShell.Main>
-                    <div className={classes.atmosphere} aria-hidden="true" />
-                    <div className={classes.page}>
-                        <Routes>
-                            <Route path="/" element={<ReviewQueuePage />} />
-                            <Route path="/classify" element={<ClassifyPage layout="card" />} />
-                            <Route path="/classify/table" element={<ClassifyPage layout="table" />} />
-                            <Route path="/receipts" element={<ReceiptsPage />} />
-                            <Route path="/receipts/:receiptId" element={<ReceiptDetailPage />} />
-                            <Route path="/repeating" element={<RepeatingPage />} />
-                            <Route path="/trips" element={<TripsPage />} />
-                            <Route path="/spending" element={<SpendingPage />} />
-                        </Routes>
-                    </div>
-                </AppShell.Main>
-            </AppShell>
+            {isNarrow ? <MobileLayout mode={mode} /> : <DesktopLayout mode={mode} />}
         </div>
+    );
+}
+
+type LayoutProps = {
+    mode: OperatingMode;
+};
+
+function DesktopLayout({ mode }: LayoutProps) {
+    return (
+        <AppShell header={{ height: 60 }} padding={0} classNames={{ header: classes.header, main: classes.main }}>
+            <AppShell.Header withBorder={false}>
+                <div className={classes.headerInner}>
+                    <div className={classes.brand}>
+                        <span className={classes.wordmark}>Budget Tools</span>
+                        {mode === 'live' ? (
+                            <span className={classes.liveStamp} aria-hidden="true">
+                                Live
+                            </span>
+                        ) : null}
+                        <AppNav />
+                    </div>
+                    <div className={classes.headerEnd}>
+                        <OutboundSyncChip />
+                        <OperatingModeToggle />
+                        <NavbarHealthBadge />
+                        <AccountMenu />
+                    </div>
+                </div>
+            </AppShell.Header>
+            <AppShell.Main>
+                <div className={classes.atmosphere} aria-hidden="true" />
+                <div className={classes.page}>
+                    <Routes>
+                        <Route path="/" element={<ReviewQueuePage />} />
+                        <Route path="/classify" element={<ClassifyPage layout="card" />} />
+                        <Route path="/classify/table" element={<ClassifyPage layout="table" />} />
+                        <Route path="/configure" element={<ConfigurePage />} />
+                        {sharedRoutes()}
+                    </Routes>
+                </div>
+            </AppShell.Main>
+        </AppShell>
+    );
+}
+
+/**
+ * Phone shell: no header, a bottom tab bar, and Review standing in for Queue, Classify and Table.
+ * The header's mode switch, sync and account controls move to Configure.
+ */
+function MobileLayout({ mode }: LayoutProps) {
+    const location = useLocation();
+    const underConfigure = currentMobileTab(location.pathname).id === 'configure' && location.pathname !== '/configure';
+
+    return (
+        <div className={classes.mobileShell}>
+            <div className={classes.atmosphere} aria-hidden="true" />
+            <main className={classes.mobilePage}>
+                {underConfigure ? (
+                    <Link className={classes.backLink} to="/configure">
+                        <IconChevronLeft size={18} aria-hidden="true" />
+                        Configure
+                    </Link>
+                ) : null}
+                <Routes>
+                    {/* One mount for list and card, so both share a session. */}
+                    <Route element={<MobileReviewPage />}>
+                        <Route path="/" element={null} />
+                        <Route path="/classify" element={null} />
+                    </Route>
+                    <Route path="/classify/table" element={<Navigate replace to="/" />} />
+                    <Route path="/configure" element={<ConfigurePage />} />
+                    {sharedRoutes()}
+                </Routes>
+            </main>
+            <MobileTabBar live={mode === 'live'} />
+        </div>
+    );
+}
+
+function sharedRoutes() {
+    return (
+        <>
+            <Route path="/receipts" element={<ReceiptsPage />} />
+            <Route path="/receipts/:receiptId" element={<ReceiptDetailPage />} />
+            <Route path="/repeating" element={<RepeatingPage />} />
+            <Route path="/trips" element={<TripsPage />} />
+            <Route path="/spending" element={<SpendingPage />} />
+        </>
     );
 }

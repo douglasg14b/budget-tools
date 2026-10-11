@@ -1,10 +1,9 @@
-import type { CategorizationQueueItemDto } from '@budget-tools/web-sdk';
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { BackendErrorNotice } from '../components/BackendErrorNotice';
 import { isCertainProposal } from '../components/review/classify/isCertainProposal';
-import type { AccountOption } from '../components/review/QueueFilters';
+import { listQueueAccounts } from '../components/review/listQueueAccounts';
 import { QueueFilters } from '../components/review/QueueFilters';
 import { QueueItemCard } from '../components/review/QueueItemCard';
 import { filterQueueItems, QueueLoadState } from '../components/review/QueueLoadState';
@@ -30,7 +29,7 @@ export function ReviewQueuePage() {
 
     const items = queueQuery.data?.items ?? [];
     const visibleItems = useMemo(() => filterQueueItems(items, search), [items, search]);
-    const accounts = useMemo(() => listAccounts(items), [items]);
+    const accounts = useMemo(() => listQueueAccounts(items), [items]);
 
     function updateSearch(patch: Partial<QueueSearchState>): void {
         setSearchParams(serializeQueueSearchParams({ ...search, ...patch }), { replace: true });
@@ -105,17 +104,4 @@ export function ReviewQueuePage() {
             </QueueLoadState>
         </div>
     );
-}
-
-function listAccounts(items: CategorizationQueueItemDto[]): AccountOption[] {
-    const namesById = new Map<string, string>();
-    for (const item of items) {
-        if (!namesById.has(item.transaction.accountId)) {
-            namesById.set(item.transaction.accountId, item.transaction.accountName);
-        }
-    }
-
-    return [...namesById.entries()]
-        .map(([id, name]) => ({ id, name }))
-        .sort((left, right) => left.name.localeCompare(right.name));
 }

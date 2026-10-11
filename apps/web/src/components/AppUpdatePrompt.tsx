@@ -1,8 +1,17 @@
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { Affix, Alert, Button, Group } from '@mantine/core';
 
+import { useIsNarrow } from './useIsNarrow';
+
 /** Backstop for a tab left visible for hours; resume-from-background is the main trigger. */
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
+/** Clear of the phone's bottom tab bar, inset from both edges. */
+const PHONE_POSITION = {
+    bottom: 'calc(var(--app-tab-bar-height) + env(safe-area-inset-bottom) + 0.75rem)',
+    left: 12,
+    right: 12,
+};
 
 /**
  * Registers the service worker and offers a reload once a new release is waiting.
@@ -17,6 +26,7 @@ const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
  * unsaved work, so the user chooses when.
  */
 export function AppUpdatePrompt() {
+    const isNarrow = useIsNarrow();
     const {
         needRefresh: [needRefresh, setNeedRefresh],
         updateServiceWorker,
@@ -54,7 +64,7 @@ export function AppUpdatePrompt() {
     }
 
     return (
-        <Affix position={{ bottom: 20, right: 20 }} zIndex={1000}>
+        <Affix position={isNarrow ? PHONE_POSITION : { bottom: 20, right: 20 }} zIndex={1000}>
             <Alert
                 color="sage"
                 title="Update available"

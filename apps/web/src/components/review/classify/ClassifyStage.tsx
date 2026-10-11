@@ -7,6 +7,7 @@ import type {
 } from '@budget-tools/web-sdk';
 import { ActionIcon, Button, Loader, Select, Tooltip, UnstyledButton } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
+import { useState } from 'react';
 
 import { FlagChips } from '../FlagChips';
 import { formatConfidence } from '../formatConfidence';
@@ -39,6 +40,8 @@ import type { YnabFlagOption } from './ynabFlagOptions';
 import { ynabFlagLabel } from './ynabFlagOptions';
 
 type ClassifyStageProps = {
+    /** `external` drops Accept / Reject because the caller pins them to a thumb bar. */
+    actions?: 'inline' | 'external';
     assignableIds: ReadonlySet<string>;
     categoryGroups: readonly CategorySelectGroup[];
     choicesById: ReadonlyMap<string, CategoryChoice>;
@@ -87,6 +90,7 @@ type ClassifyStageProps = {
 };
 
 export function ClassifyStage({
+    actions = 'inline',
     assignableIds,
     categoryGroups,
     choicesById,
@@ -136,8 +140,13 @@ export function ClassifyStage({
               ? formatCategoryLabel(amazonLines[0]?.categoryName ?? null, amazonLines[0]?.categoryGroup ?? null)
               : `Split · ${amazonLines.length} lines`;
     const splitError = splitLines ? validateSplitLines(splitLines, transaction.amount, assignableIds) : null;
-    const canAccept = splitLines ? splitError === null : Boolean(proposal?.suggestedCategory);
+    const canAccept = canAcceptStage(item, splitLines, assignableIds);
     const alternatives = alternativeOptions(proposal);
+    // Keyed by transaction so moving to the next card closes a box opened on this one.
+    const [noteOpenFor, setNoteOpenFor] = useState<string | null>(null);
+    const noteRequested = noteOpenFor === transaction.id;
+    const memoOpen = Boolean(note.memo) || noteRequested;
+    const canAddNote = !decision && !memoOpen;
 
     return (
         <section className={classes.stage} data-certain={certain || undefined}>
@@ -179,11 +188,39 @@ export function ClassifyStage({
             </header>
             <ClassifyNote
                 flagOptions={flagOptions}
+                focusMemo={noteRequested}
+                memoOpen={memoOpen}
                 note={note}
                 readOnly={Boolean(decision)}
                 onChangeFlag={onChangeFlag}
                 onChangeMemo={onChangeMemo}
+                onMemoBlur={() => {
+                    // An opened-but-empty box folds back to the link.
+                    if (!note.memo) {
+                        setNoteOpenFor(null);
+                    }
+                }}
             />
+
+            {!splitLines || canAddNote ? (
+                <div className={classes.cardLinks}>
+                    {splitLines ? null : (
+                        <UnstyledButton className={classes.cardLink} onClick={onBeginSplit}>
+                            Split this charge
+                        </UnstyledButton>
+                    )}
+                    {canAddNote ? (
+                        <UnstyledButton
+                            className={classes.cardLink}
+                            onClick={() => {
+                                setNoteOpenFor(transaction.id);
+                            }}
+                        >
+                            Add note
+                        </UnstyledButton>
+                    ) : null}
+                </div>
+            ) : null}
 
             {splitLines ? (
                 <ClassifySplitEditor
@@ -195,11 +232,7 @@ export function ClassifyStage({
                     onChange={onChangeSplit}
                     onClose={onCancelSplit}
                 />
-            ) : (
-                <UnstyledButton className={classes.splitToggle} onClick={onBeginSplit}>
-                    Split this charge
-                </UnstyledButton>
-            )}
+            ) : null}
 
             <div className={classes.verdict}>
                 <p className={classes.verdictLabel}>Suggestion</p>
@@ -276,15 +309,19 @@ export function ClassifyStage({
                 </p>
             ) : null}
 
-            <div className={classes.actions}>
-                <Button className={classes.accept} size="md" disabled={!canAccept} onClick={onAccept}>
-                    Accept
-                    <kbd className={classes.kbd}>{CLASSIFY_KEY_LABELS.accept}</kbd>
-                </Button>
-                <Button className={classes.reject} size="md" variant="default" onClick={onReject}>
-                    Reject
-                    <kbd className={classes.kbd}>{CLASSIFY_KEY_LABELS.reject}</kbd>
-                </Button>
+            <div className={classes.actions} data-external={actions === 'external' || undefined}>
+                {actions === 'inline' ? (
+                    <>
+                        <Button className={classes.accept} size="md" disabled={!canAccept} onClick={onAccept}>
+                            Accept
+                            <kbd className={classes.kbd}>{CLASSIFY_KEY_LABELS.accept}</kbd>
+                        </Button>
+                        <Button className={classes.reject} size="md" variant="default" onClick={onReject}>
+                            Reject
+                            <kbd className={classes.kbd}>{CLASSIFY_KEY_LABELS.reject}</kbd>
+                        </Button>
+                    </>
+                ) : null}
                 <Tooltip label="Save the memo and flag without categorizing. It stays in the queue.">
                     <Button disabled={!noteDirty || Boolean(decision)} size="md" variant="subtle" onClick={onAnnotate}>
                         Flag & skip
@@ -369,6 +406,18 @@ export function ClassifyStage({
             ) : null}
         </section>
     );
+}
+
+/** A valid split draft, or a suggestion to apply. */
+export function canAcceptStage(
+    item: CategorizationQueueItemDto,
+    splitLines: readonly SplitLine[] | undefined,
+    assignableIds: ReadonlySet<string>,
+): boolean {
+    if (splitLines) {
+        return validateSplitLines(splitLines, item.transaction.amount, assignableIds) === null;
+    }
+    return Boolean(item.proposal?.suggestedCategory);
 }
 
 function formatDecision(decision: SessionDecision, flagOptions: readonly YnabFlagOption[]): string {

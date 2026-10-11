@@ -1,84 +1,32 @@
-import { getCategoriesOptions, getOperatingModeOptions } from '@budget-tools/web-sdk';
-import { useDebouncedValue, useMediaQuery } from '@mantine/hooks';
-import { useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { SegmentedControl } from '@mantine/core';
+import { useNavigate } from 'react-router-dom';
 
 import { BackendErrorNotice } from '../components/BackendErrorNotice';
 import { ClassifyTable } from '../components/review/classify/ClassifyTable';
 import { ClassifyWorkspace } from '../components/review/classify/ClassifyWorkspace';
-import { pinFocusedQueueItem } from '../components/review/classify/mergeClassifyQueue';
-import { useLiveClassification } from '../components/review/classify/useLiveClassification';
-import { filterQueueItems, QueueLoadState } from '../components/review/QueueLoadState';
+import { QueueLoadState } from '../components/review/QueueLoadState';
 import { QueueSearchInput } from '../components/review/QueueSearchInput';
-import {
-    parseQueueSearchParams,
-    queueFiltersActive,
-    serializeQueueSearchParams,
-} from '../components/review/queueSearchParams';
-import { sortQueueItemsByDateDesc } from '../components/review/sortQueueItems';
-import { useClassifyQueue } from '../components/review/useClassifyQueue';
-import type { OperatingMode } from '../operatingMode/operatingModeCopy';
+import { queueFiltersActive } from '../components/review/queueSearchParams';
+import { useClassifyQueueView } from '../components/review/useClassifyQueueView';
 import { operatingModeClassifyNote } from '../operatingMode/operatingModeCopy';
 import classes from './ClassifyPage.module.css';
 
+type ClassifyLayout = 'card' | 'table';
+
 type ClassifyPageProps = {
-    layout: 'card' | 'table';
+    layout: ClassifyLayout;
 };
 
-/** Keep in sync with classify / nav CSS (`max-width: 56rem`). */
-const NARROW_VIEWPORT = '(max-width: 56rem)';
+const LAYOUT_PATHS: Record<ClassifyLayout, string> = {
+    card: '/classify',
+    table: '/classify/table',
+};
 
+/** Desktop classify: one card at a time, or every row in a table. Phones use `MobileReviewPage`. */
 export function ClassifyPage({ layout }: ClassifyPageProps) {
-    const isNarrow = useMediaQuery(NARROW_VIEWPORT, false, { getInitialValueInEffect: false });
-    const [searchParams, setSearchParams] = useSearchParams();
-    const search = parseQueueSearchParams(searchParams);
-    const [debouncedQ] = useDebouncedValue(search.q ?? '', 250);
-    const querySettled = (search.q ?? '') === debouncedQ;
-    const {
-        expandError,
-        expandNewer,
-        expandOlder,
-        hasMoreNewer,
-        hasMoreOlder,
-        isExpandingNewer,
-        isExpandingOlder,
-        queueQuery,
-    } = useClassifyQueue(search.transactionId, debouncedQ || undefined);
-
-    const writeTransactionId = useCallback(
-        (transactionId: string | undefined) => {
-            setSearchParams(
-                (previous) => {
-                    const current = parseQueueSearchParams(previous);
-                    const next = serializeQueueSearchParams({ ...current, transactionId });
-                    return next.toString() === previous.toString() ? previous : next;
-                },
-                { replace: true },
-            );
-        },
-        [setSearchParams],
-    );
-
-    const categoriesQuery = useQuery({
-        ...getCategoriesOptions(),
-        staleTime: Number.POSITIVE_INFINITY,
-        refetchOnWindowFocus: false,
-    });
-    const modeQuery = useQuery(getOperatingModeOptions());
-    const mode: OperatingMode = modeQuery.data?.mode ?? 'practice';
-    const live = useLiveClassification(mode === 'live');
-
-    const items = queueQuery.data?.items ?? [];
-    const visibleItems = useMemo(
-        () =>
-            pinFocusedQueueItem(sortQueueItemsByDateDesc(filterQueueItems(items, search)), items, search.transactionId),
-        [items, search],
-    );
-
-    if (layout === 'table' && isNarrow) {
-        return <Navigate replace to={{ pathname: '/classify', search: searchParams.toString() }} />;
-    }
+    const navigate = useNavigate();
+    const view = useClassifyQueueView();
+    const { search, mode, live, visibleItems, queueQuery, querySettled } = view;
 
     return (
         <div className={classes.page}>
@@ -91,69 +39,77 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
                         </p>
                     </div>
                 ) : null}
-                <QueueSearchInput
-                    compact={layout === 'card'}
-                    value={search.q}
-                    onChange={(q) => {
-                        setSearchParams(serializeQueueSearchParams({ ...search, q }), { replace: true });
-                    }}
-                />
+                <div className={classes.headerControls}>
+                    <SegmentedControl
+                        aria-label="Classify layout"
+                        className={classes.layoutToggle}
+                        data={[
+                            { value: 'card', label: 'Card' },
+                            { value: 'table', label: 'Table' },
+                        ]}
+                        size="sm"
+                        value={layout}
+                        onChange={(next) => {
+                            void navigate({
+                                pathname: LAYOUT_PATHS[next as ClassifyLayout],
+                                search: view.searchParams.toString(),
+                            });
+                        }}
+                    />
+                    <QueueSearchInput
+                        compact={layout === 'card'}
+                        value={search.q}
+                        onChange={(q) => {
+                            view.updateSearch({ q });
+                        }}
+                    />
+                </div>
             </header>
-            {expandError ? <BackendErrorNotice error={expandError} /> : null}
+            {view.expandError ? <BackendErrorNotice error={view.expandError} /> : null}
             <QueueLoadState
                 error={queueQuery.isError ? queueQuery.error : undefined}
                 expandingCopy="Loading more pending transactions…"
                 filtersActive={queueFiltersActive(search)}
-                hasMore={hasMoreOlder}
-                isExpanding={isExpandingOlder}
+                hasMore={view.hasMoreOlder}
+                isExpanding={view.isExpandingOlder}
                 isPending={queueQuery.isPending}
                 loadingCopy="Loading pending transactions…"
                 pendingCount={queueQuery.data?.pendingCount}
                 visibleCount={visibleItems.length}
                 onClearFilters={() => {
-                    setSearchParams(
-                        serializeQueueSearchParams({
-                            ...search,
-                            tiers: undefined,
-                            accountId: undefined,
-                            q: undefined,
-                        }),
-                        {
-                            replace: true,
-                        },
-                    );
+                    view.updateSearch({ tiers: undefined, accountId: undefined, q: undefined });
                 }}
-                onNeedMore={querySettled ? expandOlder : undefined}
+                onNeedMore={querySettled ? view.expandOlder : undefined}
             >
                 {layout === 'table' ? (
                     <ClassifyTable
                         key={mode}
-                        categoryGroups={categoriesQuery.data?.groups ?? []}
-                        hasMoreNewer={hasMoreNewer}
-                        hasMoreOlder={hasMoreOlder}
-                        isExpandingNewer={isExpandingNewer}
-                        isExpandingOlder={isExpandingOlder}
+                        categoryGroups={view.categoryGroups}
+                        hasMoreNewer={view.hasMoreNewer}
+                        hasMoreOlder={view.hasMoreOlder}
+                        isExpandingNewer={view.isExpandingNewer}
+                        isExpandingOlder={view.isExpandingOlder}
                         items={visibleItems}
                         live={live}
                         requestedId={search.transactionId}
-                        onCurrentIdChange={writeTransactionId}
-                        onNeedNewer={querySettled ? expandNewer : ignoreNeedMore}
-                        onNeedOlder={querySettled ? expandOlder : ignoreNeedMore}
+                        onCurrentIdChange={view.writeTransactionId}
+                        onNeedNewer={querySettled ? view.expandNewer : ignoreNeedMore}
+                        onNeedOlder={querySettled ? view.expandOlder : ignoreNeedMore}
                     />
                 ) : (
                     <ClassifyWorkspace
                         key={mode}
-                        categoryGroups={categoriesQuery.data?.groups ?? []}
-                        hasMoreNewer={hasMoreNewer}
-                        hasMoreOlder={hasMoreOlder}
-                        isExpandingNewer={isExpandingNewer}
-                        isExpandingOlder={isExpandingOlder}
+                        categoryGroups={view.categoryGroups}
+                        hasMoreNewer={view.hasMoreNewer}
+                        hasMoreOlder={view.hasMoreOlder}
+                        isExpandingNewer={view.isExpandingNewer}
+                        isExpandingOlder={view.isExpandingOlder}
                         items={visibleItems}
                         live={live}
                         requestedId={search.transactionId}
-                        onCurrentIdChange={writeTransactionId}
-                        onNeedNewer={querySettled ? expandNewer : ignoreNeedMore}
-                        onNeedOlder={querySettled ? expandOlder : ignoreNeedMore}
+                        onCurrentIdChange={view.writeTransactionId}
+                        onNeedNewer={querySettled ? view.expandNewer : ignoreNeedMore}
+                        onNeedOlder={querySettled ? view.expandOlder : ignoreNeedMore}
                     />
                 )}
             </QueueLoadState>
@@ -161,6 +117,6 @@ export function ClassifyPage({ layout }: ClassifyPageProps) {
     );
 }
 
-function ignoreNeedMore(): void {
+export function ignoreNeedMore(): void {
     return;
 }

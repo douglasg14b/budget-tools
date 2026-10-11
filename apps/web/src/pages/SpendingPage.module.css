@@ -122,4 +122,22 @@
     .title {
         font-size: 1.7rem;
     }
+
+    /* Five columns do not fit a phone; the chart already shows the per-day line. */
+    .tableCard {
+        overflow-x: auto;
+        padding-inline: 0.65rem;
+    }
+
+    .perDayCol {
+        display: none;
+    }
+
+    .chartCol {
+        width: 3.25rem;
+    }
+
+    .spreadCol {
+        width: 5.5rem;
+    }
 }

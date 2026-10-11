@@ -141,6 +141,8 @@ __data__/
 # silently kept three C# source files out of git and broke every build from a clean clone.
 /models/
 cleaning-output.json
+# Phone / desktop screenshots from `pnpm shots:mobile`; explicit so it never rides on the loose `out` above.
+apps/web/scripts/mobile-shots/out/
 apps/categorization-ai/predict-output.json
 apps/categorization-ai/predict-stderr.txt
 apps/categorization-ai/transactions.json

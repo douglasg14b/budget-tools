@@ -19,7 +19,10 @@
     margin: 0;
     padding: 0;
     min-width: 0;
-    overflow: hidden;
+    /* Four tier chips outgrow a narrow window; scroll inside the pill rather than widen the page. */
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
     border: 1px solid var(--app-border-strong);
     border-radius: 999px;
     background: var(--app-bg-surface);

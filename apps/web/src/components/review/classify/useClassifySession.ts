@@ -162,9 +162,13 @@ export function useClassifySession(
 
     function acceptCurrent(): void {
         const item = displayedCurrent();
-        if (!item) {
-            return;
+        if (item) {
+            acceptItem(item);
         }
+    }
+
+    /** Accepts any row's split draft or suggestion, e.g. straight from a list without focusing it. */
+    function acceptItem(item: CategorizationQueueItemDto): void {
         const draft = splitDrafts[item.transaction.id];
         if (draft) {
             if (validateSplitLines(draft, item.transaction.amount, assignableIds)) {
@@ -398,6 +402,7 @@ export function useClassifySession(
     return {
         acceptAllCertain,
         acceptCurrent,
+        acceptItem,
         annotateCurrent,
         assignableIds,
         beginSplit,
@@ -431,6 +436,8 @@ export function useClassifySession(
         undo,
     };
 }
+
+export type ClassifySession = ReturnType<typeof useClassifySession>;
 
 function unlessDialogOpen(handler: () => void): () => void {
     return () => {

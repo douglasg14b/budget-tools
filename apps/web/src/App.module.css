@@ -1,4 +1,5 @@
 :global(html) {
+    --app-tab-bar-height: 3.75rem;
     background: var(--app-bg-root);
 }
 
@@ -140,6 +141,32 @@
     z-index: 1;
     margin: 0 auto;
     padding: 2rem 1.5rem 4rem;
+}
+
+.mobileShell {
+    position: relative;
+    min-height: 100dvh;
+    background: var(--app-bg-root);
+}
+
+.mobilePage {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    padding: calc(1rem + env(safe-area-inset-top)) 0.85rem
+        calc(var(--app-tab-bar-height) + env(safe-area-inset-bottom) + 1.5rem);
+}
+
+.backLink {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    margin: -0.35rem 0 0.75rem -0.3rem;
+    padding: 0.35rem 0.3rem;
+    color: var(--app-text-secondary);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    text-decoration: none;
 }
 
 @media (max-width: 56rem) {

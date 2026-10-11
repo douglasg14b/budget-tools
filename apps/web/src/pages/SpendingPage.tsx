@@ -147,7 +147,7 @@ export function SpendingPage() {
                                     <Table.Th className={classes.chartCol}>Chart</Table.Th>
                                     <Table.Th>Category</Table.Th>
                                     <Table.Th className={classes.numberCol}>Spent</Table.Th>
-                                    <Table.Th className={classes.numberCol}>Per day</Table.Th>
+                                    <Table.Th className={`${classes.numberCol} ${classes.perDayCol}`}>Per day</Table.Th>
                                     <Table.Th className={classes.spreadCol}>Spread over</Table.Th>
                                 </Table.Tr>
                             </Table.Thead>
@@ -187,7 +187,7 @@ export function SpendingPage() {
                                             <Table.Td className={classes.numberCol}>
                                                 {formatYnabAmount(category.totalMilliunits)}
                                             </Table.Td>
-                                            <Table.Td className={classes.numberCol}>
+                                            <Table.Td className={`${classes.numberCol} ${classes.perDayCol}`}>
                                                 {formatYnabAmount(
                                                     Math.round(category.totalMilliunits / chart.days.length),
                                                 )}

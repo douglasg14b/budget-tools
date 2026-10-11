@@ -9,6 +9,13 @@
     min-width: 0;
 }
 
+.mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    min-width: 0;
+}
+
 @media (max-width: 72rem) {
     .workspace {
         grid-template-columns: minmax(14.5rem, 18.5rem) minmax(0, 1fr);

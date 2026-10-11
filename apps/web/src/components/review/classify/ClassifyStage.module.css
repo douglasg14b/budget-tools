@@ -93,16 +93,21 @@
     color: var(--app-amount-inflow);
 }
 
-.splitToggle {
-    align-self: flex-start;
+.cardLinks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.25rem;
     margin: -0.35rem 0 0;
+}
+
+.cardLink {
     color: var(--app-text-secondary);
     font-size: 0.8125rem;
     text-decoration: underline;
     text-underline-offset: 0.15em;
 }
 
-.splitToggle:hover {
+.cardLink:hover {
     color: var(--app-text-primary);
 }
 
@@ -412,6 +417,11 @@
     .actions {
         flex-direction: column;
         gap: 0.5rem;
+    }
+
+    /* Accept / Reject live in the sheet's thumb bar; Flag & skip alone needs no full-width slab. */
+    .actions[data-external] {
+        flex-direction: row;
     }
 
     .accept,

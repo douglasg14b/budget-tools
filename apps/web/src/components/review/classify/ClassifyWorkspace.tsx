@@ -1,6 +1,7 @@
 import type { CategorizationQueueItemDto, CategoryGroupDto } from '@budget-tools/web-sdk';
 import { getYnabFlagsOptions } from '@budget-tools/web-sdk';
 import { useQuery } from '@tanstack/react-query';
+import type { MutableRefObject, ReactNode } from 'react';
 import { useEffect, useRef } from 'react';
 
 import { BackendErrorNotice } from '../../BackendErrorNotice';
@@ -14,7 +15,7 @@ import {
 import { ClassifyFilmstrip } from './ClassifyFilmstrip';
 import { ClassifyProgress } from './ClassifyProgress';
 import { ClassifyShortcuts } from './ClassifyShortcuts';
-import { ClassifyStage } from './ClassifyStage';
+import { ClassifyStage, canAcceptStage } from './ClassifyStage';
 import classes from './ClassifyWorkspace.module.css';
 import { hasNoteChanges } from './decisionNote';
 import { isAmazonTransaction } from './isAmazonTransaction';
@@ -22,6 +23,7 @@ import { usePracticeReceipts } from './PracticeReceiptsContext';
 import { remainingItems } from './sessionDecisions';
 import { splitLinesFromReceiptDraft } from './splitLines';
 import { useAmazonSplitOverlay } from './useAmazonSplitOverlay';
+import type { ClassifySession } from './useClassifySession';
 import { useClassifySession } from './useClassifySession';
 import type { LiveClassification } from './useLiveClassification';
 import { useLlmOverlay } from './useLlmOverlay';
@@ -57,10 +59,7 @@ export function ClassifyWorkspace({
     requestedId,
     live,
 }: ClassifyWorkspaceProps) {
-    const { receipts: sessionReceipts, setReceipts: setSessionReceipts } = usePracticeReceipts();
     const displayedItemRef = useRef<CategorizationQueueItemDto | undefined>(undefined);
-    const amazonDismissedRef = useRef(new Set<string>());
-    const receiptDismissedRef = useRef(new Set<string>());
     const classify = useClassifySession(items, categoryGroups, {
         displayedItemRef,
         live,
@@ -68,6 +67,67 @@ export function ClassifyWorkspace({
         onCurrentIdChange,
         requestedId,
     });
+
+    return (
+        <ClassifyFocus
+            chrome="desktop"
+            classify={classify}
+            displayedItemRef={displayedItemRef}
+            hasMoreNewer={hasMoreNewer}
+            hasMoreOlder={hasMoreOlder}
+            isExpandingNewer={isExpandingNewer}
+            isExpandingOlder={isExpandingOlder}
+            items={items}
+            live={live}
+            onNeedNewer={onNeedNewer}
+            onNeedOlder={onNeedOlder}
+        />
+    );
+}
+
+type ClassifyFocusProps = {
+    /**
+     * `desktop` frames the card with progress, the queue rail and shortcuts. `mobile` renders the
+     * card alone and leaves Accept / Reject to the full-screen sheet's thumb bar.
+     */
+    chrome: 'desktop' | 'mobile';
+    classify: ClassifySession;
+    /** The same ref handed to `useClassifySession`, so Accept applies the LLM overlay on screen. */
+    displayedItemRef: MutableRefObject<CategorizationQueueItemDto | undefined>;
+    hasMoreNewer: boolean;
+    hasMoreOlder: boolean;
+    isExpandingNewer: boolean;
+    isExpandingOlder: boolean;
+    items: readonly CategorizationQueueItemDto[];
+    live?: LiveClassification;
+    onNeedNewer: () => void;
+    onNeedOlder: () => void;
+    /** Mobile thumb bar. Rendered here because only this component knows the on-screen overlay. */
+    renderActions?: (state: { canAccept: boolean }) => ReactNode;
+};
+
+/**
+ * The focused-transaction card plus everything that enriches it (scoring, LLM, receipt and Amazon
+ * overlays, receipt capture). The session is owned by the caller so a list and this card can
+ * share one set of decisions.
+ */
+export function ClassifyFocus({
+    chrome,
+    classify,
+    displayedItemRef,
+    hasMoreNewer,
+    hasMoreOlder,
+    isExpandingNewer,
+    isExpandingOlder,
+    items,
+    live,
+    onNeedNewer,
+    onNeedOlder,
+    renderActions,
+}: ClassifyFocusProps) {
+    const { receipts: sessionReceipts, setReceipts: setSessionReceipts } = usePracticeReceipts();
+    const amazonDismissedRef = useRef(new Set<string>());
+    const receiptDismissedRef = useRef(new Set<string>());
     const current = classify.current;
     const currentDecided = Boolean(current && classify.session.byId[current.transaction.id]);
     const remaining = remainingItems(items, classify.session);
@@ -166,37 +226,43 @@ export function ClassifyWorkspace({
     }
 
     const currentId = current.transaction.id;
+    const desktop = chrome === 'desktop';
 
     return (
-        <div className={classes.workspace}>
+        <div className={desktop ? classes.workspace : classes.mobile}>
             {classify.liveError ? <BackendErrorNotice error={new Error(classify.liveError)} /> : null}
-            <ClassifyProgress
-                canGoNext={classify.canGoNext}
-                canGoPrevious={classify.canGoPrevious}
-                certainCount={classify.certainRemaining.length}
-                completeHint="Batch reviewed. Undo to go back."
-                hasMore={hasMoreOlder}
-                isExpanding={isExpandingOlder}
-                itemCount={items.length}
-                onAcceptAllCertain={classify.acceptAllCertain}
-                onNext={classify.goNext}
-                onPrevious={classify.goPrevious}
-                position={classify.position}
-                tally={classify.tally}
-            />
-            <ClassifyFilmstrip
-                currentId={currentId}
-                hasMoreNewer={hasMoreNewer}
-                hasMoreOlder={hasMoreOlder}
-                isExpandingNewer={isExpandingNewer}
-                isExpandingOlder={isExpandingOlder}
-                items={items}
-                session={classify.session}
-                onNeedNewer={onNeedNewer}
-                onNeedOlder={onNeedOlder}
-                onSelect={classify.setCurrentId}
-            />
+            {desktop ? (
+                <>
+                    <ClassifyProgress
+                        canGoNext={classify.canGoNext}
+                        canGoPrevious={classify.canGoPrevious}
+                        certainCount={classify.certainRemaining.length}
+                        completeHint="Batch reviewed. Undo to go back."
+                        hasMore={hasMoreOlder}
+                        isExpanding={isExpandingOlder}
+                        itemCount={items.length}
+                        onAcceptAllCertain={classify.acceptAllCertain}
+                        onNext={classify.goNext}
+                        onPrevious={classify.goPrevious}
+                        position={classify.position}
+                        tally={classify.tally}
+                    />
+                    <ClassifyFilmstrip
+                        currentId={currentId}
+                        hasMoreNewer={hasMoreNewer}
+                        hasMoreOlder={hasMoreOlder}
+                        isExpandingNewer={isExpandingNewer}
+                        isExpandingOlder={isExpandingOlder}
+                        items={items}
+                        session={classify.session}
+                        onNeedNewer={onNeedNewer}
+                        onNeedOlder={onNeedOlder}
+                        onSelect={classify.setCurrentId}
+                    />
+                </>
+            ) : null}
             <ClassifyStage
+                actions={desktop ? 'inline' : 'external'}
                 assignableIds={classify.assignableIds}
                 categoryGroups={classify.selectGroups}
                 choicesById={classify.choicesById}
@@ -268,9 +334,14 @@ export function ClassifyWorkspace({
                 onReject={classify.rejectCurrent}
                 onUndo={classify.undo}
             />
-            <div className={classes.shortcuts}>
-                <ClassifyShortcuts certainAvailable={classify.certainRemaining.length > 0} />
-            </div>
+            {desktop ? (
+                <div className={classes.shortcuts}>
+                    <ClassifyShortcuts certainAvailable={classify.certainRemaining.length > 0} />
+                </div>
+            ) : null}
+            {renderActions?.({
+                canAccept: canAcceptStage(displayItem, classify.splitDrafts[currentId], classify.assignableIds),
+            })}
         </div>
     );
 }

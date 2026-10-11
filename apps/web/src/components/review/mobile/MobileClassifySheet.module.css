@@ -1,0 +1,111 @@
+/* Above the tab bar (150), below Mantine modals (200) and dropdowns (300). */
+.sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 160;
+    display: flex;
+    flex-direction: column;
+    background: var(--app-bg-root);
+}
+
+.sheet[data-live] {
+    box-shadow: inset 0 0 0 3px var(--app-mode-live);
+}
+
+.top {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+    padding: calc(0.35rem + env(safe-area-inset-top)) 0.5rem 0.35rem;
+}
+
+.position {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+    line-height: 1.2;
+}
+
+.positionCount {
+    font-family: var(--app-font-mono);
+    font-size: 0.9375rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--app-text-primary);
+}
+
+.positionLeft {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8125rem;
+    color: var(--app-text-muted);
+}
+
+.track {
+    height: 2px;
+    margin: 0 0.85rem;
+    background: var(--app-border);
+}
+
+.fill {
+    display: block;
+    height: 100%;
+    background: var(--app-tier-auto);
+    transition: width 200ms ease;
+}
+
+.tools {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.75rem 0.85rem 0.25rem;
+}
+
+.body {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    padding: 0.75rem 0.65rem 1rem;
+}
+
+.card {
+    will-change: transform;
+}
+
+.actionSlot {
+    flex: none;
+}
+
+.thumbBar {
+    display: grid;
+    grid-template-columns: 2.75rem minmax(0, 1fr) minmax(0, 1.4fr) 2.75rem;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.65rem calc(0.6rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--app-border);
+    background: var(--app-bg-root);
+}
+
+.step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 2.75rem;
+    border-radius: 999px;
+    color: var(--app-text-secondary);
+}
+
+.step:disabled {
+    opacity: 0.35;
+}
+
+.reject,
+.accept {
+    width: 100%;
+}
