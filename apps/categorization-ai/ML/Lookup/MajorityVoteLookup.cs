@@ -8,6 +8,14 @@ public readonly record struct VoteDistribution(float TopVoteShare, float TotalWe
 public sealed class MajorityVoteLookup
 {
     private readonly Dictionary<string, Dictionary<string, float>> _weights = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _sampleCounts = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Pseudo-count k that shrinks predicted confidence by sample size: <c>share × n / (n + k)</c>,
+    /// where n is the number of votes for the key. 0 reports the raw vote share.
+    /// Raw distributions (<see cref="TryGetDistribution"/>) are never shrunk.
+    /// </summary>
+    public float SamplePrior { get; set; }
 
     public void Add(string key, string label, float weight = 1f)
     {
@@ -21,6 +29,7 @@ public sealed class MajorityVoteLookup
         }
 
         labelWeights[label] = labelWeights.GetValueOrDefault(label) + weight;
+        _sampleCounts[key] = _sampleCounts.GetValueOrDefault(key) + 1;
     }
 
     public bool TryPredict(string key, float minVoteShare, out LookupPrediction prediction)
@@ -30,13 +39,15 @@ public sealed class MajorityVoteLookup
         if (!TryGetDistribution(key, out VoteDistribution distribution, out string? topLabel))
             return false;
 
-        if (distribution.TopVoteShare < minVoteShare || topLabel == null)
+        int sampleCount = _sampleCounts.GetValueOrDefault(key);
+        float confidence = SamplePrior > 0
+            ? distribution.TopVoteShare * sampleCount / (sampleCount + SamplePrior)
+            : distribution.TopVoteShare;
+
+        if (confidence < minVoteShare || topLabel == null)
             return false;
 
-        prediction = new LookupPrediction(
-            topLabel,
-            distribution.TopVoteShare,
-            (int)Math.Round(distribution.TotalWeight));
+        prediction = new LookupPrediction(topLabel, confidence, sampleCount);
         return true;
     }
 
@@ -74,5 +85,9 @@ public sealed class MajorityVoteLookup
 
     public IEnumerable<string> Keys => _weights.Keys;
 
-    public void Clear() => _weights.Clear();
+    public void Clear()
+    {
+        _weights.Clear();
+        _sampleCounts.Clear();
+    }
 }

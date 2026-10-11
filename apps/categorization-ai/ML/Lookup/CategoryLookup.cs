@@ -21,6 +21,12 @@ public sealed class CategoryLookup
         _byImportAndAmount.Clear();
         _byCanonicalPayee.Clear();
 
+        float samplePrior = ambiguitySettings.CategoryVoteSamplePrior;
+        _byPayeeId.SamplePrior = samplePrior;
+        _byImportOriginal.SamplePrior = samplePrior;
+        _byImportAndAmount.SamplePrior = samplePrior;
+        _byCanonicalPayee.SamplePrior = samplePrior;
+
         foreach (TrainingTransaction t in transactions)
         {
             float weight = TemporalWeighting.ComputeWeight(

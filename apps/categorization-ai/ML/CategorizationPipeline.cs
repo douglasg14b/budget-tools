@@ -60,17 +60,19 @@ public sealed class CategorizationPipeline
             .Where(t => !_ambiguousIndex.IsAmbiguous(t))
             .ToList();
 
+        // Payee resolution learns from every transaction: a payee whose category varies is still a known payee.
+        // Leaving it out lets look-alike payees claim its charges. Category ambiguity is handled by CategoryLookup.
         List<WeightedPayeeImport> augmentedImports = PayeeTrainingDataBuilder.BuildWeightedAugmentedImports(
-            unambiguous,
+            transactions,
             referenceDate,
             _settings.Ambiguity,
             _settings.PayeeResolution);
 
-        _payeeLookup.Train(unambiguous, referenceDate, _settings.Ambiguity, augmentedImports);
-        _payeeClusterIndex.Train(unambiguous, augmentedImports);
+        _payeeLookup.Train(transactions, referenceDate, _settings.Ambiguity, augmentedImports);
+        _payeeClusterIndex.Train(transactions, augmentedImports);
         _categoryLookup.Train(transactions, _ambiguousIndex, referenceDate, _settings.Ambiguity);
         _periodicIndex.Train(transactions, _settings.PeriodicSeries);
-        _payeeModel.Train(unambiguous, forceRetrain);
+        _payeeModel.Train(transactions, forceRetrain);
         _hierarchicalModel.Train(unambiguous, forceRetrain);
         _payeeModel.Load();
         _hierarchicalModel.Load();
@@ -306,7 +308,6 @@ public sealed class CategorizationPipeline
                 transaction.ImportPayeeNameOriginal,
                 transaction.ImportPayeeName,
                 _settings.PayeeResolution,
-                _ambiguousIndex,
                 out LookupPrediction cluster)
             && cluster.Confidence >= minConfidence)
         {
@@ -575,7 +576,6 @@ public sealed class CategorizationPipeline
                      transaction.ImportPayeeNameOriginal,
                      transaction.ImportPayeeName,
                      _settings.PayeeResolution,
-                     _ambiguousIndex,
                      out LookupPrediction clusterPayee)
                  && _categoryLookup.TryPredictByCanonicalPayee(
                      clusterPayee.Label,

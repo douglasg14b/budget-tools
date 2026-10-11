@@ -50,7 +50,8 @@ public static class PayeeTrainingDataBuilder
                     entry.ImportText,
                     entry.CanonicalPayee,
                     temporalWeight * oversampleMultiplier,
-                    entry.IsFromImportPayee));
+                    entry.IsFromImportPayee,
+                    entry.IsTruncated));
             }
         }
 

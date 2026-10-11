@@ -43,6 +43,10 @@ public sealed class PayeeLookup
 
         foreach (WeightedPayeeImport entry in augmentedImports)
         {
+            // Truncated variants can collide with another merchant's name; exact lookup must not claim them.
+            if (entry.IsTruncated)
+                continue;
+
             if (entry.IsFromImportPayee)
                 _byImportPayee.Add(entry.NormalizedImport, entry.CanonicalPayee, entry.Weight);
             else

@@ -30,18 +30,26 @@ public static partial class ImportStringAugmenter
         "sd", "tn", "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy", "dc"
     ];
 
-    public static IEnumerable<string> Augment(string? rawImport)
+    public static IEnumerable<string> Augment(string? rawImport) =>
+        AugmentDetailed(rawImport).Select(variant => variant.Import);
+
+    /// <summary>
+    /// Normalized variants, flagging the ones that drop merchant-name words (<see cref="ExtractMerchantCore"/>).
+    /// A truncated variant can equal a different merchant's name ("The Local Station" → "the local"),
+    /// so it is only safe for fuzzy or learned matching, never exact lookup.
+    /// </summary>
+    public static IEnumerable<(string Import, bool IsTruncated)> AugmentDetailed(string? rawImport)
     {
         if (string.IsNullOrWhiteSpace(rawImport))
             yield break;
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (string rawVariant in GenerateRawVariants(rawImport))
+        foreach ((string rawVariant, bool isTruncated) in GenerateRawVariants(rawImport))
         {
             string? normalized = TextPreprocessor.Normalize(rawVariant);
             if (normalized != null && seen.Add(normalized))
-                yield return normalized;
+                yield return (normalized, isTruncated);
         }
     }
 
@@ -70,12 +78,12 @@ public static partial class ImportStringAugmenter
             if (string.IsNullOrWhiteSpace(raw))
                 continue;
 
-            foreach (string import in Augment(raw))
+            foreach ((string import, bool isTruncated) in AugmentDetailed(raw))
             {
                 if (canonicalNormalized != null
                     && !string.Equals(import, canonicalNormalized, StringComparison.Ordinal))
                 {
-                    yield return new AugmentedPayeeImport(import, transaction.PayeeName, isFromImportPayee);
+                    yield return new AugmentedPayeeImport(import, transaction.PayeeName, isFromImportPayee, isTruncated);
                 }
             }
         }
@@ -94,43 +102,44 @@ public static partial class ImportStringAugmenter
         }
     }
 
-    private static IEnumerable<string> GenerateRawVariants(string raw)
+    private static IEnumerable<(string Variant, bool IsTruncated)> GenerateRawVariants(string raw)
     {
-        yield return raw;
+        yield return (raw, false);
 
         string strippedPrefix = StripProcessorPrefixes(raw);
         if (!string.Equals(strippedPrefix, raw, StringComparison.OrdinalIgnoreCase))
-            yield return strippedPrefix;
+            yield return (strippedPrefix, false);
 
         string strippedStore = StripStoreNumbers(raw);
         if (!string.Equals(strippedStore, raw, StringComparison.OrdinalIgnoreCase))
-            yield return strippedStore;
+            yield return (strippedStore, false);
 
         string strippedPhone = StripPhoneNumbers(raw);
         if (!string.Equals(strippedPhone, raw, StringComparison.OrdinalIgnoreCase))
-            yield return strippedPhone;
+            yield return (strippedPhone, false);
 
         string strippedDash = StripTrailingDashSegments(raw);
         if (!string.Equals(strippedDash, raw, StringComparison.OrdinalIgnoreCase))
-            yield return strippedDash;
+            yield return (strippedDash, false);
 
         string strippedLocation = StripCityStateSuffix(raw);
         if (!string.Equals(strippedLocation, raw, StringComparison.OrdinalIgnoreCase))
-            yield return strippedLocation;
+            yield return (strippedLocation, false);
 
-        string coreWords = ExtractMerchantCore(raw, maxWords: 4);
-        if (!string.Equals(coreWords, raw, StringComparison.OrdinalIgnoreCase))
-            yield return coreWords;
-
-        string coreWords2 = ExtractMerchantCore(raw, maxWords: 2);
-        if (!string.Equals(coreWords2, raw, StringComparison.OrdinalIgnoreCase))
-            yield return coreWords2;
-
-        // Combined: prefix + store + location strips on progressively cleaned text
+        // Combined: prefix + store + location strips on progressively cleaned text.
+        // Yielded before the truncated cores so a shared normalized form keeps its exact-safe flag.
         string combined = StripCityStateSuffix(StripStoreNumbers(StripProcessorPrefixes(raw)));
         combined = StripTrailingDashSegments(combined).Trim();
         if (!string.IsNullOrWhiteSpace(combined))
-            yield return combined;
+            yield return (combined, false);
+
+        string coreWords = ExtractMerchantCore(raw, maxWords: 4);
+        if (!string.Equals(coreWords, raw, StringComparison.OrdinalIgnoreCase))
+            yield return (coreWords, true);
+
+        string coreWords2 = ExtractMerchantCore(raw, maxWords: 2);
+        if (!string.Equals(coreWords2, raw, StringComparison.OrdinalIgnoreCase))
+            yield return (coreWords2, true);
     }
 
     private static string StripProcessorPrefixes(string raw)
@@ -210,4 +219,5 @@ public static partial class ImportStringAugmenter
 public readonly record struct AugmentedPayeeImport(
     string ImportText,
     string CanonicalPayee,
-    bool IsFromImportPayee);
+    bool IsFromImportPayee,
+    bool IsTruncated);

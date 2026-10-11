@@ -13,4 +13,10 @@ public class AmbiguitySettings
 
     /// <summary>Half-life in days for temporal decay of training votes (recent labels weigh more).</summary>
     public float TemporalHalfLifeDays { get; set; } = 365f;
+
+    /// <summary>
+    /// Pseudo-count k for category lookups: confidence = vote share × n / (n + k), so a merchant seen
+    /// twice cannot report the same certainty as one seen fifty times. 0 disables the shrink.
+    /// </summary>
+    public float CategoryVoteSamplePrior { get; set; } = 1f;
 }

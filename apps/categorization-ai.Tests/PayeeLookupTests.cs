@@ -65,6 +65,39 @@ public sealed class PayeeLookupTests
         Assert.Equal("Amazon", prediction.Label);
     }
 
+    [Fact]
+    public void ALookAlikePayeesTruncatedNameDoesNotClaimAnotherMerchant()
+    {
+        TrainingTransaction[] station =
+        [
+            Tx("1", "Sq *the Local Station La Grande Or", "The Local Station", importPayee: "The Local Station"),
+            Tx("2", "Sq *the Local Station La Grande Or", "The Local Station", importPayee: "The Local Station"),
+        ];
+        PayeeLookup lookup = TrainWithAugmentation(station);
+
+        Assert.False(lookup.TryResolve(
+            "Sq *the Local La Grande Or",
+            "The Local",
+            minVoteShare: 0f,
+            out _,
+            out _));
+    }
+
+    [Fact]
+    public void StillResolvesExactSafeAugmentedVariants()
+    {
+        PayeeLookup lookup = TrainWithAugmentation(
+            Tx("1", "SQ *STUMPTOWN COFFEE PORTLAND OR", "Stumptown"));
+
+        Assert.True(lookup.TryResolve(
+            "STUMPTOWN COFFEE PORTLAND OR",
+            null,
+            minVoteShare: 0.8f,
+            out LookupPrediction prediction,
+            out _));
+        Assert.Equal("Stumptown", prediction.Label);
+    }
+
     private static PayeeLookup Train(params TrainingTransaction[] transactions)
     {
         var lookup = new PayeeLookup();
@@ -72,11 +105,26 @@ public sealed class PayeeLookupTests
         return lookup;
     }
 
-    private static TrainingTransaction Tx(string id, string import, string payee) =>
+    private static PayeeLookup TrainWithAugmentation(params TrainingTransaction[] transactions)
+    {
+        DateOnly referenceDate = transactions.Max(t => t.Date);
+        var ambiguity = new AmbiguitySettings();
+        List<WeightedPayeeImport> augmented = PayeeTrainingDataBuilder.BuildWeightedAugmentedImports(
+            transactions,
+            referenceDate,
+            ambiguity,
+            new PayeeResolutionSettings());
+
+        var lookup = new PayeeLookup();
+        lookup.Train(transactions, referenceDate, ambiguity, augmented);
+        return lookup;
+    }
+
+    private static TrainingTransaction Tx(string id, string import, string payee, string? importPayee = null) =>
         new(
             id,
             import,
-            import,
+            importPayee ?? import,
             payee,
             "payee-" + payee,
             "Groceries",

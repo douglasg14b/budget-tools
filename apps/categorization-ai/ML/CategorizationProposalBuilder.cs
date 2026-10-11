@@ -227,7 +227,9 @@ public static class CategorizationProposalBuilder
             SuggestedCategory = suggestedCategory,
             SuggestedCategoryGroup = draft.SuggestedCategoryGroup ?? matchingOption?.CategoryGroup,
             SuggestedCategoryId = draft.SuggestedCategoryId ?? matchingOption?.CategoryId,
-            Confidence = draft.Confidence > 0 ? draft.Confidence : matchingOption?.Confidence ?? 0,
+            // Only qualified evidence sets proposal confidence. A category pre-filled from the options list
+            // when nothing qualified must not inherit that option's score (it showed 100% / "Certain").
+            Confidence = draft.Confidence,
             Method = draft.Method,
             RouteReason = draft.RouteReason,
             GapReason = gapReason,

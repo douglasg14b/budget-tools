@@ -41,7 +41,6 @@ public sealed class PayeeClusterIndex
         string? importOriginal,
         string? importPayee,
         PayeeResolutionSettings settings,
-        AmbiguousMerchantIndex ambiguousIndex,
         out LookupPrediction prediction)
     {
         prediction = default;
@@ -57,11 +56,9 @@ public sealed class PayeeClusterIndex
         string? secondCanonical = null;
         double secondScore = 0;
 
+        // Category-ambiguous payees stay in: skipping them hands their charges to the nearest other payee.
         foreach ((string canonical, HashSet<string> variants) in _variantsByCanonical)
         {
-            if (ambiguousIndex.IsCanonicalPayeeAmbiguous(canonical))
-                continue;
-
             double clusterBest = 0;
             foreach (string variant in variants)
             {
@@ -123,4 +120,5 @@ public readonly record struct WeightedPayeeImport(
     string NormalizedImport,
     string CanonicalPayee,
     float Weight,
-    bool IsFromImportPayee);
+    bool IsFromImportPayee,
+    bool IsTruncated);

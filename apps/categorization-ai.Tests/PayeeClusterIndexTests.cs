@@ -23,7 +23,6 @@ public sealed class PayeeClusterIndexTests
             "STARBUCKS STORE 99881 SEATTLE WA",
             "Starbucks Store 99881 Seattle Wa",
             new PayeeResolutionSettings(),
-            new AmbiguousMerchantIndex(),
             out LookupPrediction prediction));
 
         Assert.Equal("Starbucks", prediction.Label);
@@ -44,7 +43,6 @@ public sealed class PayeeClusterIndexTests
             "SHELL OIL 77821",
             "Shell Oil 77821",
             new PayeeResolutionSettings(),
-            new AmbiguousMerchantIndex(),
             out _));
     }
 
