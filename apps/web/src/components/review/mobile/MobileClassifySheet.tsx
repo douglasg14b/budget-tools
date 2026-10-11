@@ -1,16 +1,18 @@
 import type { CategorizationQueueItemDto } from '@budget-tools/web-sdk';
 import { ActionIcon, Button, Collapse, UnstyledButton } from '@mantine/core';
 import { IconCheck, IconChevronLeft, IconChevronRight, IconSearch, IconX } from '@tabler/icons-react';
-import type { MutableRefObject } from 'react';
+import type { CSSProperties, MutableRefObject } from 'react';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { ClassifyFocus } from '../classify/ClassifyWorkspace';
+import { ClassifyFocus, ClassifyPeek } from '../classify/ClassifyWorkspace';
 import type { ClassifySession } from '../classify/useClassifySession';
 import type { LiveClassification } from '../classify/useLiveClassification';
 import { QueueSearchInput } from '../QueueSearchInput';
 import classes from './MobileClassifySheet.module.css';
-import { useSwipeNavigation } from './useSwipeNavigation';
+import type { SwipeStep } from './swipeGesture';
+import { swipeSide } from './swipeGesture';
+import { SWIPE_PAGE_GAP, useSwipeNavigation } from './useSwipeNavigation';
 
 type MobileClassifySheetProps = {
     classify: ClassifySession;
@@ -50,18 +52,23 @@ export function MobileClassifySheet({
     searchValue,
 }: MobileClassifySheetProps) {
     const [surface, setSurface] = useState<HTMLDivElement | null>(null);
-    const [card, setCard] = useState<HTMLDivElement | null>(null);
+    const [track, setTrack] = useState<HTMLDivElement | null>(null);
     const [actionSlot, setActionSlot] = useState<HTMLDivElement | null>(null);
     const [toolsOpen, setToolsOpen] = useState(Boolean(searchValue));
     const currentId = classify.current?.transaction.id;
     const splitOpen = Boolean(currentId && classify.splitDrafts[currentId]);
     const { tally } = classify;
     const certainCount = classify.certainRemaining.length;
+    const neighbours: Record<SwipeStep, CategorizationQueueItemDto | undefined> = {
+        next: classify.nextItem,
+        previous: classify.previousItem,
+    };
 
-    useSwipeNavigation({
+    const { slide } = useSwipeNavigation({
         surface,
-        card,
+        track,
         enabled: !splitOpen,
+        canStep: (step) => Boolean(neighbours[step]),
         onSwipe: (step) => {
             if (step === 'next') {
                 classify.goNext();
@@ -70,6 +77,11 @@ export function MobileClassifySheet({
             }
         },
     });
+
+    /** A decision also lands on the next card, so it gets the same slide when there is one. */
+    function decideAndSlide(decide: () => void): void {
+        slide('next', decide);
+    }
 
     useEffect(() => {
         surface?.scrollTo({ top: 0 });
@@ -139,7 +151,25 @@ export function MobileClassifySheet({
                 </div>
             </Collapse>
             <div ref={setSurface} className={classes.body}>
-                <div ref={setCard} className={classes.card}>
+                <div
+                    ref={setTrack}
+                    className={classes.pager}
+                    style={{ '--swipe-gap': `${SWIPE_PAGE_GAP}px` } as CSSProperties}
+                >
+                    {(['previous', 'next'] as const).map((step) => {
+                        const item = neighbours[step];
+                        return item ? (
+                            <div
+                                key={item.transaction.id}
+                                aria-hidden="true"
+                                className={classes.neighbour}
+                                data-side={swipeSide(step)}
+                                inert
+                            >
+                                <ClassifyPeek classify={classify} item={item} />
+                            </div>
+                        ) : null;
+                    })}
                     <ClassifyFocus
                         chrome="mobile"
                         classify={classify}
@@ -159,10 +189,25 @@ export function MobileClassifySheet({
                                           canAccept={canAccept}
                                           canGoNext={classify.canGoNext}
                                           canGoPrevious={classify.canGoPrevious}
-                                          onAccept={classify.acceptCurrent}
-                                          onNext={classify.goNext}
-                                          onPrevious={classify.goPrevious}
-                                          onReject={classify.rejectCurrent}
+                                          onAccept={() => {
+                                              // Taken now: an LLM overlay landing mid-slide must not
+                                              // change what gets accepted.
+                                              const shown = displayedItemRef.current;
+                                              if (shown) {
+                                                  decideAndSlide(() => {
+                                                      classify.acceptItem(shown);
+                                                  });
+                                              }
+                                          }}
+                                          onNext={() => {
+                                              slide('next');
+                                          }}
+                                          onPrevious={() => {
+                                              slide('previous');
+                                          }}
+                                          onReject={() => {
+                                              decideAndSlide(classify.rejectCurrent);
+                                          }}
                                       />,
                                       actionSlot,
                                   )
@@ -171,7 +216,7 @@ export function MobileClassifySheet({
                     />
                 </div>
             </div>
-            {/* Outside the swiped card: a transformed ancestor would drag the bar along with it. */}
+            {/* Outside the swiped track: a transformed ancestor would drag the bar along with it. */}
             <div ref={setActionSlot} className={classes.actionSlot} />
         </section>,
         document.body,

@@ -74,8 +74,33 @@
     padding: 0.75rem 0.65rem 1rem;
 }
 
-.card {
+/* The current card in flow, its neighbours parked a gap off either side; the whole row slides. */
+.pager {
+    position: relative;
+    /* Fill the screen (less the body's padding) so a short card doesn't crop a taller neighbour. */
+    min-height: calc(100% - 1.75rem);
     will-change: transform;
+}
+
+/*
+ * Pinned to the visible top of a scrolled card while dragging, and cut to the current card's
+ * height so a long neighbour never stretches the scroll area.
+ */
+.neighbour {
+    position: absolute;
+    top: var(--swipe-scroll-top, 0px);
+    width: 100%;
+    max-height: calc(100% - var(--swipe-scroll-top, 0px));
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.neighbour[data-side="left"] {
+    right: calc(100% + var(--swipe-gap));
+}
+
+.neighbour[data-side="right"] {
+    left: calc(100% + var(--swipe-gap));
 }
 
 .actionSlot {

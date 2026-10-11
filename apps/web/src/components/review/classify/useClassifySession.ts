@@ -309,36 +309,31 @@ export function useClassifySession(
         persistLive(applied);
     }
 
+    const nextId =
+        options.navigate === 'rows'
+            ? nextRowId(items, current?.transaction.id)
+            : nextRemainingId(items, session, current?.transaction.id);
+    const previousId =
+        options.navigate === 'rows'
+            ? previousRowId(items, current?.transaction.id)
+            : previousRemainingId(items, session, current?.transaction.id);
+    // The cards Next / Previous land on, so a carousel can show them before the move.
+    const nextItem = nextId ? items.find((item) => item.transaction.id === nextId) : undefined;
+    const previousItem = previousId ? items.find((item) => item.transaction.id === previousId) : undefined;
+    const canGoNext = Boolean(nextId);
+    const canGoPrevious = Boolean(previousId);
+
     function goNext(): void {
-        const nextId =
-            options.navigate === 'rows'
-                ? nextRowId(items, current?.transaction.id)
-                : nextRemainingId(items, session, current?.transaction.id);
         if (nextId) {
             setCurrentId(nextId);
         }
     }
 
     function goPrevious(): void {
-        const previousId =
-            options.navigate === 'rows'
-                ? previousRowId(items, current?.transaction.id)
-                : previousRemainingId(items, session, current?.transaction.id);
         if (previousId) {
             setCurrentId(previousId);
         }
     }
-
-    const canGoNext = Boolean(
-        options.navigate === 'rows'
-            ? nextRowId(items, current?.transaction.id)
-            : nextRemainingId(items, session, current?.transaction.id),
-    );
-    const canGoPrevious = Boolean(
-        options.navigate === 'rows'
-            ? previousRowId(items, current?.transaction.id)
-            : previousRemainingId(items, session, current?.transaction.id),
-    );
 
     function commitPayee(transactionId: string, name: string): void {
         setPayeeEdits((edits) => setPayeeName(edits, transactionId, name));
@@ -419,6 +414,7 @@ export function useClassifySession(
         goNext,
         goPrevious,
         liveError,
+        nextItem,
         note,
         noteFor,
         payeeName,
@@ -426,6 +422,7 @@ export function useClassifySession(
         pickCategoryId,
         pickOption,
         position,
+        previousItem,
         rejectCurrent,
         selectGroups,
         session,

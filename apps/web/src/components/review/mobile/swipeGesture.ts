@@ -1,14 +1,20 @@
 export type SwipeStep = 'next' | 'previous';
 
 /**
- * What a rightward swipe does. Asked for as "swipe right to go next, left to go back" — the
- * reverse of a photo carousel, where dragging the card left reveals the next one. Flip this one
- * constant to switch.
+ * What a rightward swipe does. Carousel-style: dragging the card left pulls in the next one from
+ * the right, dragging it right brings back the previous one. The sheet lays the neighbour cards
+ * out from this constant, so flipping it flips the whole carousel.
  */
-export const SWIPE_RIGHT_STEP: SwipeStep = 'next';
+export const SWIPE_RIGHT_STEP: SwipeStep = 'previous';
 
-/** Horizontal travel (px) before a drag counts as a swipe. */
-export const SWIPE_MIN_DISTANCE = 64;
+/** Share of the card's width a slow drag must cover before releasing it pages. */
+export const SWIPE_COMMIT_SHARE = 0.3;
+
+/** A flick this fast (px/ms) pages even when it is short. */
+export const SWIPE_FLICK_VELOCITY = 0.35;
+
+/** Shortest drag (px) a flick can be; below it a quick twitch stays a tap. */
+export const SWIPE_FLICK_MIN_DISTANCE = 24;
 
 /** Horizontal travel must beat vertical travel by this factor, so scrolling never pages. */
 export const SWIPE_DOMINANCE = 1.6;
@@ -21,20 +27,48 @@ export const SWIPE_AXIS_SLOP = 10;
 
 export type SwipePoint = { readonly x: number; readonly y: number };
 
-/** The step a finished drag asks for, or `null` when it was a scroll, a tap, or an edge swipe. */
-export function readSwipe(start: SwipePoint, end: SwipePoint, viewportWidth: number): SwipeStep | null {
+export type SwipeRelease = {
+    start: SwipePoint;
+    end: SwipePoint;
+    /** Horizontal speed (px/ms) over the last few moves; signed like the drag. */
+    velocityX: number;
+    /** Width of the swiped card, which sets how far a slow drag must go. */
+    width: number;
+    viewportWidth: number;
+};
+
+/** Which side of the current card a step's neighbour waits on. */
+export function swipeSide(step: SwipeStep): 'left' | 'right' {
+    return step === SWIPE_RIGHT_STEP ? 'left' : 'right';
+}
+
+/** The step a drag of this sign heads toward. */
+export function swipeStepFor(dx: number): SwipeStep {
+    if (dx > 0) {
+        return SWIPE_RIGHT_STEP;
+    }
+    return SWIPE_RIGHT_STEP === 'next' ? 'previous' : 'next';
+}
+
+/**
+ * The step a finished drag asks for, or `null` when it was a scroll, a tap, an edge swipe, or a
+ * drag let go before it went far or fast enough.
+ */
+export function readSwipe({ start, end, velocityX, width, viewportWidth }: SwipeRelease): SwipeStep | null {
     if (startsAtEdge(start, viewportWidth)) {
         return null;
     }
     const dx = end.x - start.x;
     const dy = end.y - start.y;
-    if (Math.abs(dx) < SWIPE_MIN_DISTANCE || Math.abs(dx) < SWIPE_DOMINANCE * Math.abs(dy)) {
+    if (dx === 0 || Math.abs(dx) < SWIPE_DOMINANCE * Math.abs(dy)) {
         return null;
     }
-    if (dx > 0) {
-        return SWIPE_RIGHT_STEP;
-    }
-    return SWIPE_RIGHT_STEP === 'next' ? 'previous' : 'next';
+    const far = Math.abs(dx) >= width * SWIPE_COMMIT_SHARE;
+    const flicked =
+        Math.abs(dx) >= SWIPE_FLICK_MIN_DISTANCE &&
+        Math.abs(velocityX) >= SWIPE_FLICK_VELOCITY &&
+        Math.sign(velocityX) === Math.sign(dx);
+    return far || flicked ? swipeStepFor(dx) : null;
 }
 
 /** Which way a drag in progress is heading, once it has moved far enough to tell. */

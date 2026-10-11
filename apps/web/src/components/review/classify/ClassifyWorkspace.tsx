@@ -345,3 +345,58 @@ export function ClassifyFocus({
         </div>
     );
 }
+
+type ClassifyPeekProps = {
+    classify: ClassifySession;
+    item: CategorizationQueueItemDto;
+};
+
+/**
+ * A neighbouring transaction's card as it will look once focused, for a carousel to slide in.
+ * Inert: none of `ClassifyFocus`'s scoring or overlay fetches, and nothing on it can be pressed.
+ */
+export function ClassifyPeek({ classify, item }: ClassifyPeekProps) {
+    const flagsQuery = useQuery({
+        ...getYnabFlagsOptions(),
+        staleTime: Number.POSITIVE_INFINITY,
+        refetchOnWindowFocus: false,
+    });
+    const transactionId = item.transaction.id;
+
+    return (
+        <div className={classes.mobile}>
+            <ClassifyStage
+                actions="external"
+                assignableIds={classify.assignableIds}
+                categoryGroups={classify.selectGroups}
+                choicesById={classify.choicesById}
+                decision={classify.session.byId[transactionId]}
+                flagOptions={ynabFlagOptions(flagsQuery.data?.flags, item.transaction)}
+                item={item}
+                note={classify.note(item)}
+                noteDirty={hasNoteChanges(classify.noteFor(item))}
+                payee={classify.payeeName(item)}
+                rename={classify.payeeRename(item)}
+                scoring={!item.proposal}
+                splitLines={classify.splitDrafts[transactionId]}
+                onAccept={ignore}
+                onAnnotate={ignore}
+                onBeginSplit={ignore}
+                onCancelSplit={ignore}
+                onChangeFlag={ignore}
+                onChangeMemo={ignore}
+                onChangeSplit={ignore}
+                onCommitPayee={ignore}
+                onDismissRename={ignore}
+                onPickCategoryId={ignore}
+                onPickOption={ignore}
+                onReject={ignore}
+                onUndo={ignore}
+            />
+        </div>
+    );
+}
+
+function ignore(): void {
+    // A peek is inert; its handlers are never reached.
+}

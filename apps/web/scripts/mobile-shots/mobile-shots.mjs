@@ -56,7 +56,14 @@ const DEFAULT_ROUTES = [
     '@review-certain',
     '@review-accept',
     '@sheet',
+    '@sheet-drag',
     '@sheet-swipe',
+    '@sheet-flick',
+    '@sheet-short',
+    '@sheet-next-tap',
+    '@sheet-accept',
+    '@sheet-open-other',
+    '@sheet-close',
 ];
 
 /**
@@ -108,12 +115,96 @@ const SCENARIOS = {
             await page.locator('[data-row-id] button').first().click();
         },
     },
+    // Leftward = next. Mid-drag: the next card should be sliding in from the right.
+    'sheet-drag': {
+        path: '/',
+        run: async (page) => {
+            await page.locator('[data-row-id] button').first().click();
+            await page.waitForTimeout(400);
+            await swipe(page, 300, -170, { release: false });
+        },
+    },
     'sheet-swipe': {
         path: '/',
         run: async (page) => {
             await page.locator('[data-row-id] button').first().click();
             await page.waitForTimeout(400);
-            await swipe(page, 120, 160);
+            await swipe(page, 300, -170);
+            await page.waitForTimeout(500);
+        },
+    },
+    // Short but fast: should still page.
+    'sheet-flick': {
+        path: '/',
+        run: async (page) => {
+            await page.locator('[data-row-id] button').first().click();
+            await page.waitForTimeout(400);
+            await flick(page, 300, -60);
+            await page.waitForTimeout(500);
+        },
+    },
+    // Short and slow: should spring back to the same card.
+    'sheet-short': {
+        path: '/',
+        run: async (page) => {
+            await page.locator('[data-row-id] button').first().click();
+            await page.waitForTimeout(400);
+            await swipe(page, 300, -60, { stepMs: 40 });
+            await page.waitForTimeout(500);
+        },
+    },
+    // A row that isn't already focused, tapped once: the sheet must open on it first time.
+    'sheet-open-other': {
+        path: '/',
+        run: async (page) => {
+            await page.locator('[data-row-id] button').nth(6).click();
+            await page.waitForTimeout(300);
+            const sheet = await page.getByRole('region', { name: 'Classify transaction' }).count();
+            if (sheet === 0) {
+                throw new Error('sheet-open-other: one tap on row 7 did not open the sheet');
+            }
+        },
+    },
+    // Open then close: X should pop back to the list entry, not stack a new one.
+    'sheet-close': {
+        path: '/',
+        run: async (page) => {
+            const before = await page.evaluate(() => window.history.length);
+            await page.locator('[data-row-id] button').nth(6).click();
+            await page.waitForTimeout(300);
+            await page.getByRole('button', { name: 'Back to list' }).click();
+            await page.waitForTimeout(300);
+            const after = await page.evaluate(() => ({
+                path: window.location.pathname,
+                sheets: document.querySelectorAll('[aria-label="Classify transaction"]').length,
+                length: window.history.length,
+            }));
+            if (after.path !== '/' || after.sheets !== 0) {
+                throw new Error(`sheet-close: still open (${JSON.stringify(after)})`);
+            }
+            // One forward entry (the sheet) is expected; a replace-close would leave the same count
+            // but a push-close would add another.
+            if (after.length > before + 1) {
+                throw new Error(`sheet-close: history grew ${before} → ${after.length}`);
+            }
+        },
+    },
+    'sheet-accept': {
+        path: '/',
+        run: async (page) => {
+            await page.locator('[data-row-id] button').first().click();
+            await page.waitForTimeout(400);
+            await page.getByRole('button', { name: 'Accept', exact: true }).click();
+            await page.waitForTimeout(500);
+        },
+    },
+    'sheet-next-tap': {
+        path: '/',
+        run: async (page) => {
+            await page.locator('[data-row-id] button').first().click();
+            await page.waitForTimeout(400);
+            await page.getByRole('button', { name: 'Next transaction' }).click();
+            await page.waitForTimeout(500);
         },
     },
 };
@@ -123,20 +214,66 @@ const SCENARIOS = {
  * @param {import('playwright-core').Page} page
  * @param {number} fromX
  * @param {number} distance positive = rightward
+ * @param {{ release?: boolean, stepMs?: number, steps?: number }} [options] `release: false` holds the finger down
  */
-async function swipe(page, fromX, distance) {
+async function swipe(page, fromX, distance, { release = true, stepMs = 16, steps = 10 } = {}) {
     const cdp = await page.context().newCDPSession(page);
     const y = 500;
-    const steps = 8;
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: fromX, y }] });
     for (let step = 1; step <= steps; step++) {
+        if (stepMs > 0) {
+            await page.waitForTimeout(stepMs);
+        }
         await cdp.send('Input.dispatchTouchEvent', {
             type: 'touchMove',
             touchPoints: [{ x: fromX + (distance * step) / steps, y }],
         });
     }
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    if (release) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    }
     await cdp.detach();
+}
+
+/**
+ * A fast flick, dispatched inside the page at ~8ms per move. CDP round trips take 20-60ms per
+ * event headless, far too slow to look like a real flick.
+ * @param {import('playwright-core').Page} page
+ * @param {number} fromX
+ * @param {number} distance positive = rightward
+ */
+async function flick(page, fromX, distance) {
+    await page.evaluate(
+        async ({ fromX, distance }) => {
+            const y = 500;
+            const target = document.elementFromPoint(fromX, y);
+            if (!target) {
+                throw new Error('flick: nothing under the start point');
+            }
+            /** @param {string} type @param {number} x @param {boolean} down */
+            const fire = (type, x, down) => {
+                const touch = new Touch({ identifier: 1, target, clientX: x, clientY: y });
+                target.dispatchEvent(
+                    new TouchEvent(type, {
+                        bubbles: true,
+                        cancelable: true,
+                        touches: down ? [touch] : [],
+                        targetTouches: down ? [touch] : [],
+                        changedTouches: [touch],
+                    }),
+                );
+            };
+            const pause = () => new Promise((resolve) => setTimeout(resolve, 8));
+            const steps = 5;
+            fire('touchstart', fromX, true);
+            for (let step = 1; step <= steps; step++) {
+                await pause();
+                fire('touchmove', fromX + (distance * step) / steps, true);
+            }
+            fire('touchend', fromX + distance, false);
+        },
+        { fromX, distance },
+    );
 }
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 

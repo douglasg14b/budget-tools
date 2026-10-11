@@ -35,7 +35,11 @@ import { theme } from './theme';
 export function App() {
     return (
         <MantineProvider defaultColorScheme="dark" theme={theme} cssVariablesResolver={cssVariablesResolver}>
-            <BrowserRouter>
+            {/*
+              No Suspense anywhere, so transitions buy nothing: they only queue a navigation behind
+              other renders, and a tap on a busy list (scores landing, rows scrolling) felt dead.
+            */}
+            <BrowserRouter useTransitions={false}>
                 <AuthProvider>
                     <PracticeReceiptsProvider>
                         <AuthGate />
