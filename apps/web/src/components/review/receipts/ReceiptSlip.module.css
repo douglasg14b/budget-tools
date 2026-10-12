@@ -65,3 +65,9 @@
     color: var(--app-tier-auto);
     font-weight: 700;
 }
+
+.reimbursable {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--app-tier-suggested);
+}

@@ -17,6 +17,8 @@ export type ReceiptHeaderVision = {
     readonly printedMilliunits: number | null;
     /** Header read only: a tip or total is written by hand. Triggers the handwritten-totals pass. */
     readonly hasHandwrittenAmounts?: boolean;
+    /** Header read only: "reimbursable" is written on the receipt. Triggers the reimbursable-note read. */
+    readonly markedReimbursable?: boolean;
 };
 
 export type ReceiptLinesVision = ReceiptHeaderVision & {
@@ -59,9 +61,14 @@ const HEADER_SCHEMA = {
         purchaseDate: { type: ['string', 'null'] },
         grandTotalDollars: { type: ['number', 'null'] },
         hasHandwrittenAmounts: { type: 'boolean' },
+        markedReimbursable: { type: 'boolean' },
     },
-    required: ['vendor', 'purchaseDate', 'grandTotalDollars', 'hasHandwrittenAmounts'],
+    required: ['vendor', 'purchaseDate', 'grandTotalDollars', 'hasHandwrittenAmounts', 'markedReimbursable'],
 };
+
+/** The writer misspells it freely; prompts must not demand the dictionary spelling. */
+export const REIMBURSABLE_WORD =
+    'the word "reimbursable" or "reimburse" written on the receipt — any form or common misspelling of it counts, and abbreviations too (e.g. "Reimbursible", "Reimburs", "Reimb")';
 
 /** Signed card slips print a subtotal and leave tip and total to be written in by hand. */
 const HANDWRITTEN_TOTAL_RULE =
@@ -104,7 +111,7 @@ export async function readReceiptHeaders(input: ReceiptHeaderVisionInput): Promi
         timeoutMs: input.timeoutMs,
         schemaName: 'receipt_headers',
         schema: HEADER_SCHEMA,
-        system: `Extract receipt match keys from the photo. purchaseDate must be an ISO calendar date YYYY-MM-DD with no time (example 2026-08-01). Convert printed dates such as 08/01/2026 or Aug 1, 2026 into YYYY-MM-DD. Do not invent unreadable fields — use null instead. grandTotalDollars is the grand total the customer paid, not subtotal, tax-only, or a line item. ${HANDWRITTEN_TOTAL_RULE} hasHandwrittenAmounts is true when any money amount (such as a tip or total) is written by hand.`,
+        system: `Extract receipt match keys from the photo. purchaseDate must be an ISO calendar date YYYY-MM-DD with no time (example 2026-08-01). Convert printed dates such as 08/01/2026 or Aug 1, 2026 into YYYY-MM-DD. Do not invent unreadable fields — use null instead. grandTotalDollars is the grand total the customer paid, not subtotal, tax-only, or a line item. ${HANDWRITTEN_TOTAL_RULE} hasHandwrittenAmounts is true when any money amount (such as a tip or total) is written by hand. markedReimbursable is true when ${REIMBURSABLE_WORD} appears; an amount written beside that word is the reimbursable share, never the grand total.`,
         user: 'Read vendor name, purchase date as YYYY-MM-DD, and grand total from this receipt image. Do not invent values.',
         images: [input.processedDataUrl],
     });
@@ -128,7 +135,7 @@ export async function readReceiptLines(input: ReceiptLinesVisionInput): Promise<
         timeoutMs: input.timeoutMs,
         schemaName: 'receipt_lines',
         schema: REPAIR_SCHEMA,
-        system: 'Extract receipt line items from the photo. purchaseDate must be YYYY-MM-DD. Do not invent products or amounts. tipDollars is a tip or gratuity added to the bill, printed or handwritten; read it from the receipt, never compute it from other amounts; use null when there is none, and never list the tip as a line item. If you cannot make the math work, return the best readable lines without fabricating.',
+        system: 'Extract receipt line items from the photo. purchaseDate must be YYYY-MM-DD. Do not invent products or amounts. tipDollars is a tip or gratuity added to the bill, printed or handwritten; read it from the receipt, never compute it from other amounts; use null when there is none, and never list the tip as a line item. A handwritten reimbursable amount is neither a tip nor a line item. If you cannot make the math work, return the best readable lines without fabricating.',
         user: [lockTotal, 'Return purchaseDate as YYYY-MM-DD if readable.'].join('\n'),
         images: [input.processedDataUrl],
     });
@@ -142,6 +149,7 @@ export function parseHeaderCompletion(content: string): ReceiptHeaderVision {
         purchaseDate: optionalIsoDate(record.purchaseDate),
         printedMilliunits: moneyToMilliunits(record.grandTotalDollars),
         hasHandwrittenAmounts: record.hasHandwrittenAmounts === true,
+        markedReimbursable: record.markedReimbursable === true,
     };
 }
 

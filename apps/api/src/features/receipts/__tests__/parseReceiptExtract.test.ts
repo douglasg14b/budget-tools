@@ -54,6 +54,19 @@ describe('parseReceiptExtract', () => {
             ],
         });
     });
+
+    it('reads a reimbursable mark, dropping a non-positive amount', () => {
+        expect(
+            parseReceiptExtract(
+                JSON.stringify({ reimbursable: { writtenText: 'Reimb: $54.61', amountMilliunits: 54_610 } }),
+            )?.reimbursable,
+        ).toEqual({ writtenText: 'Reimb: $54.61', amountMilliunits: 54_610 });
+        expect(parseReceiptExtract(JSON.stringify({ reimbursable: { amountMilliunits: -5 } }))?.reimbursable).toEqual({
+            writtenText: null,
+            amountMilliunits: null,
+        });
+        expect(parseReceiptExtract(JSON.stringify({ reimbursable: true }))?.reimbursable).toBeUndefined();
+    });
 });
 
 describe('formatReceiptExtractDump', () => {

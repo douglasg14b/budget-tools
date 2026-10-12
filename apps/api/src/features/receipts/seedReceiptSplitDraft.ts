@@ -3,13 +3,15 @@ import type { ReceiptExtractStatus } from './data/receiptsSchema';
 import { equalShareBankMilliunits } from './equalShareBankMilliunits';
 import { parseReceiptExtract } from './parseReceiptExtract';
 import type { ReceiptExtractLine } from './pipeline/arithmeticGate';
-import type { ReceiptSplitDraftDto } from './receiptsDtos';
+import type { ReceiptSplitDraftCategoryDto, ReceiptSplitDraftDto } from './receiptsDtos';
 
 export type SeedReceiptSplitDraftInput = {
     readonly extractStatus: ReceiptExtractStatus | null;
     readonly totalsDisagree: boolean;
     readonly bankMilliunits: number;
     readonly extractJson: string | null;
+    /** Where a reimbursable share goes; null when the catalog has no such category. */
+    readonly reimbursableCategory: ReceiptSplitDraftCategoryDto | null;
 };
 
 type ParsedExtract = {
@@ -20,17 +22,26 @@ type ParsedExtract = {
 };
 
 /**
- * Gated line amounts may own cents only when they already sum to the bank charge.
- * Otherwise names get equal shares of the bank. One name is not a fake split.
+ * A written reimbursable amount wins: its share goes to the reimbursable category and the rest
+ * stays for the reviewer. Otherwise gated line amounts may own cents only when they already sum
+ * to the bank charge, and names get equal shares of the bank. One name is not a fake split.
  */
 export function seedReceiptSplitDraft(input: SeedReceiptSplitDraftInput): ReceiptSplitDraftDto | null {
+    const parsed = parseReceiptExtract(input.extractJson);
+    const reimbursable = reimbursableSplitDraft(
+        parsed?.reimbursable?.amountMilliunits ?? null,
+        input.bankMilliunits,
+        input.reimbursableCategory,
+    );
+    if (reimbursable) {
+        return reimbursable;
+    }
     if (input.extractStatus !== 'gated' && input.extractStatus !== 'ungated') {
         return null;
     }
     if (input.totalsDisagree) {
         return null;
     }
-    const parsed = parseReceiptExtract(input.extractJson);
     if (!parsed) {
         return null;
     }
@@ -52,6 +63,29 @@ export function seedReceiptSplitDraft(input: SeedReceiptSplitDraftInput): Receip
         return { kind: 'single', lines: amounts };
     }
     return { kind: 'split', lines: amounts };
+}
+
+/**
+ * The written share needs no extract gate — it is checked against the bank charge itself. A share
+ * larger than the charge cannot be right, so it seeds nothing and the mark alone stays visible.
+ */
+function reimbursableSplitDraft(
+    amountMilliunits: number | null,
+    bankMilliunits: number,
+    category: ReceiptSplitDraftCategoryDto | null,
+): ReceiptSplitDraftDto | null {
+    if (amountMilliunits == null || !category || bankMilliunits === 0) {
+        return null;
+    }
+    const share = alignAmountToBank(amountMilliunits, bankMilliunits);
+    if (Math.abs(share) > Math.abs(bankMilliunits)) {
+        return null;
+    }
+    const shareLine = { amountMilliunits: share, memo: null, category };
+    if (share === bankMilliunits) {
+        return { kind: 'single', lines: [shareLine] };
+    }
+    return { kind: 'split', lines: [shareLine, { amountMilliunits: bankMilliunits - share, memo: null }] };
 }
 
 function gatedSplitLines(

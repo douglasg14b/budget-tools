@@ -526,8 +526,31 @@
 				],
 				"type": "object"
 			},
+			"ReceiptSplitDraftCategoryDto": {
+				"properties": {
+					"groupName": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"groupName",
+					"name",
+					"id"
+				],
+				"type": "object"
+			},
 			"ReceiptSplitDraftLineDto": {
 				"properties": {
+					"category": {
+						"$ref": "#/components/schemas/ReceiptSplitDraftCategoryDto",
+						"description": "Pre-picked category (the reimbursable share); absent when the reviewer picks."
+					},
 					"memo": {
 						"type": "string",
 						"nullable": true
@@ -799,8 +822,31 @@
 				],
 				"type": "object"
 			},
+			"PatchReceiptReimbursableDto": {
+				"properties": {
+					"amountMilliunits": {
+						"type": "number",
+						"format": "double",
+						"nullable": true,
+						"description": "The reimbursable share, positive; null when only the mark is known."
+					}
+				},
+				"required": [
+					"amountMilliunits"
+				],
+				"type": "object"
+			},
 			"PatchReceiptDto": {
 				"properties": {
+					"reimbursable": {
+						"allOf": [
+							{
+								"$ref": "#/components/schemas/PatchReceiptReimbursableDto"
+							}
+						],
+						"nullable": true,
+						"description": "Omit to keep the extracted reimbursable mark; null clears it."
+					},
 					"lines": {
 						"items": {
 							"$ref": "#/components/schemas/PatchReceiptLineDto"

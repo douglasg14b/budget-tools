@@ -409,6 +409,94 @@ describe('extractReceipt', () => {
         }
         warn.mockRestore();
     });
+
+    describe('reimbursable note', () => {
+        function extractWith(contentFor: Record<string, string>) {
+            const completeJson = vi.fn(completeJsonReturning(contentFor));
+            const result = extractReceipt({
+                frames: [processed],
+                apiKey: 'test-key',
+                verify: false,
+                prep: async () => processed,
+                completeJson,
+            });
+            return { completeJson, result };
+        }
+
+        it('reads the note only when the header saw the word', async () => {
+            const { completeJson, result } = extractWith({
+                receipt_headers: headerContent({ markedReimbursable: false }),
+                receipt_lines: linesContent(),
+            });
+            const complete = await result;
+            expect(completeJson.mock.calls.map((call) => call[0].schemaName)).not.toContain(
+                'receipt_reimbursable_note',
+            );
+            expect(complete.kind === 'complete' && JSON.parse(complete.extractJson).reimbursable).toBeUndefined();
+        });
+
+        it('stores the written share without letting it touch the totals gate', async () => {
+            const { completeJson, result } = extractWith({
+                receipt_headers: headerContent({ markedReimbursable: true }),
+                receipt_lines: linesContent(),
+                receipt_reimbursable_note: JSON.stringify({
+                    notePresent: true,
+                    writtenText: 'Roimbursoable: $4.06',
+                    amountDollars: 4.06,
+                }),
+            });
+            const complete = await result;
+            expect(completeJson.mock.calls.map((call) => call[0].schemaName)).toContain('receipt_reimbursable_note');
+            expect(complete).toMatchObject({ kind: 'complete', extractStatus: 'gated', printedMilliunits: 8120 });
+            expect(complete.kind === 'complete' && JSON.parse(complete.extractJson).reimbursable).toEqual({
+                writtenText: 'Roimbursoable: $4.06',
+                amountMilliunits: 4060,
+            });
+            expect(complete.kind === 'complete' && complete.extractCostUsd).toBeCloseTo(0.003);
+        });
+
+        it('keeps the mark without an amount when the note has none', async () => {
+            const { result } = extractWith({
+                receipt_headers: headerContent({ markedReimbursable: true }),
+                receipt_lines: linesContent(),
+                receipt_reimbursable_note: JSON.stringify({
+                    notePresent: true,
+                    writtenText: 'Reimb',
+                    amountDollars: null,
+                }),
+            });
+            const complete = await result;
+            expect(complete.kind === 'complete' && JSON.parse(complete.extractJson).reimbursable).toEqual({
+                writtenText: 'Reimb',
+                amountMilliunits: null,
+            });
+        });
+
+        it('drops the mark when the focused read finds no note', async () => {
+            const { result } = extractWith({
+                receipt_headers: headerContent({ markedReimbursable: true }),
+                receipt_lines: linesContent(),
+                receipt_reimbursable_note: JSON.stringify({ notePresent: false, writtenText: null, amountDollars: 9 }),
+            });
+            const complete = await result;
+            expect(complete.kind === 'complete' && JSON.parse(complete.extractJson).reimbursable).toBeUndefined();
+        });
+
+        it('keeps the mark and records the error when the note read fails', async () => {
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+            const { result } = extractWith({
+                receipt_headers: headerContent({ markedReimbursable: true }),
+                receipt_lines: linesContent(),
+                receipt_reimbursable_note: 'not json',
+            });
+            const complete = await result;
+            const payload = complete.kind === 'complete' ? JSON.parse(complete.extractJson) : null;
+            expect(payload.reimbursable).toEqual({ writtenText: null, amountMilliunits: null });
+            expect(payload.error).toContain('reimbursable note');
+            expect(complete).toMatchObject({ extractStatus: 'gated' });
+            warn.mockRestore();
+        });
+    });
 });
 
 describe('buildFailedReceiptExtract', () => {

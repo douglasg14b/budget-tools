@@ -67,6 +67,26 @@ describe('applyReceiptExtractEdit', () => {
         expect(JSON.parse(result.extractJson)).toMatchObject({ tipMilliunits: 0 });
     });
 
+    it('keeps, re-amounts, or clears the reimbursable mark', () => {
+        const previousExtractJson = JSON.stringify({
+            reimbursable: { writtenText: 'Reimbursable: $4.00', amountMilliunits: 4000 },
+        });
+        const reimbursableAfter = (reimbursable?: { amountMilliunits: number | null } | null) => {
+            const result = applyReceiptExtractEdit({ previousExtractJson, edit: { ...cafeEdit, reimbursable } });
+            return result.kind === 'applied' ? JSON.parse(result.extractJson).reimbursable : 'not applied';
+        };
+        expect(reimbursableAfter()).toEqual({ writtenText: 'Reimbursable: $4.00', amountMilliunits: 4000 });
+        expect(reimbursableAfter({ amountMilliunits: 4100 })).toEqual({
+            writtenText: 'Reimbursable: $4.00',
+            amountMilliunits: 4100,
+        });
+        expect(reimbursableAfter({ amountMilliunits: null })).toEqual({
+            writtenText: 'Reimbursable: $4.00',
+            amountMilliunits: null,
+        });
+        expect(reimbursableAfter(null)).toBeUndefined();
+    });
+
     it('marks failed when a match key is missing', () => {
         const result = applyReceiptExtractEdit({
             previousExtractJson: null,

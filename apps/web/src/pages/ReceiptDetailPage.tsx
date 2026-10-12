@@ -238,6 +238,7 @@ export function ReceiptDetailPage() {
                         amountMilliunits: line.amountMilliunits,
                         quantity: line.quantity,
                     })),
+                    reimbursable: edit.reimbursable,
                 },
             });
             return;

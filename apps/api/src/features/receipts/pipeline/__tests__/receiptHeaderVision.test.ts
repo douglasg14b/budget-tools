@@ -17,7 +17,22 @@ describe('parseHeaderCompletion', () => {
             purchaseDate: '2026-08-01',
             printedMilliunits: 12340,
             hasHandwrittenAmounts: false,
+            markedReimbursable: false,
         });
+    });
+
+    it('reads the reimbursable mark', () => {
+        expect(
+            parseHeaderCompletion(
+                JSON.stringify({
+                    vendor: 'Kroger',
+                    purchaseDate: '2026-07-12',
+                    grandTotalDollars: 109.23,
+                    hasHandwrittenAmounts: true,
+                    markedReimbursable: true,
+                }),
+            ).markedReimbursable,
+        ).toBe(true);
     });
 
     it('reads the handwritten-amounts flag', () => {
@@ -62,6 +77,7 @@ describe('parseHeaderCompletion', () => {
             purchaseDate: null,
             printedMilliunits: null,
             hasHandwrittenAmounts: false,
+            markedReimbursable: false,
         });
     });
 

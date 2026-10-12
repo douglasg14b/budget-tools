@@ -35,6 +35,13 @@ export function ClassifyReceiptContext({ error, overlay }: ClassifyReceiptContex
                 </p>
             ) : null}
             {overlay ? <p className={classes.status}>{extractStatusCopy(overlay)}</p> : null}
+            {overlay?.reimbursable ? (
+                <p className={classes.reimbursable}>
+                    {overlay.reimbursable.amountMilliunits != null
+                        ? `Reimbursable · ${formatYnabAmount(overlay.reimbursable.amountMilliunits)}`
+                        : 'Marked reimbursable — no amount written'}
+                </p>
+            ) : null}
             {overlay && overlay.closeMatchCount > 0 && overlay.extractStatus !== 'gated' ? (
                 <p className={classes.close}>
                     {overlay.closeMatchCount === 1 ? '1 close match' : `${overlay.closeMatchCount} close matches`}

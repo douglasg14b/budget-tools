@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 
 import { formatTransactionDate } from '../formatTransactionDate';
 import { formatYnabAmount } from '../formatYnabAmount';
+import { parseReceiptExtract } from './parseReceiptExtract';
 import classes from './ReceiptSlip.module.css';
 import { receiptExtractCopy } from './receiptExtractCopy';
 import { RECEIPTS_INBOX_FROM_STATE } from './receiptsInboxBack';
@@ -16,6 +17,7 @@ export type InboxSlipModel = {
     readonly totalsDisagree: boolean;
     readonly transactionId: string | null;
     readonly imageSrc: string | null;
+    readonly extractJson: string | null;
 };
 
 type ReceiptSlipProps = {
@@ -24,6 +26,7 @@ type ReceiptSlipProps = {
 
 export function ReceiptSlip({ slip }: ReceiptSlipProps) {
     const location = useLocation();
+    const reimbursable = parseReceiptExtract(slip.extractJson)?.reimbursable;
     return (
         <Link
             className={classes.slip}
@@ -47,6 +50,13 @@ export function ReceiptSlip({ slip }: ReceiptSlipProps) {
                     ) : null}
                 </span>
                 <span className={classes.status}>{receiptExtractCopy(slip)}</span>
+                {reimbursable ? (
+                    <span className={classes.reimbursable}>
+                        {reimbursable.amountMilliunits != null
+                            ? `Reimbursable ${formatYnabAmount(reimbursable.amountMilliunits)}`
+                            : 'Reimbursable'}
+                    </span>
+                ) : null}
                 {slip.transactionId ? (
                     <span className={classes.bound}>Bound</span>
                 ) : (

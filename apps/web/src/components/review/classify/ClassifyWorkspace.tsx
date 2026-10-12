@@ -177,6 +177,9 @@ export function ClassifyFocus({
     displayedItemRef.current = displayItem;
     const beginSplitRef = useRef(classify.beginSplit);
     beginSplitRef.current = classify.beginSplit;
+    // The on-screen suggestion (with the LLM overlay once it lands) fills a receipt draft's remainder.
+    const displayProposalRef = useRef(displayItem?.proposal);
+    displayProposalRef.current = displayItem?.proposal;
     const splitDraft = current ? classify.splitDrafts[current.transaction.id] : undefined;
 
     useEffect(() => {
@@ -197,7 +200,9 @@ export function ClassifyFocus({
     useEffect(() => {
         const draft = receipt.splitDraft;
         const transactionId = current?.transaction.id;
-        if (!current || !draft || draft.kind !== 'split' || !transactionId) {
+        // A pre-picked category (a reimbursable share) is worth opening even as one line.
+        const opens = draft?.kind === 'split' || Boolean(draft?.lines.some((line) => line.category));
+        if (!current || !draft || !opens || !transactionId) {
             return;
         }
         if (isAmazonTransaction(current.transaction)) {
@@ -209,7 +214,7 @@ export function ClassifyFocus({
         if (splitDraft || currentDecided || receiptDismissedRef.current.has(transactionId)) {
             return;
         }
-        beginSplitRef.current(current, splitLinesFromReceiptDraft(draft.lines));
+        beginSplitRef.current(current, splitLinesFromReceiptDraft(draft.lines, displayProposalRef.current));
     }, [amazon.overlay, current, currentDecided, receipt.splitDraft, splitDraft]);
 
     useEffect(() => {

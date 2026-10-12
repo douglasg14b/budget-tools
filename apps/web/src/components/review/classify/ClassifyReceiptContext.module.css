@@ -40,6 +40,13 @@
     color: var(--app-text-muted);
 }
 
+.reimbursable {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--app-tier-suggested);
+}
+
 .dot {
     margin: 0 0.45rem;
     color: color-mix(in srgb, var(--app-text-muted) 70%, transparent);

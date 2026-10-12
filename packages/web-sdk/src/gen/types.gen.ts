@@ -168,7 +168,14 @@ export type ReceiptBindCandidateDto = {
     id: string;
 };
 
+export type ReceiptSplitDraftCategoryDto = {
+    groupName: string;
+    name: string;
+    id: string;
+};
+
 export type ReceiptSplitDraftLineDto = {
+    category?: ReceiptSplitDraftCategoryDto;
     memo: string | null;
     amountMilliunits: number;
 };
@@ -235,7 +242,18 @@ export type PatchReceiptLineDto = {
     name: string;
 };
 
+export type PatchReceiptReimbursableDto = {
+    /**
+     * The reimbursable share, positive; null when only the mark is known.
+     */
+    amountMilliunits: number | null;
+};
+
 export type PatchReceiptDto = {
+    /**
+     * Omit to keep the extracted reimbursable mark; null clears it.
+     */
+    reimbursable?: PatchReceiptReimbursableDto | null;
     lines: Array<PatchReceiptLineDto>;
     /**
      * Omit to keep the previously extracted tip.

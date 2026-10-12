@@ -11,12 +11,12 @@ import { matchReceiptsToTransaction, matchTransactionsToReceipt } from './matchR
 import { paymentDateWindow } from './paymentDateWindow';
 import type {
     MatchPreviewDto,
-    MatchPreviewReceiptDto,
     MatchPreviewTransactionDto,
     ReceiptBindCandidateDto,
     ReceiptMatchDto,
     ReceiptSplitDraftDto,
 } from './receiptsDtos';
+import { reimbursableCategoryFor } from './reimbursableCategory';
 import { seedReceiptSplitDraft } from './seedReceiptSplitDraft';
 
 export type ReceiptLookupResult = ReceiptTransactionMatch & {
@@ -119,7 +119,7 @@ export async function lookupByTransaction(transactionId: string, db?: AppDatabas
     });
     const bound = await getReceiptByTransactionId(transactionId, db);
     const exact = match.exactReceiptId ? (receipts.find((row) => row.id === match.exactReceiptId) ?? bound) : bound;
-    return withCandidates(match, [], splitDraftFromRow(exact, transaction.amount));
+    return withCandidates(match, [], await splitDraftFor(exact, transaction.amount));
 }
 
 /**
@@ -143,7 +143,7 @@ export async function lookupByReceipt(receiptId: string, db?: AppDatabaseClient)
         transactions: transactions.map(transactionDetailToMatchKeys),
     });
     const bank = transactions.find((row) => row.id === (match.exactTransactionId ?? receipt.transactionId));
-    return withCandidates(match, transactions, splitDraftFromRow(receipt, bank?.amount ?? null));
+    return withCandidates(match, transactions, await splitDraftFor(receipt, bank?.amount ?? null));
 }
 
 function previewTransactionSource(
@@ -184,7 +184,7 @@ export async function matchPreview(
             receipts,
         });
         const exact = body.receipts.find((row) => row.id === match.exactReceiptId);
-        return withCandidates(match, [], splitDraftFromPreview(exact, source.transaction.amount));
+        return withCandidates(match, [], await splitDraftFor(exact, source.transaction.amount));
     }
     if (source.kind === 'id') {
         const [transaction] = await listTransactionsByIds([source.transactionId]);
@@ -196,7 +196,7 @@ export async function matchPreview(
             receipts,
         });
         const exact = body.receipts.find((row) => row.id === match.exactReceiptId);
-        return withCandidates(match, [], splitDraftFromPreview(exact, transaction.amount));
+        return withCandidates(match, [], await splitDraftFor(exact, transaction.amount));
     }
 
     const only = body.receipts[0];
@@ -217,34 +217,20 @@ export async function matchPreview(
         transactions: transactions.map(transactionDetailToMatchKeys),
     });
     const bank = transactions.find((row) => row.id === match.exactTransactionId);
-    return withCandidates(match, transactions, splitDraftFromPreview(only, bank?.amount ?? null));
+    return withCandidates(match, transactions, await splitDraftFor(only, bank?.amount ?? null));
 }
 
-function splitDraftFromRow(
+/** Stored rows and Practice preview receipts alike; preview receipts may omit the extract. */
+async function splitDraftFor(
     row:
         | {
-              readonly extractStatus: ReceiptExtractStatus | null;
+              readonly extractStatus?: ReceiptExtractStatus | null;
               readonly totalsDisagree: boolean;
-              readonly extractJson: string | null;
+              readonly extractJson?: string | null;
           }
         | undefined,
     bankMilliunits: number | null,
-): ReceiptSplitDraftDto | null {
-    if (!row || bankMilliunits == null) {
-        return null;
-    }
-    return seedReceiptSplitDraft({
-        extractStatus: row.extractStatus,
-        totalsDisagree: row.totalsDisagree,
-        bankMilliunits,
-        extractJson: row.extractJson,
-    });
-}
-
-function splitDraftFromPreview(
-    row: MatchPreviewReceiptDto | undefined,
-    bankMilliunits: number | null,
-): ReceiptSplitDraftDto | null {
+): Promise<ReceiptSplitDraftDto | null> {
     if (!row || bankMilliunits == null) {
         return null;
     }
@@ -253,5 +239,6 @@ function splitDraftFromPreview(
         totalsDisagree: row.totalsDisagree,
         bankMilliunits,
         extractJson: row.extractJson ?? null,
+        reimbursableCategory: await reimbursableCategoryFor(row.extractJson),
     });
 }

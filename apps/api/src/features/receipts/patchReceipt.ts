@@ -22,6 +22,7 @@ export async function patchReceipt(id: string, body: PatchReceiptDto, db?: AppDa
         discountMilliunits: body.discountMilliunits,
         tipMilliunits: body.tipMilliunits,
         lines: body.lines.map(toExtractLine),
+        reimbursable: body.reimbursable,
     };
     const result = applyReceiptExtractEdit({ previousExtractJson: row.extractJson, edit });
     if (result.kind === 'amazon') {

@@ -1,3 +1,9 @@
+import type {
+    CategorizationProposalDto,
+    ReceiptSplitDraftCategoryDto,
+    ReceiptSplitDraftLineDto,
+} from '@budget-tools/web-sdk';
+
 export type SplitLine = {
     readonly amount: number;
     readonly categoryId: string;
@@ -65,13 +71,49 @@ export function seedSingleSplitLine(amount: number, line?: Partial<SplitLine>): 
 }
 
 export function splitLinesFromReceiptDraft(
-    lines: ReadonlyArray<{ readonly amountMilliunits: number; readonly memo: string | null }>,
+    lines: readonly ReceiptSplitDraftLineDto[],
+    proposal?: CategorizationProposalDto | null,
 ): SplitLine[] {
-    return lines.map((line) => ({
-        amount: line.amountMilliunits,
-        categoryId: '',
-        categoryName: '',
-        categoryGroup: '',
-        memo: line.memo,
-    }));
+    const prePicked = new Set(lines.flatMap((line) => (line.category ? [line.category.id] : [])));
+    // A pre-picked line (the reimbursable share) leaves one remainder: it takes the card's own
+    // suggestion. Item-name drafts stay blank for the reviewer, as before.
+    const remainder = prePicked.size > 0 ? remainderCategory(proposal, prePicked) : null;
+    return lines.map((line) => {
+        const category = line.category ?? remainder;
+        return {
+            amount: line.amountMilliunits,
+            categoryId: category?.id ?? '',
+            categoryName: category?.name ?? '',
+            categoryGroup: category?.groupName ?? '',
+            memo: line.memo,
+        };
+    });
+}
+
+/** The highest-ranked suggestion that is not already a pre-picked line (e.g. work travel's Transient). */
+function remainderCategory(
+    proposal: CategorizationProposalDto | null | undefined,
+    exclude: ReadonlySet<string>,
+): ReceiptSplitDraftCategoryDto | null {
+    if (!proposal) {
+        return null;
+    }
+    const ranked = [
+        {
+            id: proposal.suggestedCategoryId,
+            name: proposal.suggestedCategory,
+            groupName: proposal.suggestedCategoryGroup,
+        },
+        ...proposal.options.map((option) => ({
+            id: option.categoryId,
+            name: option.category,
+            groupName: option.categoryGroup,
+        })),
+    ];
+    for (const candidate of ranked) {
+        if (candidate.id && candidate.name && !exclude.has(candidate.id)) {
+            return { id: candidate.id, name: candidate.name, groupName: candidate.groupName ?? '' };
+        }
+    }
+    return null;
 }

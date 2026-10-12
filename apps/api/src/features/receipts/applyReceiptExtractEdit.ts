@@ -4,6 +4,7 @@ import type { ReceiptExtractPayload } from './parseReceiptExtract';
 import { formatReceiptExtractDump, parseReceiptExtract } from './parseReceiptExtract';
 import type { ReceiptExtractLine } from './pipeline/arithmeticGate';
 import { arithmeticGate } from './pipeline/arithmeticGate';
+import type { ReceiptReimbursableNote } from './pipeline/readReimbursableNote';
 
 export type ReceiptExtractEdit = {
     readonly vendor: string | null;
@@ -14,6 +15,8 @@ export type ReceiptExtractEdit = {
     /** Omitted by older clients; the previously extracted tip is kept so the edit can't silently drop it. */
     readonly tipMilliunits?: number;
     readonly lines: readonly ReceiptExtractLine[];
+    /** Omit to keep the extracted reimbursable note; null clears the mark. */
+    readonly reimbursable?: { readonly amountMilliunits: number | null } | null;
 };
 
 export type ReceiptExtractEditApplied = {
@@ -44,6 +47,7 @@ export function applyReceiptExtractEdit(input: {
     const printedMilliunits = input.edit.printedMilliunits;
     const previous = parseReceiptExtract(input.previousExtractJson);
     const tipMilliunits = input.edit.tipMilliunits ?? previous?.tipMilliunits ?? 0;
+    const reimbursable = editedReimbursable(previous?.reimbursable, input.edit.reimbursable);
     const gated =
         printedMilliunits != null &&
         arithmeticGate({
@@ -65,6 +69,7 @@ export function applyReceiptExtractEdit(input: {
         tipMilliunits,
         lines: [...input.edit.lines],
         error: null,
+        ...(reimbursable ? { reimbursable } : {}),
     };
     return {
         kind: 'applied',
@@ -80,6 +85,24 @@ export function applyReceiptExtractEdit(input: {
             input.edit.discountMilliunits,
             tipMilliunits,
         ),
+    };
+}
+
+/** The reviewer owns the amount; what was written on the paper stays as the audit trail. */
+function editedReimbursable(
+    previous: ReceiptReimbursableNote | undefined,
+    edit: ReceiptExtractEdit['reimbursable'],
+): ReceiptReimbursableNote | undefined {
+    if (edit === undefined) {
+        return previous;
+    }
+    if (edit === null) {
+        return undefined;
+    }
+    const amount = edit.amountMilliunits;
+    return {
+        writtenText: previous?.writtenText ?? null,
+        amountMilliunits: amount != null && amount > 0 ? amount : null,
     };
 }
 

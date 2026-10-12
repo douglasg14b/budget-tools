@@ -25,6 +25,14 @@ export type ParsedReceiptExtract = {
      * confirmed that amount against the marks. Worth a glance before trusting.
      */
     readonly totalReconciled: boolean;
+    /** "Reimbursable" is written on the receipt; the amount is the share written beside it, if any. */
+    readonly reimbursable?: ReceiptReimbursableNote;
+};
+
+/** Mirrors ReceiptReimbursableNote on the api side. */
+export type ReceiptReimbursableNote = {
+    readonly writtenText: string | null;
+    readonly amountMilliunits: number | null;
 };
 
 /**
@@ -51,10 +59,13 @@ export function parseReceiptExtract(extractJson: string | null): ParsedReceiptEx
             error?: unknown;
             verifyFlags?: unknown;
             handwrittenTotals?: { totalSource?: unknown } | null;
+            reimbursable?: unknown;
         };
         const verifyFlags = parseVerifyFlags(record.verifyFlags);
+        const reimbursable = parseReimbursable(record.reimbursable);
         return {
             ...(verifyFlags ? { verifyFlags } : {}),
+            ...(reimbursable ? { reimbursable } : {}),
             repaired: record.repaired === true,
             gated: record.gated === true,
             headerPrintedMilliunits:
@@ -79,6 +90,18 @@ function parseVerifyFlags(value: unknown): readonly ReceiptVerifyFlag[] | undefi
         return undefined;
     }
     return value.filter((flag): flag is ReceiptVerifyFlag => VERIFY_FLAGS.includes(flag as ReceiptVerifyFlag));
+}
+
+function parseReimbursable(value: unknown): ReceiptReimbursableNote | undefined {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return undefined;
+    }
+    const note = value as { writtenText?: unknown; amountMilliunits?: unknown };
+    return {
+        writtenText: typeof note.writtenText === 'string' ? note.writtenText : null,
+        amountMilliunits:
+            typeof note.amountMilliunits === 'number' && note.amountMilliunits > 0 ? note.amountMilliunits : null,
+    };
 }
 
 function parseLines(value: unknown): ReceiptExtractLine[] {

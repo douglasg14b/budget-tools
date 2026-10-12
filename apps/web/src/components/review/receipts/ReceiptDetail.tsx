@@ -1,5 +1,5 @@
 import type { ReceiptExtractStatus, ReceiptMatchDto, ReceiptSplitDraftDto } from '@budget-tools/web-sdk';
-import { Button, Collapse, TextInput, UnstyledButton } from '@mantine/core';
+import { Button, Checkbox, Collapse, TextInput, UnstyledButton } from '@mantine/core';
 import { IconChevronDown, IconChevronLeft } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
@@ -299,6 +299,7 @@ function retryExplanation(receipt: ReceiptDetailModel): string {
 }
 
 function ExtractSummary({ receipt }: { readonly receipt: ReceiptDetailModel }) {
+    const reimbursable = parseReceiptExtract(receipt.extractJson)?.reimbursable;
     return (
         <dl className={classes.facts}>
             <div>
@@ -315,6 +316,17 @@ function ExtractSummary({ receipt }: { readonly receipt: ReceiptDetailModel }) {
                     {receipt.printedMilliunits != null ? formatYnabAmount(receipt.printedMilliunits) : 'No total yet'}
                 </dd>
             </div>
+            {reimbursable ? (
+                <div>
+                    <dt>Reimbursable</dt>
+                    <dd>
+                        {reimbursable.amountMilliunits != null
+                            ? formatYnabAmount(reimbursable.amountMilliunits)
+                            : 'Marked — no amount written'}
+                        {reimbursable.writtenText ? ` (“${reimbursable.writtenText}”)` : null}
+                    </dd>
+                </div>
+            ) : null}
             {receipt.extractCostUsd != null ? (
                 <div>
                     <dt>OCR cost</dt>
@@ -340,22 +352,29 @@ function SplitDraftPreview({ draft }: { readonly draft: ReceiptSplitDraftDto | n
             <h2 id="seed-heading" className={classes.heading}>
                 Classify would seed
             </h2>
-            <p className={classes.lede}>
-                {draft.kind === 'split'
-                    ? 'These memos and amounts can seed a split. Categories are chosen in Classify.'
-                    : 'One line — not a fake split. Category is chosen in Classify.'}
-            </p>
+            <p className={classes.lede}>{splitDraftLede(draft)}</p>
             <ul className={classes.lines}>
                 {draft.lines.map((line, index) => (
                     // biome-ignore lint/suspicious/noArrayIndexKey: split draft lines are not uniquely keyed
                     <li key={`${line.memo ?? 'line'}-${index}`}>
-                        <span className={classes.lineName}>{line.memo ?? 'Line'}</span>
+                        <span className={classes.lineName}>{line.category?.name ?? line.memo ?? 'Line'}</span>
                         <span className={classes.lineMeta}>{formatYnabAmount(line.amountMilliunits)}</span>
                     </li>
                 ))}
             </ul>
         </section>
     );
+}
+
+function splitDraftLede(draft: ReceiptSplitDraftDto): string {
+    if (draft.lines.some((line) => line.category)) {
+        return draft.kind === 'split'
+            ? 'The written reimbursable share is pre-categorized. The rest takes the card’s suggestion in Classify.'
+            : 'The whole charge is written as reimbursable.';
+    }
+    return draft.kind === 'split'
+        ? 'These memos and amounts can seed a split. Categories are chosen in Classify.'
+        : 'One line — not a fake split. Category is chosen in Classify.';
 }
 
 type ExtractEditorProps = {
@@ -374,6 +393,8 @@ function ExtractEditor({ receipt, saveError, saving, onCancel, onSave }: Extract
     const [tax, setTax] = useState(milliunitsToInput(parsed?.taxMilliunits ?? 0));
     const [discount, setDiscount] = useState(milliunitsToInput(parsed?.discountMilliunits ?? 0));
     const [tip, setTip] = useState(milliunitsToInput(parsed?.tipMilliunits ?? 0));
+    const [reimbursableMarked, setReimbursableMarked] = useState(Boolean(parsed?.reimbursable));
+    const [reimbursable, setReimbursable] = useState(milliunitsToInput(parsed?.reimbursable?.amountMilliunits ?? null));
     const [lines, setLines] = useState(
         (parsed?.lines.length ? parsed.lines : [{ name: '', amountMilliunits: null, quantity: null }]).map((line) => ({
             name: line.name,
@@ -399,6 +420,7 @@ function ExtractEditor({ receipt, saveError, saving, onCancel, onSave }: Extract
                         amountMilliunits: inputToMilliunits(line.amount),
                         quantity: parseQuantity(line.quantity),
                     })),
+                    reimbursable: reimbursableMarked ? { amountMilliunits: inputToMilliunits(reimbursable) } : null,
                 });
             }}
         >
@@ -413,6 +435,20 @@ function ExtractEditor({ receipt, saveError, saving, onCancel, onSave }: Extract
             <TextInput label="Tax" value={tax} onChange={(event) => setTax(event.currentTarget.value)} />
             <TextInput label="Discount" value={discount} onChange={(event) => setDiscount(event.currentTarget.value)} />
             <TextInput label="Tip" value={tip} onChange={(event) => setTip(event.currentTarget.value)} />
+            <Checkbox
+                label="Marked reimbursable"
+                checked={reimbursableMarked}
+                onChange={(event) => setReimbursableMarked(event.currentTarget.checked)}
+            />
+            {reimbursableMarked ? (
+                <TextInput
+                    label="Reimbursable amount"
+                    description="Leave blank when no amount is written."
+                    placeholder="0.00"
+                    value={reimbursable}
+                    onChange={(event) => setReimbursable(event.currentTarget.value)}
+                />
+            ) : null}
             <ul className={classes.editLines}>
                 {lines.map((line, index) => (
                     // biome-ignore lint/suspicious/noArrayIndexKey: lines are edited by position

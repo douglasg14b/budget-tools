@@ -55,6 +55,13 @@ export type PatchReceiptDto = {
     /** Omit to keep the previously extracted tip. */
     tipMilliunits?: number;
     lines: PatchReceiptLineDto[];
+    /** Omit to keep the extracted reimbursable mark; null clears it. */
+    reimbursable?: PatchReceiptReimbursableDto | null;
+};
+
+export type PatchReceiptReimbursableDto = {
+    /** The reimbursable share, positive; null when only the mark is known. */
+    amountMilliunits: number | null;
 };
 
 export type ReceiptMatchCloseDto = ClosePairMatch;
@@ -74,6 +81,14 @@ export type ReceiptBindCandidateDto = {
 export type ReceiptSplitDraftLineDto = {
     amountMilliunits: number;
     memo: string | null;
+    /** Pre-picked category (the reimbursable share); absent when the reviewer picks. */
+    category?: ReceiptSplitDraftCategoryDto;
+};
+
+export type ReceiptSplitDraftCategoryDto = {
+    id: string;
+    name: string;
+    groupName: string;
 };
 
 export type ReceiptSplitDraftDto = {

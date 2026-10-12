@@ -2,7 +2,7 @@ import type { ReceiptExtractStatus } from '@budget-tools/web-sdk';
 
 import { isAmazonTransaction } from '../classify/isAmazonTransaction';
 import type { PracticeReceipt } from '../classify/practiceReceipts';
-import type { ReceiptExtractLine } from './parseReceiptExtract';
+import type { ReceiptExtractLine, ReceiptReimbursableNote } from './parseReceiptExtract';
 import { parseReceiptExtract } from './parseReceiptExtract';
 
 export const AMAZON_RECEIPT_EDIT_MESSAGE = 'Amazon receipts are not stored in this inbox';
@@ -15,6 +15,8 @@ export type ReceiptExtractEdit = {
     readonly discountMilliunits: number;
     readonly tipMilliunits: number;
     readonly lines: readonly ReceiptExtractLine[];
+    /** Omit to keep the extracted reimbursable mark; null clears it. */
+    readonly reimbursable?: { readonly amountMilliunits: number | null } | null;
 };
 
 export type AppliedReceiptExtractEdit = {
@@ -66,6 +68,7 @@ export function applyReceiptExtractEdit(input: {
             tipMilliunits: input.edit.tipMilliunits,
             lines: [...input.edit.lines],
             error: null,
+            reimbursable: editedReimbursable(previous?.reimbursable, input.edit.reimbursable),
         }),
         rawText: formatDump(input.edit),
     };
@@ -116,6 +119,24 @@ function formatDump(edit: ReceiptExtractEdit): string | null {
         rows.push(`Tip ${(edit.tipMilliunits / 1000).toFixed(2)}`);
     }
     return rows.length > 0 ? rows.join('\n') : null;
+}
+
+/** Mirrors the api: the reviewer owns the amount; the written text stays as the audit trail. */
+function editedReimbursable(
+    previous: ReceiptReimbursableNote | undefined,
+    edit: ReceiptExtractEdit['reimbursable'],
+): ReceiptReimbursableNote | undefined {
+    if (edit === undefined) {
+        return previous;
+    }
+    if (edit === null) {
+        return undefined;
+    }
+    const amount = edit.amountMilliunits;
+    return {
+        writtenText: previous?.writtenText ?? null,
+        amountMilliunits: amount != null && amount > 0 ? amount : null,
+    };
 }
 
 function emptyToNull(value: string | null): string | null {

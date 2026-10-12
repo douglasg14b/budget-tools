@@ -85,6 +85,7 @@ function slipFromDto(row: ReceiptDto): InboxSlipModel {
         totalsDisagree: row.totalsDisagree,
         transactionId: row.transactionId,
         imageSrc: liveReceiptImageSrc(row),
+        extractJson: row.extractJson,
     };
 }
 
@@ -98,5 +99,6 @@ function slipFromPractice(row: PracticeReceipt): InboxSlipModel {
         totalsDisagree: row.totalsDisagree,
         transactionId: row.transactionId,
         imageSrc: practiceReceiptImageSrc(row),
+        extractJson: row.extractJson,
     };
 }

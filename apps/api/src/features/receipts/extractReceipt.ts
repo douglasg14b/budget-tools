@@ -16,6 +16,8 @@ import { formatReceiptExtractDump } from './parseReceiptExtract';
 import type { ArithmeticGateInput, ReceiptExtractLine } from './pipeline/arithmeticGate';
 import { arithmeticGate, printedTotalsDisagree } from './pipeline/arithmeticGate';
 import { jpegDataUrl, prepReceiptImage } from './pipeline/prepReceiptImage';
+import type { ReceiptReimbursableNote } from './pipeline/readReimbursableNote';
+import { RECEIPT_REIMBURSABLE_TIMEOUT_MS, readReimbursableNote } from './pipeline/readReimbursableNote';
 import type { CompleteOpenRouterJson, ReceiptHeaderVision, ReceiptLinesVision } from './pipeline/receiptHeaderVision';
 import {
     RECEIPT_HEADER_TIMEOUT_MS,
@@ -114,6 +116,15 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
     let linesVision: ReceiptLinesVision | null = null;
     let repaired = false;
 
+    // Independent of the line read, so it runs alongside it.
+    const reimbursableAttempt = header.markedReimbursable
+        ? tryReadReimbursable({
+              ...visionBase,
+              model: input.repairModel ?? OPENROUTER_RECEIPT_REPAIR_MODEL,
+              timeoutMs: input.repairTimeoutMs ?? RECEIPT_REIMBURSABLE_TIMEOUT_MS,
+          })
+        : null;
+
     if (headerAttempt.error == null) {
         const linesAttempt = await tryReadLines({
             ...visionBase,
@@ -130,6 +141,11 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
             }
         }
     }
+    const reimbursableRead = await reimbursableAttempt;
+    if (reimbursableRead) {
+        error = joinErrors(error, reimbursableRead.error);
+    }
+    const reimbursable = reimbursableRead?.note ?? null;
 
     const vendor = header.vendor ?? linesVision?.vendor ?? null;
     const purchaseDate = header.purchaseDate ?? linesVision?.purchaseDate ?? null;
@@ -193,6 +209,7 @@ export async function extractReceipt(input: ExtractReceiptInput): Promise<Receip
         error,
         ...(verifyFlags ? { verifyFlags } : {}),
         ...(settlement ? { handwrittenTotals: settlement } : {}),
+        ...(reimbursable ? { reimbursable } : {}),
     };
 
     return {
@@ -407,6 +424,26 @@ async function trySettle(input: Parameters<typeof settleHandwrittenTotals>[0]): 
         const message = errorMessage(error);
         console.warn('receipt handwritten totals failed', message);
         return { settlement: null, error: `handwritten totals: ${message}` };
+    }
+}
+
+type ReimbursableAttempt = {
+    note: ReceiptReimbursableNote | null;
+    error: string | null;
+};
+
+/**
+ * The header saw the word, so a failed read still records the mark (with no amount) rather than
+ * dropping it: the receipt stays flagged for the reviewer.
+ */
+async function tryReadReimbursable(input: Parameters<typeof readReimbursableNote>[0]): Promise<ReimbursableAttempt> {
+    try {
+        const result = await readReimbursableNote(input);
+        return { note: result.note, error: null };
+    } catch (error) {
+        const message = errorMessage(error);
+        console.warn('receipt reimbursable note failed', message);
+        return { note: { writtenText: null, amountMilliunits: null }, error: `reimbursable note: ${message}` };
     }
 }
 

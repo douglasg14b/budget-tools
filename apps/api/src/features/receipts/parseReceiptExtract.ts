@@ -1,4 +1,5 @@
 import type { ReceiptExtractLine } from './pipeline/arithmeticGate';
+import type { ReceiptReimbursableNote } from './pipeline/readReimbursableNote';
 import type { HandwrittenTotalsSettlement } from './pipeline/settleHandwrittenTotals';
 import type { ReceiptVerifyFlag } from './pipeline/verifyReceiptExtract';
 
@@ -25,6 +26,11 @@ export type ReceiptExtractPayload = {
      * Absent when the pass did not run. Write-only here; parseReceiptExtract does not read it back.
      */
     readonly handwrittenTotals?: HandwrittenTotalsSettlement;
+    /**
+     * "Reimbursable" is written on the receipt. Absent when it is not, and on records written
+     * before the note was read. The amount is the share written beside the word, if any.
+     */
+    readonly reimbursable?: ReceiptReimbursableNote;
 };
 
 /**
@@ -50,10 +56,13 @@ export function parseReceiptExtract(extractJson: string | null): ReceiptExtractP
             lines?: unknown;
             error?: unknown;
             verifyFlags?: unknown;
+            reimbursable?: unknown;
         };
         const verifyFlags = parseVerifyFlags(record.verifyFlags);
+        const reimbursable = parseReimbursable(record.reimbursable);
         return {
             ...(verifyFlags ? { verifyFlags } : {}),
+            ...(reimbursable ? { reimbursable } : {}),
             repaired: record.repaired === true,
             gated: record.gated === true,
             headerPrintedMilliunits:
@@ -102,6 +111,18 @@ function parseVerifyFlags(value: unknown): readonly ReceiptVerifyFlag[] | undefi
         return undefined;
     }
     return value.filter((flag): flag is ReceiptVerifyFlag => VERIFY_FLAGS.includes(flag as ReceiptVerifyFlag));
+}
+
+function parseReimbursable(value: unknown): ReceiptReimbursableNote | undefined {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return undefined;
+    }
+    const note = value as { writtenText?: unknown; amountMilliunits?: unknown };
+    return {
+        writtenText: typeof note.writtenText === 'string' ? note.writtenText : null,
+        amountMilliunits:
+            typeof note.amountMilliunits === 'number' && note.amountMilliunits > 0 ? note.amountMilliunits : null,
+    };
 }
 
 function parseLines(value: unknown): ReceiptExtractLine[] {

@@ -11,6 +11,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 
 import { getBackendErrorMessage } from '../../BackendErrorNotice';
+import type { ReceiptReimbursableNote } from '../receipts/parseReceiptExtract';
+import { parseReceiptExtract } from '../receipts/parseReceiptExtract';
 import type { ReceiptLlmSkip } from './applyLlmOverlay';
 import { buildReceiptLlmSkip, needsReceiptLookup, overlayQueryKey } from './applyLlmOverlay';
 import type { PracticeReceipt } from './practiceReceipts';
@@ -35,6 +37,8 @@ export type ReceiptOverlayModel = {
     readonly totalsDisagree: boolean;
     readonly imageSrc: string | null;
     readonly closeMatchCount: number;
+    /** "Reimbursable" is written on the receipt. */
+    readonly reimbursable: ReceiptReimbursableNote | null;
 };
 
 type UseReceiptOverlayResult = {
@@ -220,6 +224,7 @@ export function useReceiptOverlay({
                     ? practiceReceiptImageSrc(receipt)
                     : null,
               closeMatchCount: match?.closeMatches.length ?? 0,
+              reimbursable: parseReceiptExtract(receipt.extractJson)?.reimbursable ?? null,
           }
         : undefined;
 
