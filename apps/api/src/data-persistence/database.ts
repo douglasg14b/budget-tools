@@ -12,6 +12,7 @@ import type {
     AmazonSyncStateTable,
 } from '../features/amazonOrders/data/amazonOrdersSchema';
 import type { SessionsTable, UsersTable } from '../features/auth/data/authSchema';
+import type { InferenceCallsTable } from '../features/inference/data/inferenceCallsSchema';
 import type { OperatingModeTable } from '../features/operatingMode/data/operatingModeSchema';
 import type { ReceiptBindRejectionsTable, ReceiptsTable } from '../features/receipts/data/receiptsSchema';
 import type { CategorySmoothingTable } from '../features/spendChart/data/categorySmoothingSchema';
@@ -44,6 +45,7 @@ export type AppDatabase = {
     receipts: ReceiptsTable;
     receipt_bind_rejections: ReceiptBindRejectionsTable;
     category_smoothing: CategorySmoothingTable;
+    inference_calls: InferenceCallsTable;
     users: UsersTable;
     sessions: SessionsTable;
 };

@@ -105,6 +105,7 @@ const REPAIR_SCHEMA = {
  */
 export async function readReceiptHeaders(input: ReceiptHeaderVisionInput): Promise<ReceiptHeaderVisionResult> {
     const { content, usage } = await input.completeJson({
+        purpose: 'receipt-header',
         apiKey: input.apiKey,
         baseUrl: input.baseUrl,
         model: input.model,
@@ -129,6 +130,7 @@ export async function readReceiptLines(input: ReceiptLinesVisionInput): Promise<
             ? `Read the grand total the customer paid. ${HANDWRITTEN_TOTAL_RULE} Do not invent a total that is not on the receipt.`
             : `Grand total must stay ${expectedDollars} dollars. Do not change that total.`;
     const { content, usage } = await input.completeJson({
+        purpose: 'receipt-lines',
         apiKey: input.apiKey,
         baseUrl: input.baseUrl,
         model: input.model,

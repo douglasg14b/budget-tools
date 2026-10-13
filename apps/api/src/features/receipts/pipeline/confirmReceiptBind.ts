@@ -94,6 +94,7 @@ export function buildBindConfirmState(receipt: BindConfirmReceipt, transaction: 
 export async function confirmReceiptBind(input: ConfirmReceiptBindInput): Promise<ReceiptBindConfirmation> {
     const decide = input.completeDecisionsImpl ?? completeDecisions;
     const result = await decide({
+        purpose: 'receipt-bind-confirm',
         apiKey: input.apiKey,
         model: input.model,
         state: buildBindConfirmState(input.receipt, input.transaction),

@@ -158,6 +158,7 @@ export async function suggestWithLlm(
     });
 
     const prediction = await completeLlmPrediction({
+        purpose: 'transaction-category',
         apiKey,
         baseUrl: OPENROUTER_BASE_URL,
         model: OPENROUTER_MODEL,

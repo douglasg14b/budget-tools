@@ -189,6 +189,7 @@ export async function suggestAmazonSplits(transactionId: string, signal?: AbortS
         catalog,
     });
     const { content } = await completeOpenRouterJson({
+        purpose: 'amazon-split',
         apiKey,
         baseUrl: OPENROUTER_BASE_URL,
         model: OPENROUTER_MODEL,

@@ -95,6 +95,7 @@ export function buildVerifyState(input: VerifyReceiptExtractInput): string {
 export async function verifyReceiptExtract(input: VerifyReceiptExtractInput): Promise<ReceiptVerifyResult> {
     const decide = input.completeDecisionsImpl ?? completeDecisions;
     const result = await decide({
+        purpose: 'receipt-verify',
         apiKey: input.apiKey,
         model: input.model,
         state: buildVerifyState(input),

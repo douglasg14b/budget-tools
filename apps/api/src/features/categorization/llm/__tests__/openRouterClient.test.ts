@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { setInferenceCallRecorderForTests } from '../../../inference/recordInferenceCall';
 import {
     completeOpenRouterJson,
     formatUsd,
@@ -8,6 +9,15 @@ import {
     parseOpenRouterUsage,
 } from '../openRouterClient';
 import { UnknownOpenRouterModelError } from '../openRouterModelProfiles';
+
+// The ledger write is covered in callOpenRouter.test.ts; these tests have no database.
+beforeEach(() => {
+    setInferenceCallRecorderForTests(async () => {});
+});
+
+afterEach(() => {
+    setInferenceCallRecorderForTests(undefined);
+});
 
 describe('parseOpenRouterPrediction', () => {
     it('reads primary and alternate categories', () => {
@@ -137,6 +147,7 @@ describe('completeOpenRouterJson vision payload', () => {
         vi.stubGlobal('fetch', fetchMock);
 
         const result = await completeOpenRouterJson({
+            purpose: 'receipt-header',
             apiKey: 'test-key',
             baseUrl: 'https://openrouter.example/api/v1',
             model: 'qwen/qwen3.7-flash',
@@ -178,6 +189,7 @@ describe('completeOpenRouterJson vision payload', () => {
         vi.stubGlobal('fetch', fetchMock);
 
         await completeOpenRouterJson({
+            purpose: 'receipt-header',
             apiKey: 'test-key',
             baseUrl: 'https://openrouter.example/api/v1',
             model: 'qwen/qwen3.7-flash',
@@ -209,6 +221,7 @@ describe('completeOpenRouterJson model profile', () => {
         });
         vi.stubGlobal('fetch', fetchMock);
         await completeOpenRouterJson({
+            purpose: 'receipt-header',
             apiKey: 'test-key',
             baseUrl: 'https://openrouter.example/api/v1',
             model,
@@ -227,6 +240,7 @@ describe('completeOpenRouterJson model profile', () => {
         vi.stubGlobal('fetch', fetchMock);
         await expect(
             completeOpenRouterJson({
+                purpose: 'receipt-header',
                 apiKey: 'test-key',
                 baseUrl: 'https://openrouter.example/api/v1',
                 model: 'vendor/unknown-model',

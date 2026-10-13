@@ -1,4 +1,6 @@
 import type { OpenRouterUsage } from '../../categorization/llm/openRouterClient';
+import { callOpenRouter, OpenRouterCallError } from '../../inference/callOpenRouter';
+import type { InferencePurpose } from '../../inference/inferencePurpose';
 
 /**
  * OpenRouter Decisions API. A different surface from chat completions: you send a
@@ -15,6 +17,8 @@ export type NoulQuestion = {
 };
 
 export type DecisionsInput = {
+    /** Recorded with the call's cost in `inference_calls`. */
+    readonly purpose: InferencePurpose;
     readonly apiKey: string;
     readonly model: string;
     readonly state: string;
@@ -33,32 +37,28 @@ export type DecisionsResult = {
 export type CompleteDecisions = (input: DecisionsInput) => Promise<DecisionsResult>;
 
 export async function completeDecisions(input: DecisionsInput): Promise<DecisionsResult> {
-    const doFetch = input.fetchImpl ?? fetch;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), input.timeoutMs);
+    let result: Awaited<ReturnType<typeof callOpenRouter>>;
     try {
-        const response = await doFetch(input.url ?? OPENROUTER_DECISIONS_URL, {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${input.apiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: input.model,
+        result = await callOpenRouter({
+            purpose: input.purpose,
+            url: input.url ?? OPENROUTER_DECISIONS_URL,
+            apiKey: input.apiKey,
+            model: input.model,
+            timeoutMs: input.timeoutMs,
+            fetchImpl: input.fetchImpl,
+            parseUsage: parseDecisionsUsage,
+            body: {
                 state: input.state,
                 questions: input.questions,
-            }),
-            signal: controller.signal,
+            },
         });
-        if (!response.ok) {
-            const body = await response.text();
-            throw new Error(`decisions ${response.status}: ${body.slice(0, 200)}`);
+    } catch (error) {
+        if (error instanceof OpenRouterCallError && error.outcome === 'http-error') {
+            throw new Error(`decisions ${error.status}: ${error.detail.slice(0, 200)}`);
         }
-        const parsed: unknown = await response.json();
-        return { nouls: parseNouls(parsed), usage: parseDecisionsUsage(parsed) };
-    } finally {
-        clearTimeout(timer);
+        throw error;
     }
+    return { nouls: parseNouls(result.payload), usage: result.usage };
 }
 
 function parseNouls(payload: unknown): Record<string, number> {

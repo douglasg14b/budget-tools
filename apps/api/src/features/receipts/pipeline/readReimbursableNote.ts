@@ -46,6 +46,7 @@ const NOTE_SCHEMA = {
  */
 export async function readReimbursableNote(input: ReadReimbursableNoteInput): Promise<ReadReimbursableNoteResult> {
     const { content, usage } = await input.completeJson({
+        purpose: 'receipt-reimbursable-note',
         apiKey: input.apiKey,
         baseUrl: input.baseUrl,
         model: input.model,

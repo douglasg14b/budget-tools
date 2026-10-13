@@ -1,5 +1,6 @@
 import { moneyToMilliunits } from '../../amazonOrders/moneyToMilliunits';
 import type { OpenRouterUsage } from '../../categorization/llm/openRouterClient';
+import type { InferencePurpose } from '../../inference/inferencePurpose';
 import type { CompleteOpenRouterJson } from './receiptHeaderVision';
 import { parseObjectContent } from './receiptHeaderVision';
 
@@ -281,7 +282,13 @@ type Usages = (OpenRouterUsage | null)[];
  */
 async function completeRecord(
     input: SettleHandwrittenTotalsInput,
-    request: { schemaName: string; schema: Record<string, unknown>; system: string; user: string },
+    request: {
+        purpose: InferencePurpose;
+        schemaName: string;
+        schema: Record<string, unknown>;
+        system: string;
+        user: string;
+    },
     label: string,
     wellFormed: (record: Record<string, unknown>) => boolean = () => true,
 ): Promise<{ record: Record<string, unknown>; usage: Usages }> {
@@ -341,6 +348,7 @@ async function readTotalsBlock(
     const { record, usage } = await completeRecord(
         input,
         {
+            purpose: 'receipt-totals-block',
             schemaName: 'receipt_totals_block',
             schema: BLOCK_SCHEMA,
             system: `Transcribe the money rows of this receipt's totals block (subtotal, tax, discount, tip, total) exactly as written. ${NO_ARITHMETIC} Mark each row printed or handwritten; use medium "blank" with empty writtenText when a row has nothing written on it.`,
@@ -360,6 +368,7 @@ async function readRow(
     const { record, usage } = await completeRecord(
         input,
         {
+            purpose: 'receipt-row-read',
             schemaName: 'receipt_row_read',
             schema: ROW_SCHEMA,
             system: `You read one row of a receipt: ${row}. Look only at that row and the space where its amount is written. Ignore every other row. ${NO_ARITHMETIC} If nothing is written for this row, set marksPresent false and writtenText and amountDollars null. Otherwise transcribe exactly what is written, including small or raised digits after the dollars, and give amountDollars as a decimal number (raised cents are the decimal part: 23 with a raised 40 is 23.40).`,
@@ -430,6 +439,7 @@ async function askTotalChoice(
     const { record, usage } = await completeRecord(
         input,
         {
+            purpose: 'receipt-total-choice',
             schemaName: 'receipt_total_choice',
             schema: CHOICE_SCHEMA,
             system: `You check one handwritten amount on a receipt: ${TOTAL_ROW}. Handwritten cents are often small raised digits after the dollars and can be hard to read. If this receipt adds up, that total would be ${dollars(claimedImplied)} — but receipts do not always add up, so choose what is actually written, not what the arithmetic suggests. First describe the marks you see on that row, then choose.`,

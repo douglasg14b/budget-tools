@@ -1,8 +1,11 @@
+import { callOpenRouter, OpenRouterCallError } from '../../inference/callOpenRouter';
+import type { InferencePurpose } from '../../inference/inferencePurpose';
 import { LlmSuggestError } from './LlmSuggestError';
 import { logLlmSuggest } from './logLlmSuggest';
 import { openRouterProfileRequestFields, resolveOpenRouterModelProfile } from './openRouterModelProfiles';
 
 export type OpenRouterChatInput = {
+    readonly purpose: InferencePurpose;
     readonly apiKey: string;
     readonly baseUrl: string;
     readonly model: string;
@@ -26,6 +29,8 @@ export type OpenRouterTextPart = {
 export type OpenRouterUserContentPart = OpenRouterTextPart | OpenRouterImageUrlPart;
 
 export type OpenRouterJsonInput = {
+    /** Recorded with the call's cost in `inference_calls`. */
+    readonly purpose: InferencePurpose;
     readonly apiKey: string;
     readonly baseUrl: string;
     readonly model: string;
@@ -102,6 +107,7 @@ type ChatCompletionResponse = {
  */
 export async function completeLlmPrediction(input: OpenRouterChatInput): Promise<OpenRouterPrediction> {
     const { content } = await completeOpenRouterJson({
+        purpose: input.purpose,
         apiKey: input.apiKey,
         baseUrl: input.baseUrl,
         model: input.model,
@@ -133,36 +139,24 @@ export function openRouterUserContent(user: string, images?: readonly string[]):
 /**
  * Shared OpenRouter JSON-schema completion. Temperature and reasoning come from the model's
  * profile in openRouterModelProfiles; an unregistered model throws UnknownOpenRouterModelError
- * before any request. Returns the raw content string plus parsed usage/cost.
+ * before any request. Returns the raw content string plus parsed usage/cost. The call is
+ * recorded in `inference_calls` under `input.purpose` (see callOpenRouter).
  */
 export async function completeOpenRouterJson(input: OpenRouterJsonInput): Promise<OpenRouterJsonResult> {
-    // Outside the try below so a config error is not reported as a failed request.
+    // Before the request so a config error is not reported as a failed request.
     const profileFields = openRouterProfileRequestFields(resolveOpenRouterModelProfile(input.model));
-    const endpoint = `${input.baseUrl.replace(/\/$/, '')}/chat/completions`;
-    const controller = new AbortController();
-    let timedOut = false;
-    const timer = setTimeout(() => {
-        timedOut = true;
-        controller.abort();
-    }, input.timeoutMs);
 
-    const onParentAbort = (): void => {
-        controller.abort();
-    };
-    input.signal?.addEventListener('abort', onParentAbort, { once: true });
-
+    let result: Awaited<ReturnType<typeof callOpenRouter>>;
     try {
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            signal: controller.signal,
-            headers: {
-                Authorization: `Bearer ${input.apiKey}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://budget-tools.local',
-                'X-Title': 'Budget Tools',
-            },
-            body: JSON.stringify({
-                model: input.model,
+        result = await callOpenRouter({
+            purpose: input.purpose,
+            url: `${input.baseUrl.replace(/\/$/, '')}/chat/completions`,
+            apiKey: input.apiKey,
+            model: input.model,
+            timeoutMs: input.timeoutMs,
+            signal: input.signal,
+            parseUsage: (payload) => parseOpenRouterUsage((payload as ChatCompletionResponse | null)?.usage),
+            body: {
                 ...profileFields,
                 response_format: {
                     type: 'json_schema',
@@ -176,48 +170,43 @@ export async function completeOpenRouterJson(input: OpenRouterJsonInput): Promis
                     { role: 'system', content: input.system },
                     { role: 'user', content: openRouterUserContent(input.user, input.images) },
                 ],
-            }),
+            },
         });
-
-        if (!response.ok) {
-            const detail = (await response.text()).trim();
-            throw new LlmSuggestError(503, openRouterFailureMessage(response.status, detail));
-        }
-
-        const payload = (await response.json()) as ChatCompletionResponse;
-        const content = payload.choices?.[0]?.message?.content?.trim();
-        if (!content) {
-            throw new LlmSuggestError(503, 'OpenRouter returned an empty completion');
-        }
-
-        const usage = parseOpenRouterUsage(payload.usage);
-        logLlmSuggest('inference cost', {
-            completionTokens: usage?.completionTokens ?? null,
-            cost: formatUsd(usage?.costUsd ?? null),
-            costUsd: usage?.costUsd ?? null,
-            generationId: payload.id ?? null,
-            model: payload.model ?? input.model,
-            promptTokens: usage?.promptTokens ?? null,
-            totalTokens: usage?.totalTokens ?? null,
-            cachedTokens: usage?.cachedTokens ?? null,
-        });
-        return { content, usage };
     } catch (error) {
-        if (error instanceof LlmSuggestError) {
-            throw error;
-        }
-        if (error instanceof Error && error.name === 'AbortError') {
-            throw new LlmSuggestError(
-                503,
-                timedOut ? 'OpenRouter request timed out' : 'OpenRouter request was cancelled',
-                { cause: error },
-            );
-        }
-        throw new LlmSuggestError(503, 'OpenRouter request failed', { cause: error });
-    } finally {
-        clearTimeout(timer);
-        input.signal?.removeEventListener('abort', onParentAbort);
+        throw toLlmSuggestError(error);
     }
+
+    const payload = result.payload as ChatCompletionResponse | null;
+    const content = payload?.choices?.[0]?.message?.content?.trim();
+    if (!content) {
+        throw new LlmSuggestError(503, 'OpenRouter returned an empty completion');
+    }
+
+    const usage = result.usage;
+    logLlmSuggest('inference cost', {
+        completionTokens: usage?.completionTokens ?? null,
+        cost: formatUsd(usage?.costUsd ?? null),
+        costUsd: usage?.costUsd ?? null,
+        generationId: payload?.id ?? null,
+        model: payload?.model ?? input.model,
+        promptTokens: usage?.promptTokens ?? null,
+        totalTokens: usage?.totalTokens ?? null,
+        cachedTokens: usage?.cachedTokens ?? null,
+    });
+    return { content, usage };
+}
+
+function toLlmSuggestError(error: unknown): LlmSuggestError {
+    if (!(error instanceof OpenRouterCallError)) {
+        return new LlmSuggestError(503, 'OpenRouter request failed', { cause: error });
+    }
+    if (error.outcome === 'http-error' && error.status != null) {
+        return new LlmSuggestError(503, openRouterFailureMessage(error.status, error.detail));
+    }
+    if (error.outcome === 'timeout' || error.outcome === 'cancelled') {
+        return new LlmSuggestError(503, error.message, { cause: error.cause });
+    }
+    return new LlmSuggestError(503, 'OpenRouter request failed', { cause: error });
 }
 
 /**
