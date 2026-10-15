@@ -1,5 +1,5 @@
 import type { AuthUserDto } from '@budget-tools/web-sdk';
-import { getMeOptions, getMeQueryKey, postLoginMutation, postLogoutMutation } from '@budget-tools/web-sdk';
+import { Auth, getMeQueryKey, postLoginMutation, postLogoutMutation } from '@budget-tools/web-sdk';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
@@ -26,22 +26,50 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** How often to re-ask while the API is unreachable, so the app comes back on its own. */
+const UNREACHABLE_RECHECK_MS = 5_000;
+
+/**
+ * `GET /auth/me`, with a 401 resolved to `null` instead of thrown.
+ *
+ * The generated `getMeOptions` throws on every non-2xx, which made "you are signed out" and "the
+ * API is down" the same rejection — and the app answered both with the login form. Resolving the
+ * 401 here leaves a rejection meaning only "no answer", which `deriveAuthStatus` reports as
+ * unreachable rather than signed out.
+ */
+async function fetchSignedInUser({ signal }: { signal: AbortSignal }): Promise<AuthUserDto | null> {
+    const { data, error, response } = await Auth.request3({ signal });
+    if (response?.status === 401) {
+        return null;
+    }
+    if (error !== undefined || data === undefined) {
+        // A network failure arrives as a TypeError; a proxy 502 as its raw (often HTML) body,
+        // which is no use on screen, so the status stands in for it.
+        throw error instanceof Error ? error : new Error(`The API answered HTTP ${response?.status ?? 'error'}.`);
+    }
+    return data;
+}
+
 /**
  * Owns sign-in state for the whole app.
  *
- * `GET /auth/me` is the single source of truth: a 200 means signed in, a 401 means anonymous.
- * Nothing is mirrored into localStorage — the session lives in an HttpOnly cookie that JS cannot
- * read, so any local copy would only ever be a stale guess at what the browser is actually
- * sending.
+ * `GET /auth/me` is the single source of truth: a 200 means signed in, a 401 means anonymous, and
+ * no answer at all means unreachable — which is not the same as signed out. Nothing is mirrored
+ * into localStorage — the session lives in an HttpOnly cookie that JS cannot read, so any local
+ * copy would only ever be a stale guess at what the browser is actually sending.
  */
 export function AuthProvider({ children }: { readonly children: ReactNode }) {
     const queryClient = useQueryClient();
 
     const meQuery = useQuery({
-        ...getMeOptions(),
-        // A 401 is a definitive answer ("you are signed out"), not a transient failure, so
-        // retrying only delays the login form and prints avoidable console noise.
+        queryKey: getMeQueryKey(),
+        queryFn: fetchSignedInUser,
+        // Retries would hold the splash for their whole backoff before the unreachable screen
+        // can say anything; the polling below does the waiting instead, with the screen up.
         retry: false,
+        // While unreachable, keep asking: the moment the API answers, the user lands back in the
+        // app (or on the login form) without having to think of refreshing.
+        refetchInterval: (query) => (query.state.status === 'error' ? UNREACHABLE_RECHECK_MS : false),
         refetchOnWindowFocus: false,
         // The cookie can lapse server-side while the tab sits idle; letting the cached identity
         // go stale means a remount re-checks rather than trusting an old 200 indefinitely.
@@ -124,7 +152,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             user,
             status: deriveAuthStatus({
                 data: meQuery.data,
-                isPending: meQuery.isPending,
                 isError: meQuery.isError,
             }),
             login,
@@ -142,7 +169,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         };
     }, [
         meQuery.data,
-        meQuery.isPending,
         meQuery.isError,
         meQuery.status,
         meQuery.fetchStatus,

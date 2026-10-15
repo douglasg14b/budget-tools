@@ -108,6 +108,10 @@ the user back to the login page over a typo.
   disclose which usernames exist.
 - **Sign-out clears the TanStack query cache**, so one person's financial data cannot linger in the
   tab for the next.
+- **Only a 401 from `/auth/me` shows the login form.** If the check gets no answer (network down,
+  proxy 502), the web app shows a "can't reach the server" screen instead and re-checks every few
+  seconds, returning the user to the app once the API is back. A signed-in user whose background
+  re-check fails stays in the app.
 - Expired session rows are swept on API start.
 
 ## Verifying

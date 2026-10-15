@@ -9,10 +9,10 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import { diagnoseAuthStall } from './auth/authStallDiagnosis';
 import { useStallTimeout } from './auth/useStallTimeout';
 import { AccountMenu } from './components/AccountMenu';
+import { ApiHealthBadge } from './components/ApiHealthBadge';
 import { AppNav } from './components/AppNav';
 import { AppUpdatePrompt } from './components/AppUpdatePrompt';
 import { MobileTabBar } from './components/MobileTabBar';
-import { NavbarHealthBadge } from './components/NavbarHealthBadge';
 import { OperatingModeToggle } from './components/OperatingModeToggle';
 import { OutboundSyncChip } from './components/OutboundSyncChip';
 import { currentMobileTab } from './components/primaryNav';
@@ -21,6 +21,7 @@ import { MobileReviewPage } from './components/review/mobile/MobileReviewPage';
 import { useIsNarrow } from './components/useIsNarrow';
 import { cssVariablesResolver } from './cssVariablesResolver';
 import type { OperatingMode } from './operatingMode/operatingModeCopy';
+import { ApiUnreachablePage } from './pages/ApiUnreachablePage';
 import { ClassifyPage } from './pages/ClassifyPage';
 import { ConfigurePage } from './pages/ConfigurePage';
 import { LoginPage } from './pages/LoginPage';
@@ -92,6 +93,10 @@ function AuthGate() {
         );
     }
 
+    if (status === 'unreachable') {
+        return <ApiUnreachablePage detail={stallState.errorMessage} onRetry={retry} />;
+    }
+
     if (status === 'anonymous') {
         return <LoginPage />;
     }
@@ -132,7 +137,7 @@ function DesktopLayout({ mode }: LayoutProps) {
                     <div className={classes.headerEnd}>
                         <OutboundSyncChip />
                         <OperatingModeToggle />
-                        <NavbarHealthBadge />
+                        <ApiHealthBadge />
                         <AccountMenu />
                     </div>
                 </div>

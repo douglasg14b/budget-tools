@@ -1,9 +1,9 @@
 import type { AuthUserDto } from '@budget-tools/web-sdk';
 
-export type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
+export type AuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'unreachable';
 
 /**
- * Result shape of the `getMe` query, narrowed to the three flags that decide sign-in state.
+ * Result shape of the `getMe` query, narrowed to the fields that decide sign-in state.
  *
  * Declared structurally rather than importing TanStack's `UseQueryResult` so this stays a plain
  * function with no React or query-client dependency — which is what makes it testable in the
@@ -11,29 +11,35 @@ export type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
  */
 export type MeQuerySnapshot = {
     readonly data: AuthUserDto | null | undefined;
-    readonly isPending: boolean;
     readonly isError: boolean;
 };
 
 /**
  * Derives sign-in state from the `getMe` query.
  *
- * The error check comes first and that ordering is the whole point. In TanStack Query v5
- * `isPending` means "no data yet", NOT "a request is in flight" — so a query that rejects with
- * `retry: false` never sets data and leaves `isPending` true forever. Reading `isPending` alone
- * pins an anonymous visitor to 'loading' and strands them on the splash screen instead of the
- * login form.
+ * `data` is checked before the flags because it is the only thing that carries an actual answer:
+ * a user means signed in, and `null` means the server said 401 (the query maps that to `null`
+ * rather than rejecting, and the global 401 handler and logout write the same). TanStack keeps
+ * `data` through a failed refetch, so a signed-in user whose background re-check hits a dead API
+ * stays in the app instead of being thrown to a login form they do not need.
  *
- * A failed `getMe` is treated as anonymous regardless of cause. A 401 is the expected signed-out
- * answer, and for anything else (network down, API 500) the login form is still the honest thing
- * to show: without a confirmed identity there is no session to render an app around.
+ * A rejection with no answer on file is 'unreachable', NOT 'anonymous': the API being down says
+ * nothing about whether the session cookie is still good. Showing the login form there misleads a
+ * signed-in user into typing credentials that cannot fix anything.
+ *
+ * `isPending` is deliberately not consulted: in TanStack Query v5 it means "no data yet", not "a
+ * request is in flight", so it can stay true after a rejection and would strand the visitor on the
+ * splash screen. Anything without data or an error is simply still loading.
  */
 export function deriveAuthStatus(meQuery: MeQuerySnapshot): AuthStatus {
-    if (meQuery.isError) {
+    if (meQuery.data) {
+        return 'authenticated';
+    }
+    if (meQuery.data === null) {
         return 'anonymous';
     }
-    if (meQuery.isPending) {
-        return 'loading';
+    if (meQuery.isError) {
+        return 'unreachable';
     }
-    return meQuery.data ? 'authenticated' : 'anonymous';
+    return 'loading';
 }

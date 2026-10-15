@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { useAuth } from '../auth/AuthContext';
 import { loginErrorMessage } from '../auth/loginErrorMessage';
+import { ApiHealthBadge, PRE_LOGIN_HEALTH_RECHECK_MS } from '../components/ApiHealthBadge';
 import classes from './LoginPage.module.css';
 
 export function LoginPage() {
@@ -18,7 +19,6 @@ export function LoginPage() {
         setError(null);
         login({ username, password }).catch((cause: unknown) => {
             setError(loginErrorMessage(cause));
-            setPassword('');
         });
     }
 
@@ -66,6 +66,9 @@ export function LoginPage() {
                         </Button>
                     </div>
                 </form>
+                <div className={classes.footer}>
+                    <ApiHealthBadge refetchInterval={PRE_LOGIN_HEALTH_RECHECK_MS} />
+                </div>
             </main>
         </div>
     );

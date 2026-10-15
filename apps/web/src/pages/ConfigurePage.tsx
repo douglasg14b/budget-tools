@@ -7,8 +7,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useAuth } from '../auth/AuthContext';
+import { ApiHealthBadge } from '../components/ApiHealthBadge';
 import { ChangePasswordForm } from '../components/ChangePasswordForm';
-import { NavbarHealthBadge } from '../components/NavbarHealthBadge';
 import { OperatingModeToggle } from '../components/OperatingModeToggle';
 import { OutboundSyncChip } from '../components/OutboundSyncChip';
 import type { OperatingMode } from '../operatingMode/operatingModeCopy';
@@ -89,7 +89,7 @@ export function ConfigurePage() {
                     Status
                 </h2>
                 <div className={classes.row}>
-                    <NavbarHealthBadge />
+                    <ApiHealthBadge />
                     <OutboundSyncChip />
                 </div>
             </section>
