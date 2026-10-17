@@ -276,7 +276,9 @@ curl -sS $RESOLVE -D - -o /dev/null -H 'X-Requested-With: XMLHttpRequest' \
 Expect a `302` to `https://$TEAM/…` for the page. For the background request, expect `401` and **no**
 `x-budget-tools-api` header. That 401 is the behaviour the web client's expired-session handling depends on. If
 Access answers with a `302` instead, look in the Access application's settings for the sub-request behaviour before
-changing anything in the client.
+changing anything in the client. The symptom in the app would be an expired Access session showing the "can't reach
+the server" screen (the browser blocks the cross-origin redirect, which looks like no answer) instead of
+Cloudflare's PIN page.
 
 ### 2. The app loads through the tunnel, past Access
 
