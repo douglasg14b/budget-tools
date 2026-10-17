@@ -200,6 +200,12 @@ function sharedRoutes() {
             <Route path="/repeating" element={<RepeatingPage />} />
             <Route path="/trips" element={<TripsPage />} />
             <Route path="/spending" element={<SpendingPage />} />
+            {/*
+              Anything else goes home rather than rendering a blank page. Unknown paths do reach the
+              app: the service worker and nginx both fall back to index.html, and an installed app can
+              reopen whatever URL it was last left on, e.g. the Cloudflare Access callback.
+            */}
+            <Route path="*" element={<Navigate replace to="/" />} />
         </>
     );
 }
