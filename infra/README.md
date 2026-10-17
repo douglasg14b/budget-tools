@@ -211,8 +211,9 @@ record.
 
 ## Applying, in order
 
-Order matters, because `docker-compose-prod.yml` requires `TUNNEL_TOKEN` (`${TUNNEL_TOKEN:?}`). Deploying the compose
-change before the token is set in Coolify fails the whole deploy.
+Order matters, because `docker-compose-prod.yml` requires `CLOUDFLARE_TUNNEL_TOKEN` (`${CLOUDFLARE_TUNNEL_TOKEN:?}`).
+Deploying the compose change before the token is set in Coolify fails the whole deploy. The compose file hands it to
+cloudflared as `TUNNEL_TOKEN`, the only name cloudflared reads.
 
 ```bash
 pnpm install                 # from the repo root; infra is a workspace member
@@ -225,7 +226,7 @@ pulumi stack output tunnelToken --show-secrets
 
 1. Do [Before the first `pulumi up`](#before-the-first-pulumi-up), including the two dashboard rules.
 2. `pulumi preview`, then `pulumi up`.
-3. In Coolify, add `TUNNEL_TOKEN` to the budget-tools resource's environment with the value from step 2. Use a real
+3. In Coolify, add `CLOUDFLARE_TUNNEL_TOKEN` to the budget-tools resource's environment with the value from step 2. Use a real
    value, never placeholder text.
 4. Merge to `master` and deploy. `cloudflared` starts once `web` is healthy.
 5. Run [Verifying](#verifying), and record the results in the PR.
@@ -246,7 +247,7 @@ Nothing about how Coolify points at this repo is in the repo, so it is recorded 
 Coolify gotchas carried over from Fettra:
 
 - `${VAR:?message}` deploys the message as the value. This repo uses bare `${VAR:?}`, with guidance in a comment.
-- Coolify's deployment logs echo the whole `.env` in plaintext, `TUNNEL_TOKEN` included. Do not paste raw
+- Coolify's deployment logs echo the whole `.env` in plaintext, `CLOUDFLARE_TUNNEL_TOKEN` included. Do not paste raw
   deployment logs anywhere.
 
 ## Verifying
@@ -365,7 +366,7 @@ From inside the LAN, `https://budget.moochermedia.co/` still loads through Caddy
 
 | Output | Use |
 | --- | --- |
-| `tunnelToken` | `TUNNEL_TOKEN` for the `cloudflared` service (secret) |
+| `tunnelToken` | `CLOUDFLARE_TUNNEL_TOKEN` in Coolify, for the `cloudflared` service (secret) |
 | `tunnelId` | Identifies the tunnel in the dashboard and in the CNAME target |
 | `tunnelIngressVersion` | Increments when the remotely-stored ingress rules change |
 | `appHostname` | The public hostname |

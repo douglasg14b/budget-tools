@@ -239,7 +239,7 @@ export const accessLoginDomain = accessTeamDomain;
 export const accessApplicationAud = appAccess.aud;
 
 /**
- * What TUNNEL_TOKEN in docker-compose-prod.yml consumes. Anyone holding it can run a connector for this tunnel, so it
+ * What CLOUDFLARE_TUNNEL_TOKEN in docker-compose-prod.yml consumes. Anyone holding it can run a connector for this tunnel, so it
  * is a secret: encrypted in stack state and withheld from `pulumi stack output` unless asked for explicitly.
  */
 export const tunnelToken = secret(

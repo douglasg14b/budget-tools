@@ -21,8 +21,8 @@ name: budget-tools
 # are declared in infra/ (Pulumi). Router DNS keeps LAN clients on Caddy. See infra/README.md.
 # Either way, `web` refuses any request the browser did not make over HTTPS (apps/web/nginx.conf).
 #
-# TUNNEL_TOKEN is written `${TUNNEL_TOKEN:?}`: mandatory, so `docker compose config` fails loudly
-# without it. Use a bare `:?` for any new required variable. Coolify seeds a new variable with
+# CLOUDFLARE_TUNNEL_TOKEN is written `${CLOUDFLARE_TUNNEL_TOKEN:?}`: mandatory, so
+# `docker compose config` fails loudly without it. Use a bare `:?` for any new required variable. Coolify seeds a new variable with
 # whatever text follows the question mark, so a message there would be deployed verbatim as the
 # value. Put guidance in a comment above the line instead.
 
@@ -230,8 +230,9 @@ services:
         command: tunnel --no-autoupdate run
         environment:
             # The tunnel's connector token: `pulumi stack output tunnelToken --show-secrets` in
-            # infra/. A secret; anyone holding it can serve this hostname.
-            TUNNEL_TOKEN: ${TUNNEL_TOKEN:?}
+            # infra/. A secret; anyone holding it can serve this hostname. Coolify holds it as
+            # CLOUDFLARE_TUNNEL_TOKEN; cloudflared itself only reads the name TUNNEL_TOKEN.
+            TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?}
         depends_on:
             web:
                 condition: service_healthy
