@@ -211,9 +211,9 @@ record.
 
 ## Applying, in order
 
-Order matters, because `docker-compose-prod.yml` requires `CLOUDFLARE_TUNNEL_TOKEN` (`${CLOUDFLARE_TUNNEL_TOKEN:?}`).
-Deploying the compose change before the token is set in Coolify fails the whole deploy. The compose file hands it to
-cloudflared as `TUNNEL_TOKEN`, the only name cloudflared reads.
+Order matters, because `docker-compose-prod.yml` needs `CLOUDFLARE_TUNNEL_TOKEN`. If you deploy before the token is
+set in Coolify, `cloudflared` restart-loops and the public hostname stays down. The LAN path is unaffected. The
+compose file hands the token to cloudflared as `TUNNEL_TOKEN`, the only name cloudflared reads.
 
 ```bash
 pnpm install                 # from the repo root; infra is a workspace member
@@ -246,7 +246,10 @@ Nothing about how Coolify points at this repo is in the repo, so it is recorded 
 
 Coolify gotchas carried over from Fettra:
 
-- `${VAR:?message}` deploys the message as the value. This repo uses bare `${VAR:?}`, with guidance in a comment.
+- `${VAR:?message}` deploys the message as the value.
+- In this resource, even a bare `${CLOUDFLARE_TUNNEL_TOKEN:?}` failed the deploy with "required variable ... is
+  missing a value", although the variable was set and saved. Fettra's working `TUNNEL_TOKEN: ${TUNNEL_TOKEN:?}` uses
+  the same name on both sides; this one maps to a different name. Use plain `${VAR}`, as the rest of the file does.
 - Coolify's deployment logs echo the whole `.env` in plaintext, `CLOUDFLARE_TUNNEL_TOKEN` included. Do not paste raw
   deployment logs anywhere.
 
