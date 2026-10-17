@@ -1,0 +1,16 @@
+/* Sage's light variant is within a shade of the page in dark mode; lift it like the review toast. */
+.alert {
+    background-color: var(--app-bg-elevated);
+    border-color: var(--app-border-strong);
+    box-shadow: 0 0.75rem 1.75rem color-mix(in srgb, var(--app-bg-root) 70%, transparent);
+}
+
+.copy {
+    flex: 1;
+    min-width: 0;
+}
+
+/* The copy otherwise squeezes the button until its label is cut off. */
+.reload {
+    flex-shrink: 0;
+}

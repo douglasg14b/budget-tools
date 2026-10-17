@@ -1,6 +1,7 @@
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { Affix, Alert, Button, Group } from '@mantine/core';
 
+import classes from './AppUpdatePrompt.module.css';
 import { useIsNarrow } from './useIsNarrow';
 
 /** Backstop for a tab left visible for hours; resume-from-background is the main trigger. */
@@ -65,18 +66,25 @@ export function AppUpdatePrompt() {
 
     return (
         <Affix position={isNarrow ? PHONE_POSITION : { bottom: 20, right: 20 }} zIndex={1000}>
+            {/* Full width between the phone insets, so list rows cannot peek out beside it. */}
             <Alert
+                className={classes.alert}
                 color="sage"
                 title="Update available"
                 role="status"
-                maw={360}
+                maw={isNarrow ? undefined : 360}
                 withCloseButton
                 onClose={() => setNeedRefresh(false)}
             >
                 <Group gap="sm" justify="space-between" wrap="nowrap">
-                    <span>A new version of Budget Tools is ready.</span>
+                    <span className={classes.copy}>A new version of Budget Tools is ready.</span>
                     {/* The hook posts SKIP_WAITING and reloads once the new worker takes control. */}
-                    <Button size="xs" variant="light" color="sage" onClick={() => updateServiceWorker(true)}>
+                    <Button
+                        className={classes.reload}
+                        size={isNarrow ? 'sm' : 'xs'}
+                        color="sage"
+                        onClick={() => updateServiceWorker(true)}
+                    >
                         Reload
                     </Button>
                 </Group>
