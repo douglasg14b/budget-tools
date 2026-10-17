@@ -23,6 +23,7 @@ import {
 } from './environment';
 import { describeAmazonOrdersSource } from './features/amazonOrders/getAmazonOrdersSource';
 import { startAmazonSyncScheduler } from './features/amazonOrders/startAmazonSyncScheduler';
+import { apiOriginHeaderMiddleware } from './features/auth/apiOriginHeader';
 import { authMiddleware } from './features/auth/authMiddleware';
 import { deleteExpiredSessions } from './features/auth/data/authRepo';
 import { QueryValidationError } from './features/categorization/filterQueue';
@@ -39,6 +40,8 @@ import { isPayloadTooLargeError, receiptsJsonBodyTooLargeMessage } from './paylo
 import { getRequestId, requestContextMiddleware } from './services/requestContext';
 
 export const app = express();
+// First, so every response this API sends is distinguishable from one Cloudflare Access sent.
+app.use(apiOriginHeaderMiddleware);
 app.use(requestContextMiddleware);
 app.use(cookieParser());
 app.use(express.json({ limit: RECEIPTS_JSON_BODY_LIMIT }));

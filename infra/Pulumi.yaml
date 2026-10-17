@@ -1,0 +1,21 @@
+name: budget-tools-edge
+runtime:
+    name: nodejs
+    options:
+        typescript: true
+# Published as the stack's pulumi:description tag, which Pulumi caps at 256 characters.
+description: >-
+    Budget Tools' Cloudflare edge: the tunnel fronting the web app at budget.moochermedia.co, its DNS record, and the
+    Cloudflare Access gate in front of it. WAF rules are hand-managed in the dashboard. See infra/README.md.
+config:
+    accountId:
+        type: string
+        description: Cloudflare account id that owns the tunnel.
+    zoneId:
+        type: string
+        description: Cloudflare zone id for moochermedia.co.
+    accessAllowedEmails:
+        type: array
+        items:
+            type: string
+        description: Email addresses Cloudflare Access lets through. Set each entry with --secret --path.

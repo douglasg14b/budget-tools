@@ -114,6 +114,35 @@ the user back to the login page over a typo.
   re-check fails stays in the app.
 - Expired session rows are swept on API start.
 
+## Public path: Cloudflare Access in front
+
+On the public hostname (`budget.moochermedia.co`, through the Cloudflare Tunnel), Cloudflare Access
+stops everyone who is not on an email allow-list before a request reaches the origin. It is a
+**separate factor in front of** this login, not a replacement for it. The API never reads or
+trusts the Access identity, and nothing above changes. On the LAN, through Caddy, there is no
+Access, only this login. Setup and verification are in `infra/README.md`.
+
+The one thing the app does have to handle is an Access session expiring while a tab is open. API
+calls then get a 401 from Access instead of from the API, and the app's login form cannot fix
+that. The contract that keeps the two apart:
+
+| Piece | Where | Role |
+| --- | --- | --- |
+| `X-Requested-With: XMLHttpRequest` on every SDK request | `packages/web-sdk/src/unauthorizedResponse.ts` | Makes Access answer an expired session with a 401, not a redirect a fetch cannot follow |
+| `X-Budget-Tools-Api: 1` on every API response | `apps/api/src/features/auth/apiOriginHeader.ts` | Marks a 401 as the API's. Access's 401 lacks it |
+| `classifyUnauthorized` | `packages/web-sdk/src/unauthorizedResponse.ts` | 401 without the marker is `edge`, checked before the `/auth/login` exemption. Otherwise `credentials` (login) or `session` |
+| Re-login navigation to `/api/auth/reauth` | `apps/web/src/auth/edgeSession.ts`, `apps/web/nginx.conf` | Bypasses the service worker so Access sees the navigation. nginx then redirects home |
+
+An `edge` 401 navigates through Cloudflare's login and back, and the app session survives it. A
+second `edge` 401 within 30 seconds of a re-login falls back to the ordinary signed-out state
+rather than navigating in a loop. `<img>` requests to `/api` cannot send `X-Requested-With`, so an
+expired Access session shows up as a broken receipt image until the next SDK call triggers the
+re-login. That is accepted.
+
+The header names are duplicated across the API and the SDK on purpose (no shared package spans
+both). A unit test on each side pins the name, but nothing checks they agree. Rename both or
+neither.
+
 ## Verifying
 
 ```

@@ -13,6 +13,18 @@ name: budget-tools
 #
 # Do not set `container_name`: Coolify must own resource-scoped names so it can replace containers
 # during redeploys. Services reach each other through the stable Compose service names below.
+#
+# Two ways in, both ending at `web`:
+#   public:  browser -> Cloudflare edge -> tunnel (`cloudflared`, below) -> https://web:8443
+#   LAN:     browser -> Caddy (outside this repo) -> WEB_PORT -> web:8443
+# The tunnel serves budget.moochermedia.co; its ingress rules and DNS record live in Cloudflare and
+# are declared in infra/ (Pulumi). Router DNS keeps LAN clients on Caddy. See infra/README.md.
+# Either way, `web` refuses any request the browser did not make over HTTPS (apps/web/nginx.conf).
+#
+# TUNNEL_TOKEN is written `${TUNNEL_TOKEN:?}`: mandatory, so `docker compose config` fails loudly
+# without it. Use a bare `:?` for any new required variable. Coolify seeds a new variable with
+# whatever text follows the question mark, so a message there would be deployed verbatim as the
+# value. Put guidance in a comment above the line instead.
 
 services:
     # One-shot: applies migrations, then exits 0. Not a long-running service.
@@ -197,6 +209,32 @@ services:
             timeout: 10s
             retries: 5
             start_period: 15s
+        restart: unless-stopped
+        networks:
+            - budget-tools
+
+    # Cloudflare Tunnel connector: the public path to `web`. It dials out to Cloudflare, so nothing
+    # here listens for inbound internet traffic and no port is published. The tunnel is
+    # remotely managed, so Cloudflare holds the ingress rules (infra/index.ts) and there is no
+    # config file: budget.moochermedia.co -> https://web:8443, and a 404 for any other hostname.
+    # Cloudflare Access gates that hostname, and this connector also rejects any request without a
+    # valid Access token for it, so nothing unauthenticated reaches `web` this way.
+    #
+    # Requests through the edge time out after about 125s (Cloudflare 524) on non-Enterprise
+    # plans, shorter than the 300s the API allows receipt extract and scoring. A slow one can fail
+    # publicly while still succeeding over the LAN path.
+    cloudflared:
+        # Pinned rather than `latest`, so a connector upgrade is a reviewed change, not a side
+        # effect of a redeploy.
+        image: cloudflare/cloudflared:2026.10.0
+        command: tunnel --no-autoupdate run
+        environment:
+            # The tunnel's connector token: `pulumi stack output tunnelToken --show-secrets` in
+            # infra/. A secret; anyone holding it can serve this hostname.
+            TUNNEL_TOKEN: ${TUNNEL_TOKEN:?}
+        depends_on:
+            web:
+                condition: service_healthy
         restart: unless-stopped
         networks:
             - budget-tools
