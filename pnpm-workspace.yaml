@@ -1,6 +1,7 @@
 packages:
     - apps/**
     - packages/**
+    - infra
 
 # argon2 ships prebuilt binaries but still declares an install script; pnpm blocks build
 # scripts by default. Allow it so password hashing works on a fresh clone without a manual

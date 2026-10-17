@@ -1,0 +1,20 @@
+{
+  "name": "@budget-tools/infra",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Pulumi TypeScript for Budget Tools' Cloudflare edge: the tunnel serving budget.moochermedia.co, and its DNS record.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@pulumi/cloudflare": "^6.22.0",
+    "@pulumi/pulumi": "^3.268.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.7.2"
+  }
+}

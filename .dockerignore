@@ -33,6 +33,11 @@ apps/categorization-ai/obj
 apps/categorization-ai/logs
 apps/categorization-ai/*.log
 
+# The Pulumi program for the Cloudflare edge runs from an operator's machine, never in an image. It is a pnpm
+# workspace member, but a frozen install tolerates its absence, so excluding it keeps @pulumi/* out of every
+# builder stage's install.
+infra
+
 # Tests and their fixtures never run in production. The receipts suite alone carries ~16MB of
 # real photo fixtures. Excluded here rather than per-Dockerfile so every image benefits.
 **/__tests__
