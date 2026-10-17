@@ -1,0 +1,8 @@
+config:
+  cloudflare:apiToken:
+    secure: AAABAAafdwzuUQqDSBs0hu2E0vYXS7yyrN5GyYcSkcpWphRz3ykbfIREsSbrkKEOUCn7xtDehZ9Qwm+zWbZBBS8x/WuVdLkl2iVkNYdL/80GQ8aKJw==
+  budget-tools-edge:accountId: 95b8af8ccb4ef613c56be4082f89b5be
+  budget-tools-edge:zoneId: 2dfabcec034f6abc00405ceba6d59ead
+  budget-tools-edge:accessAllowedEmails:
+    - secure: AAABALO+2ziunCOcuhySpEjQz0J2VloNVPP2Kl14Lpv4avTD52h7gCEeTaFGtEZD31eE/IPG
+    - secure: AAABAJpL3yMmjOnkDjrBSzOVDXsiwRJwG86z8CNosGqAVudsc8HnyhTbFpY+EmjoBdH0HsQ=
