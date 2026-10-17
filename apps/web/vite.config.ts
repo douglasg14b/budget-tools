@@ -56,7 +56,13 @@ export default defineConfig({
                 clientsClaim: true,
                 cleanupOutdatedCaches: true,
                 navigateFallback: '/index.html',
-                navigateFallbackDenylist: [/^\/api(?:\/|$)/],
+                // Navigations the service worker must let reach the network instead of answering with
+                // the cached shell:
+                //   /api/     the API, and the Cloudflare Access re-login path (src/auth/edgeSession.ts).
+                //   /cdn-cgi/ Cloudflare's own endpoints on this hostname. After the PIN, Access sends the
+                //             browser to /cdn-cgi/access/authorized, which sets the Access cookie. Served
+                //             from cache, the cookie is never set and the re-login loops.
+                navigateFallbackDenylist: [/^\/api(?:\/|$)/, /^\/cdn-cgi\//],
                 runtimeCaching: [
                     {
                         urlPattern: ({ url }) => url.pathname.startsWith('/api/'),

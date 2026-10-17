@@ -11,6 +11,8 @@
  * would reload into the same 401. This path is under `/api/`, which the service worker's
  * `navigateFallbackDenylist` excludes (vite.config.ts), so the navigation really goes out. nginx
  * answers it with a redirect home (apps/web/nginx.conf). Change the path there too if it moves.
+ * The same denylist excludes `/cdn-cgi/`, where Access lands the browser after the PIN to set its
+ * cookie; if the service worker answered that from cache, this re-login would loop.
  *
  * `<img>` requests to `/api` cannot carry the header that makes Access answer with a 401, so an
  * expired Access session shows up as a broken receipt image until the next SDK call triggers this.
