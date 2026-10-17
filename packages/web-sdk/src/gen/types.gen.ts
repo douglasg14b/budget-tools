@@ -134,6 +134,10 @@ export type ReceiptDto = {
 };
 
 export type ReceiptsDto = {
+    /**
+     * Pass as `cursor` for the next page; null on the last page or an unpaged list.
+     */
+    nextCursor: string | null;
     receipts: Array<ReceiptDto>;
 };
 
@@ -916,8 +920,18 @@ export type PutCategorySmoothingResponse = PutCategorySmoothingResponses[keyof P
 export type ListReceiptsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        cursor?: string;
+        limit?: number;
+    };
     url: '/receipts';
+};
+
+export type ListReceiptsErrors = {
+    /**
+     * Invalid page
+     */
+    400: unknown;
 };
 
 export type ListReceiptsResponses = {
@@ -1078,7 +1092,7 @@ export type GetReceiptImageData = {
         id: string;
     };
     query?: {
-        variant?: 'original' | 'processed';
+        variant?: 'original' | 'processed' | 'thumb';
         frame?: number;
     };
     url: '/receipts/{id}/image';

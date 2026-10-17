@@ -116,7 +116,7 @@ const models: TsoaRoute.Models = {
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ReceiptsDto": {
         "dataType": "refAlias",
-        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"receipts":{"dataType":"array","array":{"dataType":"refAlias","ref":"ReceiptDto"},"required":true}},"validators":{}},
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"nextCursor":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"receipts":{"dataType":"array","array":{"dataType":"refAlias","ref":"ReceiptDto"},"required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "CreateReceiptDto": {
@@ -787,6 +787,8 @@ export function RegisterRoutes(app: Router) {
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsReceiptsController_listReceipts: Record<string, TsoaRoute.ParameterSchema> = {
+                cursor: {"in":"query","name":"cursor","dataType":"string"},
+                limit: {"in":"query","name":"limit","dataType":"double"},
         };
         app.get('/api/receipts',
             ...(fetchMiddlewares<RequestHandler>(ReceiptsController)),
@@ -968,7 +970,7 @@ export function RegisterRoutes(app: Router) {
         const argsReceiptsController_getReceiptImage: Record<string, TsoaRoute.ParameterSchema> = {
                 id: {"in":"path","name":"id","required":true,"dataType":"string"},
                 request: {"in":"request","name":"request","required":true,"dataType":"object"},
-                variant: {"default":"original","in":"query","name":"variant","dataType":"union","subSchemas":[{"dataType":"enum","enums":["original"]},{"dataType":"enum","enums":["processed"]}]},
+                variant: {"default":"original","in":"query","name":"variant","dataType":"union","subSchemas":[{"dataType":"enum","enums":["original"]},{"dataType":"enum","enums":["processed"]},{"dataType":"enum","enums":["thumb"]}]},
                 frame: {"default":0,"in":"query","name":"frame","dataType":"double"},
         };
         app.get('/api/receipts/:id/image',

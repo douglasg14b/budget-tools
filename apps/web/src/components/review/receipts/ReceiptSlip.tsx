@@ -34,7 +34,7 @@ export function ReceiptSlip({ slip }: ReceiptSlipProps) {
             state={RECEIPTS_INBOX_FROM_STATE}
         >
             {slip.imageSrc ? (
-                <img alt="" className={classes.thumb} src={slip.imageSrc} />
+                <img alt="" className={classes.thumb} src={slip.imageSrc} loading="lazy" decoding="async" />
             ) : (
                 <span className={classes.blank} />
             )}

@@ -28,6 +28,8 @@ export type ReceiptDto = {
 
 export type ReceiptsDto = {
     receipts: ReceiptDto[];
+    /** Pass as `cursor` for the next page; null on the last page or an unpaged list. */
+    nextCursor: string | null;
 };
 
 export type CreateReceiptDto = {

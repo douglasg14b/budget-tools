@@ -6,10 +6,11 @@ import { ConflictError, HttpError, NotFoundError } from '../../travelWindows/Htt
 import { assertReceiptWritesAllowed } from '../assertReceiptWritesAllowed';
 import type { PerceptualNeighbor } from '../perceptualHash';
 import { findNearestPerceptualMatch, perceptualHashOf } from '../perceptualHash';
+import { renderReceiptThumb } from '../renderReceiptThumb';
 import { FilesystemReceiptStorage } from '../storage/filesystemReceiptStorage';
 import { getReceiptStorage } from '../storage/getReceiptStorage';
 import type { ReceiptStorage } from '../storage/receiptStorage';
-import { originalRef, processedRef } from '../storage/receiptStorage';
+import { originalRef, processedRef, thumbRef } from '../storage/receiptStorage';
 import type { ReceiptBindCheckOutcome, ReceiptExtractStatus, ReceiptsTable } from './receiptsSchema';
 
 export type ReceiptRow = ReceiptsTable;
@@ -65,6 +66,8 @@ async function writeProcessedIfAbsent(
         return;
     }
     await storage.put(processedRef(receiptId), processed);
+    // A thumbnail rendered from the original before this arrived would no longer match.
+    await storage.delete(thumbRef(receiptId));
 }
 
 export type ReceiptImageContentType = 'image/jpeg' | 'image/png' | 'application/octet-stream';
@@ -113,7 +116,51 @@ export async function getReceiptByTransactionId(
 
 export async function listReceipts(db?: AppDatabaseClient): Promise<ReceiptRow[]> {
     const database = db ?? (await getAppDatabase());
-    return database.selectFrom('receipts').selectAll().orderBy('createdAt', 'desc').execute();
+    return database.selectFrom('receipts').selectAll().orderBy('createdAt', 'desc').orderBy('id', 'desc').execute();
+}
+
+/** Position after the last row of a page, newest first. */
+export type ReceiptListCursor = {
+    readonly createdAt: string;
+    readonly id: string;
+};
+
+export type ReceiptPage = {
+    readonly rows: ReceiptRow[];
+    readonly nextCursor: ReceiptListCursor | null;
+};
+
+/**
+ * One page of the newest-first list. Keyset on (createdAt, id), so receipts captured while
+ * someone scrolls only show up on the first page instead of shifting later pages.
+ */
+export async function listReceiptsPage(
+    input: { readonly limit: number; readonly after?: ReceiptListCursor },
+    db?: AppDatabaseClient,
+): Promise<ReceiptPage> {
+    const database = db ?? (await getAppDatabase());
+    const after = input.after;
+    let query = database.selectFrom('receipts').selectAll();
+    if (after) {
+        query = query.where((eb) =>
+            eb.or([
+                eb('createdAt', '<', after.createdAt),
+                eb.and([eb('createdAt', '=', after.createdAt), eb('id', '<', after.id)]),
+            ]),
+        );
+    }
+    const rows = await query
+        .orderBy('createdAt', 'desc')
+        .orderBy('id', 'desc')
+        .limit(input.limit + 1)
+        .execute();
+    const hasMore = rows.length > input.limit;
+    const page = hasMore ? rows.slice(0, input.limit) : rows;
+    const last = page.at(-1);
+    return {
+        rows: page,
+        nextCursor: hasMore && last ? { createdAt: last.createdAt, id: last.id } : null,
+    };
 }
 
 /**
@@ -247,7 +294,35 @@ export async function readReceiptExtractFrameBytes(id: string, db?: AppDatabaseC
     return readReceiptAllFrameBytes(id, db);
 }
 
-export type ReceiptImageVariant = 'original' | 'processed';
+/**
+ * The list thumbnail, rendered from the processed image (or frame 0) on first request and
+ * stored beside it so every later request is a single small read.
+ */
+export async function readReceiptThumbBytes(
+    id: string,
+    db?: AppDatabaseClient,
+): Promise<{ readonly bytes: Buffer; readonly contentType: ReceiptImageContentType }> {
+    await requireReceipt(id, db);
+    const storage = getReceiptStorage();
+    const stored = await storage.get(thumbRef(id));
+    if (stored) {
+        return { bytes: stored, contentType: sniffImageContentType(stored) };
+    }
+    const source = await readHashSourceBytes(id, storage);
+    let bytes: Buffer;
+    try {
+        bytes = await renderReceiptThumb(source);
+    } catch (error) {
+        // An image sharp cannot decode still shows in the list the way it did before thumbnails.
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('receipt thumbnail skipped', { id, message });
+        return { bytes: source, contentType: sniffImageContentType(source) };
+    }
+    await storage.put(thumbRef(id), bytes);
+    return { bytes, contentType: 'image/jpeg' };
+}
+
+export type ReceiptImageVariant = 'original' | 'processed' | 'thumb';
 
 export async function readReceiptImageBytes(
     id: string,
@@ -257,6 +332,9 @@ export async function readReceiptImageBytes(
 ): Promise<{ readonly bytes: Buffer; readonly contentType: ReceiptImageContentType }> {
     if (variant === 'processed') {
         return readReceiptProcessedBytes(id, db);
+    }
+    if (variant === 'thumb') {
+        return readReceiptThumbBytes(id, db);
     }
     return readReceiptOriginalBytes(id, db, frameIndex);
 }

@@ -51,6 +51,11 @@ export function liveReceiptImageSrc(input: { readonly id: string; readonly hasPr
     return input.hasProcessed ? `/api/receipts/${input.id}/image?variant=processed` : `/api/receipts/${input.id}/image`;
 }
 
+/** Small server-rendered preview for lists; open the receipt for the full image. */
+export function liveReceiptThumbSrc(id: string): string {
+    return `/api/receipts/${id}/image?variant=thumb`;
+}
+
 export function practiceReceiptImageSrc(input: {
     readonly processedPreview: string | null;
     readonly frames: readonly string[];

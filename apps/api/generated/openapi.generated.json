@@ -401,6 +401,11 @@
 			},
 			"ReceiptsDto": {
 				"properties": {
+					"nextCursor": {
+						"type": "string",
+						"nullable": true,
+						"description": "Pass as `cursor` for the next page; null on the last page or an unpaged list."
+					},
 					"receipts": {
 						"items": {
 							"$ref": "#/components/schemas/ReceiptDto"
@@ -409,6 +414,7 @@
 					}
 				},
 				"required": [
+					"nextCursor",
 					"receipts"
 				],
 				"type": "object"
@@ -2831,14 +2837,36 @@
 								}
 							}
 						}
+					},
+					"400": {
+						"description": "Invalid page"
 					}
 				},
+				"description": "Newest first. Without `limit` every receipt comes back in one response; with it, pass\nthe previous page's `nextCursor` as `cursor` to continue.",
 				"summary": "listReceipts",
 				"tags": [
 					"receipts"
 				],
 				"security": [],
-				"parameters": []
+				"parameters": [
+					{
+						"in": "query",
+						"name": "cursor",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"in": "query",
+						"name": "limit",
+						"required": false,
+						"schema": {
+							"format": "double",
+							"type": "number"
+						}
+					}
+				]
 			},
 			"post": {
 				"operationId": "CreateReceipt",
@@ -3072,7 +3100,8 @@
 							"type": "string",
 							"enum": [
 								"original",
-								"processed"
+								"processed",
+								"thumb"
 							]
 						}
 					},

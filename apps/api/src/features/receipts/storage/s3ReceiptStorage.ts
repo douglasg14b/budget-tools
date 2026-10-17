@@ -23,6 +23,7 @@ export type S3ReceiptStorageConfig = {
  *   {prefix}{id}            original frame 0
  *   {prefix}{id}.{n}        original frame n (n >= 1)
  *   {prefix}{id}.processed  processed image
+ *   {prefix}{id}.thumb      list thumbnail
  */
 export class S3ReceiptStorage implements ReceiptStorage {
     private readonly client: S3Client;
@@ -39,6 +40,9 @@ export class S3ReceiptStorage implements ReceiptStorage {
         const base = `${this.prefix}${ref.receiptId}`;
         if (ref.kind === 'processed') {
             return `${base}.processed`;
+        }
+        if (ref.kind === 'thumb') {
+            return `${base}.thumb`;
         }
         return ref.frameIndex === 0 ? base : `${base}.${ref.frameIndex}`;
     }

@@ -366,7 +366,7 @@ const ROUTES = [
     },
 
     // Receipts (more specific paths first)
-    { method: 'GET', pattern: /^\/receipts$/, handle: () => json({ receipts: RECEIPTS }) },
+    { method: 'GET', pattern: /^\/receipts$/, handle: () => json({ receipts: RECEIPTS, nextCursor: null }) },
     {
         method: 'GET',
         pattern: /^\/receipts\/lookup-by-transaction$/,

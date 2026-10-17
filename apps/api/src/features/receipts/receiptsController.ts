@@ -24,6 +24,7 @@ import {
     deleteReceipt as deleteReceiptRow,
     hasReceiptProcessed,
     listReceipts as listReceiptRows,
+    listReceiptsPage,
     readReceiptImageBytes,
     requireReceipt,
     setReceiptTransactionId,
@@ -42,6 +43,7 @@ import {
     toReceiptMatchDto,
 } from './lookupReceiptMatch';
 import { patchReceipt as patchReceiptRow } from './patchReceipt';
+import { decodeReceiptCursor, encodeReceiptCursor } from './receiptListCursor';
 import type {
     BindReceiptDto,
     CreateReceiptDto,
@@ -54,6 +56,8 @@ import type {
     ReceiptsDto,
 } from './receiptsDtos';
 import { retryReceiptExtract as retryReceiptExtractRow } from './retryReceiptExtract';
+
+const MAX_RECEIPT_PAGE = 100;
 
 async function toReceiptDto(row: ReceiptRow): Promise<ReceiptDto> {
     return {
@@ -83,12 +87,25 @@ async function toReceiptDto(row: ReceiptRow): Promise<ReceiptDto> {
 @Tags('receipts')
 export class ReceiptsController {
     /**
+     * Newest first. Without `limit` every receipt comes back in one response; with it, pass
+     * the previous page's `nextCursor` as `cursor` to continue.
      * @summary listReceipts
      */
+    @Response(400, 'Invalid page')
     @Get()
-    public async listReceipts(): Promise<ReceiptsDto> {
-        const receipts = await listReceiptRows();
-        return { receipts: await Promise.all(receipts.map(toReceiptDto)) };
+    public async listReceipts(@Query() cursor?: string, @Query() limit?: number): Promise<ReceiptsDto> {
+        if (limit === undefined) {
+            const receipts = await listReceiptRows();
+            return { receipts: await Promise.all(receipts.map(toReceiptDto)), nextCursor: null };
+        }
+        if (!Number.isInteger(limit) || limit < 1 || limit > MAX_RECEIPT_PAGE) {
+            throw new HttpError(400, `limit must be a whole number from 1 to ${MAX_RECEIPT_PAGE}`);
+        }
+        const page = await listReceiptsPage({ limit, after: cursor ? decodeReceiptCursor(cursor) : undefined });
+        return {
+            receipts: await Promise.all(page.rows.map(toReceiptDto)),
+            nextCursor: page.nextCursor ? encodeReceiptCursor(page.nextCursor) : null,
+        };
     }
 
     /**
@@ -159,7 +176,7 @@ export class ReceiptsController {
     public async getReceiptImage(
         @Path() id: string,
         @Request() request: ExpressRequest,
-        @Query() variant: 'original' | 'processed' = 'original',
+        @Query() variant: 'original' | 'processed' | 'thumb' = 'original',
         @Query() frame = 0,
     ): Promise<void> {
         const image = await readReceiptImageBytes(id, variant, frame);
@@ -169,6 +186,8 @@ export class ReceiptsController {
         }
         response.status(200);
         response.setHeader('Content-Type', image.contentType);
+        // Receipt images never change under an id, so the browser can keep them.
+        response.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
         response.send(image.bytes);
     }
 

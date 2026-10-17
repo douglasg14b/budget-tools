@@ -1,17 +1,20 @@
 import type { ReceiptDto } from '@budget-tools/web-sdk';
-import { listReceiptsOptions } from '@budget-tools/web-sdk';
-import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { listReceiptsInfiniteOptions } from '@budget-tools/web-sdk';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
 
 import { BackendErrorNotice } from '../../BackendErrorNotice';
 import { ClassifyReceiptCapture } from '../classify/ClassifyReceiptCapture';
 import { usePracticeReceipts } from '../classify/PracticeReceiptsContext';
 import type { PracticeReceipt } from '../classify/practiceReceipts';
-import { liveReceiptImageSrc, practiceReceiptImageSrc } from '../classify/receiptCaptureAttach';
+import { liveReceiptThumbSrc, practiceReceiptImageSrc } from '../classify/receiptCaptureAttach';
 import { useReceiptCapture } from '../classify/useReceiptCapture';
+import { QueuePrefetchSentinel } from '../QueuePrefetchSentinel';
 import type { InboxSlipModel } from './ReceiptSlip';
 import { ReceiptSlip } from './ReceiptSlip';
 import classes from './ReceiptsInbox.module.css';
+
+const RECEIPTS_PAGE_SIZE = 20;
 
 type ReceiptsInboxProps = {
     readonly live: boolean;
@@ -23,17 +26,29 @@ type ReceiptsInboxProps = {
 export function ReceiptsInbox({ live }: ReceiptsInboxProps) {
     const { receipts: sessionReceipts, setReceipts: setSessionReceipts } = usePracticeReceipts();
 
-    const listQuery = useQuery({
-        ...listReceiptsOptions(),
+    const listQuery = useInfiniteQuery({
+        ...listReceiptsInfiniteOptions({ query: { limit: RECEIPTS_PAGE_SIZE } }),
+        initialPageParam: {},
+        getNextPageParam: (page) => page.nextCursor ?? undefined,
         enabled: live,
+        // Refetching walks every loaded page; pending rows are the newest, so that stays cheap.
         refetchInterval: (query) =>
-            query.state.data?.receipts.some((row) => row.extractStatus === 'pending') ? 2_000 : false,
+            query.state.data?.pages.some((page) => page.receipts.some((row) => row.extractStatus === 'pending'))
+                ? 2_000
+                : false,
         refetchOnWindowFocus: false,
     });
+    const { fetchNextPage } = listQuery;
+    const loadMore = useCallback(() => {
+        void fetchNextPage();
+    }, [fetchNextPage]);
 
     const slips = useMemo(
-        () => (live ? (listQuery.data?.receipts ?? []).map(slipFromDto) : sessionReceipts.map(slipFromPractice)),
-        [live, listQuery.data?.receipts, sessionReceipts],
+        () =>
+            live
+                ? (listQuery.data?.pages ?? []).flatMap((page) => page.receipts.map(slipFromDto))
+                : sessionReceipts.map(slipFromPractice),
+        [live, listQuery.data?.pages, sessionReceipts],
     );
 
     const capture = useReceiptCapture({
@@ -71,6 +86,14 @@ export function ReceiptsInbox({ live }: ReceiptsInboxProps) {
                     </li>
                 ))}
             </ol>
+            {live ? (
+                <QueuePrefetchSentinel
+                    enabled={listQuery.hasNextPage}
+                    isLoading={listQuery.isFetchingNextPage}
+                    loadingHint="Loading more receipts…"
+                    onNeedMore={loadMore}
+                />
+            ) : null}
         </div>
     );
 }
@@ -84,7 +107,7 @@ function slipFromDto(row: ReceiptDto): InboxSlipModel {
         extractStatus: row.extractStatus,
         totalsDisagree: row.totalsDisagree,
         transactionId: row.transactionId,
-        imageSrc: liveReceiptImageSrc(row),
+        imageSrc: liveReceiptThumbSrc(row.id),
         extractJson: row.extractJson,
     };
 }

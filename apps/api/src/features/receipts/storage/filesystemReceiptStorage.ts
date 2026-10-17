@@ -9,6 +9,7 @@ import type { ReceiptObjectRef, ReceiptStorage } from './receiptStorage';
  *   {dir}/{id}            original frame 0
  *   {dir}/{id}.{n}        original frame n (n >= 1)
  *   {dir}/{id}.processed  processed image
+ *   {dir}/{id}.thumb      list thumbnail
  */
 export class FilesystemReceiptStorage implements ReceiptStorage {
     constructor(private readonly baseDir: string) {}
@@ -17,6 +18,9 @@ export class FilesystemReceiptStorage implements ReceiptStorage {
         const base = join(this.baseDir, ref.receiptId);
         if (ref.kind === 'processed') {
             return `${base}.processed`;
+        }
+        if (ref.kind === 'thumb') {
+            return `${base}.thumb`;
         }
         return ref.frameIndex === 0 ? base : `${base}.${ref.frameIndex}`;
     }
@@ -57,6 +61,7 @@ export class FilesystemReceiptStorage implements ReceiptStorage {
         const base = join(this.baseDir, receiptId);
         await unlinkIfPresent(base);
         await unlinkIfPresent(`${base}.processed`);
+        await unlinkIfPresent(`${base}.thumb`);
         let index = 1;
         while (true) {
             const extra = `${base}.${index}`;

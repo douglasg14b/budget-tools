@@ -267,6 +267,9 @@ export const listReceiptsQueryKey = (options?: Options<ListReceiptsData>) => cre
 
 /**
  * listReceipts
+ *
+ * Newest first. Without `limit` every receipt comes back in one response; with it, pass
+ * the previous page's `nextCursor` as `cursor` to continue.
  */
 export const listReceiptsOptions = (options?: Options<ListReceiptsData>) => queryOptions<ListReceiptsResponse, DefaultError, ListReceiptsResponse, ReturnType<typeof listReceiptsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -280,6 +283,39 @@ export const listReceiptsOptions = (options?: Options<ListReceiptsData>) => quer
     },
     queryKey: listReceiptsQueryKey(options)
 });
+
+export const listReceiptsInfiniteQueryKey = (options?: Options<ListReceiptsData>): QueryKey<Options<ListReceiptsData>> => createQueryKey('listReceipts', options, true);
+
+/**
+ * listReceipts
+ *
+ * Newest first. Without `limit` every receipt comes back in one response; with it, pass
+ * the previous page's `nextCursor` as `cursor` to continue.
+ */
+export const listReceiptsInfiniteOptions = (options?: Options<ListReceiptsData>) => {
+    const opts = infiniteQueryOptions<ListReceiptsResponse, DefaultError, InfiniteData<ListReceiptsResponse>, QueryKey<Options<ListReceiptsData>>, string | Pick<QueryKey<Options<ListReceiptsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<ListReceiptsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    cursor: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await Receipts.request({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: listReceiptsInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
+};
 
 /**
  * createReceipt

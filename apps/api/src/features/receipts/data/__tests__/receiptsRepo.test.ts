@@ -8,13 +8,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AppDatabaseClient } from '../../../../data-persistence/database';
 import { createTestAppDatabase } from '../../../../data-persistence/testDatabase';
 import { setOperatingMode } from '../../../operatingMode/data/operatingModeRepo';
-import { originalRef } from '../../storage/receiptStorage';
+import { RECEIPT_THUMB_WIDTH } from '../../renderReceiptThumb';
+import { originalRef, thumbRef } from '../../storage/receiptStorage';
 import {
     deleteReceipt,
     findReceiptByContentHash,
     hasReceiptProcessed,
     insertReceiptOriginal,
+    listReceipts,
     listReceiptsInPurchaseDateWindow,
+    listReceiptsPage,
     readReceiptExtractFrameBytes,
     readReceiptImageBytes,
     readReceiptProcessedBytes,
@@ -433,6 +436,98 @@ describe('receiptsRepo', () => {
             database,
         );
         expect(saveMart.id).not.toBe(walmart.id);
+    });
+
+    it('pages receipts newest first, breaking createdAt ties by id', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = appDb.receiptsDir;
+        const ids: string[] = [];
+        for (let index = 0; index < 5; index += 1) {
+            const row = await insertReceiptOriginal(
+                { bytes: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x01, index]), receiptsDir },
+                database,
+            );
+            ids.push(row.id);
+        }
+        // Two rows share a timestamp so the id tie-break has to carry the page boundary.
+        const createdAts = [
+            '2026-03-01T00:00:00.000Z',
+            '2026-03-02T00:00:00.000Z',
+            '2026-03-02T00:00:00.000Z',
+            '2026-03-03T00:00:00.000Z',
+            '2026-03-04T00:00:00.000Z',
+        ];
+        for (const [index, id] of ids.entries()) {
+            await database.updateTable('receipts').set({ createdAt: createdAts[index] }).where('id', '=', id).execute();
+        }
+        const expected = (await listReceipts(database)).map((row) => row.id);
+
+        const seen: string[] = [];
+        let page = await listReceiptsPage({ limit: 2 }, database);
+        seen.push(...page.rows.map((row) => row.id));
+        while (page.nextCursor) {
+            page = await listReceiptsPage({ limit: 2, after: page.nextCursor }, database);
+            seen.push(...page.rows.map((row) => row.id));
+        }
+
+        expect(seen).toEqual(expected);
+        expect(new Set(seen).size).toBe(5);
+        expect(seen[0]).toBe(ids[4]);
+        expect(seen[4]).toBe(ids[0]);
+    });
+
+    it('reports no next page when the last page is exactly full', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = appDb.receiptsDir;
+        await insertReceiptOriginal({ bytes: jpegBytes, receiptsDir }, database);
+        await insertReceiptOriginal(
+            { bytes: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x11]), receiptsDir },
+            database,
+        );
+        const page = await listReceiptsPage({ limit: 2 }, database);
+        expect(page.rows).toHaveLength(2);
+        expect(page.nextCursor).toBeNull();
+    });
+
+    it('renders a small thumbnail once, from processed when present, and deletes it with the receipt', async () => {
+        await setOperatingMode('live', database);
+        const original = await sharp({
+            create: { width: 1200, height: 3000, channels: 3, background: { r: 240, g: 240, b: 240 } },
+        })
+            .jpeg()
+            .toBuffer();
+        const processed = await sharp({
+            create: { width: 900, height: 2400, channels: 3, background: { r: 250, g: 250, b: 250 } },
+        })
+            .jpeg()
+            .toBuffer();
+        const created = await insertReceiptOriginal(
+            { bytes: original, processed, receiptsDir: appDb.receiptsDir },
+            database,
+        );
+
+        const thumb = await readReceiptImageBytes(created.id, 'thumb', 0, database);
+        expect(thumb.contentType).toBe('image/jpeg');
+        const meta = await sharp(thumb.bytes).metadata();
+        expect(meta.width).toBe(RECEIPT_THUMB_WIDTH);
+        expect(meta.height).toBe(640);
+        expect(thumb.bytes.length).toBeLessThan(processed.length);
+
+        const stored = await appDb.storage.get(thumbRef(created.id));
+        expect(stored?.equals(thumb.bytes)).toBe(true);
+        const again = await readReceiptImageBytes(created.id, 'thumb', 0, database);
+        expect(again.bytes.equals(thumb.bytes)).toBe(true);
+
+        await deleteReceipt(created.id, database);
+        expect(await appDb.storage.exists(thumbRef(created.id))).toBe(false);
+    });
+
+    it('serves the source bytes as the thumbnail when the image cannot be decoded', async () => {
+        await setOperatingMode('live', database);
+        const created = await insertReceiptOriginal({ bytes: jpegBytes, receiptsDir: appDb.receiptsDir }, database);
+        const thumb = await readReceiptImageBytes(created.id, 'thumb', 0, database);
+        expect(thumb.bytes.equals(jpegBytes)).toBe(true);
+        expect(await appDb.storage.exists(thumbRef(created.id))).toBe(false);
     });
 });
 

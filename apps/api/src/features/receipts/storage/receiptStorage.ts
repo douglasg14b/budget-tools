@@ -5,6 +5,7 @@
  *  - the original capture, frame 0 (`{ kind: 'original', frameIndex: 0 }`)
  *  - additional original frames 1..N (`{ kind: 'original', frameIndex: n }`)
  *  - the processed (prepped-for-extract) image (`{ kind: 'processed' }`)
+ *  - a small list thumbnail derived on first request (`{ kind: 'thumb' }`)
  *
  * Providers own the mapping from a `ReceiptObjectRef` to their physical key/path, so callers
  * never construct paths. The filesystem provider is used locally; the S3 provider (on-network
@@ -12,7 +13,8 @@
  */
 export type ReceiptObjectRef =
     | { readonly kind: 'original'; readonly receiptId: string; readonly frameIndex: number }
-    | { readonly kind: 'processed'; readonly receiptId: string };
+    | { readonly kind: 'processed'; readonly receiptId: string }
+    | { readonly kind: 'thumb'; readonly receiptId: string };
 
 export interface ReceiptStorage {
     /** Writes (or overwrites) the object's bytes. */
@@ -47,4 +49,8 @@ export function originalRef(receiptId: string, frameIndex = 0): ReceiptObjectRef
 
 export function processedRef(receiptId: string): ReceiptObjectRef {
     return { kind: 'processed', receiptId };
+}
+
+export function thumbRef(receiptId: string): ReceiptObjectRef {
+    return { kind: 'thumb', receiptId };
 }
