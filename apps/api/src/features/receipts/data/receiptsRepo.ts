@@ -6,6 +6,8 @@ import { ConflictError, HttpError, NotFoundError } from '../../travelWindows/Htt
 import { assertReceiptWritesAllowed } from '../assertReceiptWritesAllowed';
 import type { PerceptualNeighbor } from '../perceptualHash';
 import { findNearestPerceptualMatch, perceptualHashOf } from '../perceptualHash';
+import type { ReceiptListFilter } from '../receiptMatchesFilter';
+import { receiptFilterActive, receiptMatchesFilter } from '../receiptMatchesFilter';
 import { renderReceiptThumb } from '../renderReceiptThumb';
 import { FilesystemReceiptStorage } from '../storage/filesystemReceiptStorage';
 import { getReceiptStorage } from '../storage/getReceiptStorage';
@@ -130,16 +132,51 @@ export type ReceiptPage = {
     readonly nextCursor: ReceiptListCursor | null;
 };
 
+/** Rows scanned per round trip while a filter fills a page. */
+const FILTERED_SCAN_BATCH = 200;
+
 /**
  * One page of the newest-first list. Keyset on (createdAt, id), so receipts captured while
  * someone scrolls only show up on the first page instead of shifting later pages.
+ *
+ * A filter is applied in memory, scanning batches until the page fills: the reimbursable mark
+ * lives inside the extract JSON, and this way it reads exactly as the inbox badge does.
  */
 export async function listReceiptsPage(
-    input: { readonly limit: number; readonly after?: ReceiptListCursor },
+    input: { readonly limit: number; readonly after?: ReceiptListCursor; readonly filter?: ReceiptListFilter },
     db?: AppDatabaseClient,
 ): Promise<ReceiptPage> {
     const database = db ?? (await getAppDatabase());
-    const after = input.after;
+    const filter = input.filter;
+    if (!filter || !receiptFilterActive(filter)) {
+        const rows = await selectReceiptsAfter(database, input.after, input.limit + 1);
+        return pageOf(rows, input.limit);
+    }
+    const matches: ReceiptRow[] = [];
+    let after = input.after;
+    for (;;) {
+        const batch = await selectReceiptsAfter(database, after, FILTERED_SCAN_BATCH);
+        for (const row of batch) {
+            if (receiptMatchesFilter(row, filter)) {
+                matches.push(row);
+                if (matches.length > input.limit) {
+                    return pageOf(matches, input.limit);
+                }
+            }
+        }
+        const last = batch.at(-1);
+        if (batch.length < FILTERED_SCAN_BATCH || !last) {
+            return pageOf(matches, input.limit);
+        }
+        after = { createdAt: last.createdAt, id: last.id };
+    }
+}
+
+async function selectReceiptsAfter(
+    database: AppDatabaseClient,
+    after: ReceiptListCursor | undefined,
+    limit: number,
+): Promise<ReceiptRow[]> {
     let query = database.selectFrom('receipts').selectAll();
     if (after) {
         query = query.where((eb) =>
@@ -149,13 +186,13 @@ export async function listReceiptsPage(
             ]),
         );
     }
-    const rows = await query
-        .orderBy('createdAt', 'desc')
-        .orderBy('id', 'desc')
-        .limit(input.limit + 1)
-        .execute();
-    const hasMore = rows.length > input.limit;
-    const page = hasMore ? rows.slice(0, input.limit) : rows;
+    return query.orderBy('createdAt', 'desc').orderBy('id', 'desc').limit(limit).execute();
+}
+
+/** `rows` holds up to one extra row, whose presence means another page follows. */
+function pageOf(rows: ReceiptRow[], limit: number): ReceiptPage {
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
     const last = page.at(-1);
     return {
         rows: page,

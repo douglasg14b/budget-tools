@@ -1,6 +1,9 @@
 import type { ReceiptDto } from '@budget-tools/web-sdk';
 import { listReceiptsInfiniteOptions } from '@budget-tools/web-sdk';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { Button } from '@mantine/core';
+import { useDebouncedValue } from '@mantine/hooks';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { useCallback, useMemo } from 'react';
 
 import { BackendErrorNotice } from '../../BackendErrorNotice';
@@ -13,23 +16,44 @@ import { QueuePrefetchSentinel } from '../QueuePrefetchSentinel';
 import type { InboxSlipModel } from './ReceiptSlip';
 import { ReceiptSlip } from './ReceiptSlip';
 import classes from './ReceiptsInbox.module.css';
+import type { ReceiptsSearchState } from './receiptsSearchParams';
+import { receiptMatchesSearch, receiptsFilterCount } from './receiptsSearchParams';
 
 const RECEIPTS_PAGE_SIZE = 20;
 
 type ReceiptsInboxProps = {
+    /** Rendered above the list; null when the page shows it elsewhere (the phone header). */
+    readonly filterBar: ReactNode;
     readonly live: boolean;
+    readonly onClearFilters: () => void;
+    readonly search: ReceiptsSearchState;
 };
+
+/** Typing pause before a search goes to the server. */
+const SEARCH_DEBOUNCE_MS = 250;
 
 /**
  * Burst capture without a focused transaction. Live lists SQLite receipts; Practice is session-only.
+ * Filters run on the server for Live so they reach receipts not paged in yet.
  */
-export function ReceiptsInbox({ live }: ReceiptsInboxProps) {
+export function ReceiptsInbox({ filterBar, live, onClearFilters, search }: ReceiptsInboxProps) {
     const { receipts: sessionReceipts, setReceipts: setSessionReceipts } = usePracticeReceipts();
+    const [debouncedQ] = useDebouncedValue(search.q ?? '', SEARCH_DEBOUNCE_MS);
+    const filtered = receiptsFilterCount(search) > 0;
 
     const listQuery = useInfiniteQuery({
-        ...listReceiptsInfiniteOptions({ query: { limit: RECEIPTS_PAGE_SIZE } }),
+        ...listReceiptsInfiniteOptions({
+            query: {
+                limit: RECEIPTS_PAGE_SIZE,
+                q: debouncedQ.trim() || undefined,
+                reimbursable: search.reimbursable || undefined,
+                bound: search.bound,
+            },
+        }),
         initialPageParam: {},
         getNextPageParam: (page) => page.nextCursor ?? undefined,
+        // Keep the current rows on screen while a new filter loads instead of flashing "Loading".
+        placeholderData: keepPreviousData,
         enabled: live,
         // Refetching walks every loaded page; pending rows are the newest, so that stays cheap.
         refetchInterval: (query) =>
@@ -47,9 +71,11 @@ export function ReceiptsInbox({ live }: ReceiptsInboxProps) {
         () =>
             live
                 ? (listQuery.data?.pages ?? []).flatMap((page) => page.receipts.map(slipFromDto))
-                : sessionReceipts.map(slipFromPractice),
-        [live, listQuery.data?.pages, sessionReceipts],
+                : sessionReceipts.filter((row) => receiptMatchesSearch(row, search)).map(slipFromPractice),
+        [live, listQuery.data?.pages, sessionReceipts, search],
     );
+    const searching = live && (listQuery.isPlaceholderData || (search.q ?? '') !== debouncedQ);
+    const listEmpty = !(live && listQuery.isPending) && slips.length === 0;
 
     const capture = useReceiptCapture({
         live,
@@ -75,10 +101,22 @@ export function ReceiptsInbox({ live }: ReceiptsInboxProps) {
 
             {listQuery.error ? <BackendErrorNotice error={listQuery.error} /> : null}
 
-            <ol className={classes.stack}>
+            {filterBar}
+
+            <ol className={classes.stack} aria-busy={searching || undefined} data-searching={searching || undefined}>
                 {live && listQuery.isPending ? <li className={classes.empty}>Loading receipts…</li> : null}
-                {!listQuery.isPending && slips.length === 0 ? (
+                {listEmpty && !filtered ? (
                     <li className={classes.empty}>No receipts yet. Add a photo to start matching.</li>
+                ) : null}
+                {listEmpty && filtered ? (
+                    <li className={classes.empty}>
+                        {searching ? 'Looking for matching receipts…' : 'No receipts match these filters.'}
+                        {searching ? null : (
+                            <Button variant="subtle" color="gray" onClick={onClearFilters}>
+                                Clear filters
+                            </Button>
+                        )}
+                    </li>
                 ) : null}
                 {slips.map((slip) => (
                     <li key={slip.id}>
@@ -88,7 +126,8 @@ export function ReceiptsInbox({ live }: ReceiptsInboxProps) {
             </ol>
             {live ? (
                 <QueuePrefetchSentinel
-                    enabled={listQuery.hasNextPage}
+                    // The previous filter's rows are only a placeholder; their cursor is not this query's.
+                    enabled={listQuery.hasNextPage && !listQuery.isPlaceholderData}
                     isLoading={listQuery.isFetchingNextPage}
                     loadingHint="Loading more receipts…"
                     onNeedMore={loadMore}

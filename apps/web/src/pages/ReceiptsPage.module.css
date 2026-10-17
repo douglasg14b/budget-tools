@@ -21,6 +21,25 @@
     min-width: 0;
 }
 
+/* The phone's search toggle sits at the far right of this row. */
+.titleRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.titleBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.narrowFilters {
+    padding-top: 0.5rem;
+}
+
 .kicker {
     margin: 0;
     font-family: var(--app-font-mono);
@@ -58,6 +77,13 @@
 .note[data-mode="live"] {
     color: var(--app-mode-live-ink);
     font-weight: 700;
+}
+
+/* Matches NARROW_VIEWPORT: full width so the search toggle reaches the right edge. */
+@media (max-width: 56rem) {
+    .headerCopy {
+        width: 100%;
+    }
 }
 
 @media (max-width: 40rem) {

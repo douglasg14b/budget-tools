@@ -119,6 +119,11 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"nextCursor":{"dataType":"union","subSchemas":[{"dataType":"string"},{"dataType":"enum","enums":[null]}],"required":true},"receipts":{"dataType":"array","array":{"dataType":"refAlias","ref":"ReceiptDto"},"required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ReceiptBoundFilter": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["bound"]},{"dataType":"enum","enums":["unbound"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "CreateReceiptDto": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"transactionId":{"dataType":"string"},"processed":{"dataType":"string"},"frames":{"dataType":"array","array":{"dataType":"string"},"required":true}},"validators":{}},
@@ -789,6 +794,9 @@ export function RegisterRoutes(app: Router) {
         const argsReceiptsController_listReceipts: Record<string, TsoaRoute.ParameterSchema> = {
                 cursor: {"in":"query","name":"cursor","dataType":"string"},
                 limit: {"in":"query","name":"limit","dataType":"double"},
+                q: {"in":"query","name":"q","dataType":"string"},
+                reimbursable: {"in":"query","name":"reimbursable","dataType":"boolean"},
+                bound: {"in":"query","name":"bound","ref":"ReceiptBoundFilter"},
         };
         app.get('/api/receipts',
             ...(fetchMiddlewares<RequestHandler>(ReceiptsController)),

@@ -419,6 +419,13 @@
 				],
 				"type": "object"
 			},
+			"ReceiptBoundFilter": {
+				"type": "string",
+				"enum": [
+					"bound",
+					"unbound"
+				]
+			},
 			"CreateReceiptDto": {
 				"properties": {
 					"transactionId": {
@@ -2864,6 +2871,33 @@
 						"schema": {
 							"format": "double",
 							"type": "number"
+						}
+					},
+					{
+						"description": "Case-insensitive substring filter over vendor, date, total, extracted lines, and the reimbursable note; every term must match",
+						"in": "query",
+						"name": "q",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"description": "Only receipts marked reimbursable",
+						"in": "query",
+						"name": "reimbursable",
+						"required": false,
+						"schema": {
+							"type": "boolean"
+						}
+					},
+					{
+						"description": "Only receipts bound to a transaction, or only unbound ones",
+						"in": "query",
+						"name": "bound",
+						"required": false,
+						"schema": {
+							"$ref": "#/components/schemas/ReceiptBoundFilter"
 						}
 					}
 				]

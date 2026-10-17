@@ -34,9 +34,19 @@
     margin: 0;
     padding: 0;
     list-style: none;
+    transition: opacity 120ms ease;
+}
+
+/* The previous filter's rows stay up, dimmed, until the new results land. */
+.stack[data-searching] {
+    opacity: 0.55;
 }
 
 .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
     padding: 1rem 0.25rem;
     color: var(--app-text-muted);
 }

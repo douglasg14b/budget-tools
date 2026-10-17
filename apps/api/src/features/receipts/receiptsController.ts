@@ -44,6 +44,8 @@ import {
 } from './lookupReceiptMatch';
 import { patchReceipt as patchReceiptRow } from './patchReceipt';
 import { decodeReceiptCursor, encodeReceiptCursor } from './receiptListCursor';
+import type { ReceiptBoundFilter, ReceiptListFilter } from './receiptMatchesFilter';
+import { receiptMatchesFilter } from './receiptMatchesFilter';
 import type {
     BindReceiptDto,
     CreateReceiptDto,
@@ -89,19 +91,33 @@ export class ReceiptsController {
     /**
      * Newest first. Without `limit` every receipt comes back in one response; with it, pass
      * the previous page's `nextCursor` as `cursor` to continue.
+     * @param q Case-insensitive substring filter over vendor, date, total, extracted lines, and the reimbursable note; every term must match
+     * @param reimbursable Only receipts marked reimbursable
+     * @param bound Only receipts bound to a transaction, or only unbound ones
      * @summary listReceipts
      */
     @Response(400, 'Invalid page')
     @Get()
-    public async listReceipts(@Query() cursor?: string, @Query() limit?: number): Promise<ReceiptsDto> {
+    public async listReceipts(
+        @Query() cursor?: string,
+        @Query() limit?: number,
+        @Query() q?: string,
+        @Query() reimbursable?: boolean,
+        @Query() bound?: ReceiptBoundFilter,
+    ): Promise<ReceiptsDto> {
+        const filter: ReceiptListFilter = { q, reimbursable, bound };
         if (limit === undefined) {
-            const receipts = await listReceiptRows();
+            const receipts = (await listReceiptRows()).filter((row) => receiptMatchesFilter(row, filter));
             return { receipts: await Promise.all(receipts.map(toReceiptDto)), nextCursor: null };
         }
         if (!Number.isInteger(limit) || limit < 1 || limit > MAX_RECEIPT_PAGE) {
             throw new HttpError(400, `limit must be a whole number from 1 to ${MAX_RECEIPT_PAGE}`);
         }
-        const page = await listReceiptsPage({ limit, after: cursor ? decodeReceiptCursor(cursor) : undefined });
+        const page = await listReceiptsPage({
+            limit,
+            after: cursor ? decodeReceiptCursor(cursor) : undefined,
+            filter,
+        });
         return {
             receipts: await Promise.all(page.rows.map(toReceiptDto)),
             nextCursor: page.nextCursor ? encodeReceiptCursor(page.nextCursor) : null,

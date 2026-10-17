@@ -141,6 +141,8 @@ export type ReceiptsDto = {
     receipts: Array<ReceiptDto>;
 };
 
+export type ReceiptBoundFilter = 'bound' | 'unbound';
+
 export type CreateReceiptDto = {
     transactionId?: string;
     processed?: string;
@@ -923,6 +925,18 @@ export type ListReceiptsData = {
     query?: {
         cursor?: string;
         limit?: number;
+        /**
+         * Case-insensitive substring filter over vendor, date, total, extracted lines, and the reimbursable note; every term must match
+         */
+        q?: string;
+        /**
+         * Only receipts marked reimbursable
+         */
+        reimbursable?: boolean;
+        /**
+         * Only receipts bound to a transaction, or only unbound ones
+         */
+        bound?: ReceiptBoundFilter;
     };
     url: '/receipts';
 };

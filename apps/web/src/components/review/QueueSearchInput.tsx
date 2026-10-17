@@ -5,12 +5,21 @@ import { useRef } from 'react';
 import classes from './QueueSearchInput.module.css';
 
 type QueueSearchInputProps = {
+    /** Accessible name when `compact` hides the visible label. */
+    ariaLabel?: string;
     compact?: boolean;
     onChange: (q: string | undefined) => void;
+    placeholder?: string;
     value: string | undefined;
 };
 
-export function QueueSearchInput({ compact = false, onChange, value }: QueueSearchInputProps) {
+export function QueueSearchInput({
+    ariaLabel = 'Search transactions',
+    compact = false,
+    onChange,
+    placeholder = 'Payee, memo, amount…',
+    value,
+}: QueueSearchInputProps) {
     const inputRef = useRef<HTMLInputElement>(null);
 
     useHotkeys(
@@ -30,9 +39,9 @@ export function QueueSearchInput({ compact = false, onChange, value }: QueueSear
         <TextInput
             ref={inputRef}
             className={classes.input}
-            aria-label={compact ? 'Search transactions' : undefined}
+            aria-label={compact ? ariaLabel : undefined}
             label={compact ? undefined : 'Search'}
-            placeholder="Payee, memo, amount…"
+            placeholder={placeholder}
             value={value ?? ''}
             rightSection={
                 value ? (

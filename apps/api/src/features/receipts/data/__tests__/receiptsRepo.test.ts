@@ -476,6 +476,52 @@ describe('receiptsRepo', () => {
         expect(seen[4]).toBe(ids[0]);
     });
 
+    it('pages a filter across receipts not loaded yet, newest first', async () => {
+        await setOperatingMode('live', database);
+        const receiptsDir = appDb.receiptsDir;
+        const ids: string[] = [];
+        for (let index = 0; index < 5; index += 1) {
+            const row = await insertReceiptOriginal(
+                { bytes: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x02, index]), receiptsDir },
+                database,
+            );
+            ids.push(row.id);
+            await database
+                .updateTable('receipts')
+                .set({
+                    createdAt: `2026-04-0${index + 1}T00:00:00.000Z`,
+                    // Even rows carry a reimbursable note; the badge reads the same key.
+                    extractJson: JSON.stringify(
+                        index % 2 === 0
+                            ? { lines: [], reimbursable: { writtenText: 'Reimb', amountMilliunits: null } }
+                            : { lines: [] },
+                    ),
+                })
+                .where('id', '=', row.id)
+                .execute();
+        }
+        await setReceiptTransactionId(ids[4] ?? '', 'txn-bound', database);
+
+        const seen: string[] = [];
+        let page = await listReceiptsPage({ limit: 1, filter: { reimbursable: true } }, database);
+        seen.push(...page.rows.map((row) => row.id));
+        while (page.nextCursor) {
+            page = await listReceiptsPage(
+                { limit: 1, after: page.nextCursor, filter: { reimbursable: true } },
+                database,
+            );
+            seen.push(...page.rows.map((row) => row.id));
+        }
+        expect(seen).toEqual([ids[4], ids[2], ids[0]]);
+
+        const unbound = await listReceiptsPage(
+            { limit: 10, filter: { reimbursable: true, bound: 'unbound' } },
+            database,
+        );
+        expect(unbound.rows.map((row) => row.id)).toEqual([ids[2], ids[0]]);
+        expect(unbound.nextCursor).toBeNull();
+    });
+
     it('reports no next page when the last page is exactly full', async () => {
         await setOperatingMode('live', database);
         const receiptsDir = appDb.receiptsDir;
