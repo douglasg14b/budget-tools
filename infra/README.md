@@ -90,7 +90,6 @@ file-like path.
 ```bash
 cd infra
 pulumi stack init prod                                   # or `pulumi stack select prod`
-pulumi config set --secret cloudflare:apiToken <token>   # secret
 pulumi config set accountId <cloudflare-account-id>
 pulumi config set zoneId <zone-id-for-moochermedia.co>
 pulumi config set --secret --path 'accessAllowedEmails[0]' <first-email>
@@ -101,7 +100,6 @@ Then commit `infra/Pulumi.prod.yaml`; see [Why stack config is committed](#why-s
 
 | Key | Kind | Value |
 | --- | --- | --- |
-| `cloudflare:apiToken` | secret | Scoped API token; see permissions below |
 | `accountId` | config | Cloudflare account id that owns the tunnel |
 | `zoneId` | config | Zone id for `moochermedia.co` |
 | `accessAllowedEmails` | secret list | Who Access lets through. Secret, so no address is plaintext in the repo |
@@ -109,6 +107,29 @@ Then commit `infra/Pulumi.prod.yaml`; see [Why stack config is committed](#why-s
 To change who is allowed, edit the list (`pulumi config set --secret --path 'accessAllowedEmails[N]' …`, or
 `pulumi config rm --path 'accessAllowedEmails[N]'`) and `pulumi up`. Removing someone does not end an Access session
 they already have. Revoke it in Zero Trust → My Team → Users as well.
+
+### The Cloudflare API token is temporary, not stored
+
+No Cloudflare token is kept in the stack config, the repo, or on disk. A standing token is only something to leak,
+and this program changes rarely. For each session of `pulumi preview` / `up` / `refresh`:
+
+1. Create a token with the permissions below (Cloudflare → My Profile → API Tokens → Create Custom Token), with a
+   short TTL (Cloudflare lets you set an end date).
+2. Give it to Pulumi for this shell only. `CLOUDFLARE_API_TOKEN` is read by the provider and is never written to
+   `Pulumi.prod.yaml`:
+
+   ```powershell
+   # Masked prompt; the value never reaches shell history. Works in Windows PowerShell 5.1 and PowerShell 7.
+   $env:CLOUDFLARE_API_TOKEN = [Net.NetworkCredential]::new('', (Read-Host -AsSecureString 'Cloudflare API token')).Password
+   pulumi preview
+   pulumi up
+   Remove-Item Env:CLOUDFLARE_API_TOKEN
+   ```
+
+3. Delete the token in the dashboard when done.
+
+Do not put it back with `pulumi config set --secret cloudflare:apiToken`. The provider's copy of the token also
+lands in Pulumi Cloud state, encrypted, on every `up`. Deleting the token in Cloudflare is what actually retires it.
 
 The token needs these permissions:
 
