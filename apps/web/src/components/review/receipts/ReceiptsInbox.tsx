@@ -48,6 +48,7 @@ export function ReceiptsInbox({ filterBar, live, onClearFilters, search }: Recei
                 q: debouncedQ.trim() || undefined,
                 reimbursable: search.reimbursable || undefined,
                 bound: search.bound,
+                issue: search.issue,
             },
         }),
         initialPageParam: {},
@@ -148,6 +149,7 @@ function slipFromDto(row: ReceiptDto): InboxSlipModel {
         transactionId: row.transactionId,
         imageSrc: liveReceiptThumbSrc(row.id),
         extractJson: row.extractJson,
+        bindCheckOutcome: row.bindCheckOutcome,
     };
 }
 

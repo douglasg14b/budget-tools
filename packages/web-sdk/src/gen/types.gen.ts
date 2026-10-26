@@ -143,6 +143,21 @@ export type ReceiptsDto = {
 
 export type ReceiptBoundFilter = 'bound' | 'unbound';
 
+/**
+ * Something stored on a receipt that says it needs a person. Each is a recorded fact, never a guess:
+ * - `unreadable`: the extract failed (vendor, date, or total missing).
+ * - `needs-look`: the extract finished but its amounts don't add up, or the two printed reads disagree.
+ * - `flagged`: the extract finished but a step errored or the verify pass flagged it.
+ * - `extracting`: the extract hasn't finished.
+ * - `bind-*`: unbound, and the last auto-bind check stopped for this reason.
+ */
+export type ReceiptIssue = 'unreadable' | 'needs-look' | 'flagged' | 'extracting' | 'bind-ambiguous' | 'bind-not-confirmed' | 'bind-jev-unavailable' | 'bind-no-charge';
+
+/**
+ * `any` is every issue except the ones a fresh receipt has while it waits: extracting and no charge yet.
+ */
+export type ReceiptIssueFilter = ReceiptIssue | 'any';
+
 export type CreateReceiptDto = {
     transactionId?: string;
     processed?: string;
@@ -937,6 +952,10 @@ export type ListReceiptsData = {
          * Only receipts bound to a transaction, or only unbound ones
          */
         bound?: ReceiptBoundFilter;
+        /**
+         * Only receipts with this problem; `any` leaves out the waiting states (`extracting`, `bind-no-charge`)
+         */
+        issue?: ReceiptIssueFilter;
     };
     url: '/receipts';
 };

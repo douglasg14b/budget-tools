@@ -1,8 +1,9 @@
 import type { ReceiptBoundFilter } from '@budget-tools/web-sdk';
-import { UnstyledButton } from '@mantine/core';
+import { Select, UnstyledButton } from '@mantine/core';
 
 import { QueueSearchInput } from '../QueueSearchInput';
 import classes from './ReceiptsFilterBar.module.css';
+import { isReceiptIssueFilter, RECEIPT_ISSUE_OPTIONS } from './receiptIssues';
 import type { ReceiptsSearchState } from './receiptsSearchParams';
 
 type ReceiptsFilterBarProps = {
@@ -16,8 +17,12 @@ const BOUND_CHIPS = [
     { value: 'bound', label: 'Bound' },
 ] as const satisfies readonly { value: ReceiptBoundFilter; label: string }[];
 
-/** Search box and chips for the receipts inbox. Unbound and Bound are one choice; a second tap clears it. */
+/**
+ * Search box, chips, and a problem picker for the receipts inbox. Unbound and Bound are one choice;
+ * a second tap clears it. Needs attention is the picker's "Any problem" as a one-tap chip.
+ */
 export function ReceiptsFilterBar({ compact = false, onChange, search }: ReceiptsFilterBarProps) {
+    const needsAttention = search.issue === 'any';
     return (
         <div className={classes.bar} data-compact={compact || undefined}>
             <QueueSearchInput
@@ -29,8 +34,32 @@ export function ReceiptsFilterBar({ compact = false, onChange, search }: Receipt
                     onChange({ q });
                 }}
             />
+            <Select
+                className={classes.issue}
+                aria-label={compact ? 'Problem' : undefined}
+                label={compact ? undefined : 'Problem'}
+                clearable
+                allowDeselect
+                data={RECEIPT_ISSUE_OPTIONS}
+                placeholder="Any status"
+                value={search.issue ?? null}
+                onChange={(value) => {
+                    onChange({ issue: isReceiptIssueFilter(value) ? value : undefined });
+                }}
+            />
             <fieldset className={classes.chips}>
                 <legend className={classes.srOnly}>Filter receipts</legend>
+                <UnstyledButton
+                    className={classes.chip}
+                    data-chip="attention"
+                    data-active={needsAttention || undefined}
+                    aria-pressed={needsAttention}
+                    onClick={() => {
+                        onChange({ issue: needsAttention ? undefined : 'any' });
+                    }}
+                >
+                    Needs attention
+                </UnstyledButton>
                 <UnstyledButton
                     className={classes.chip}
                     data-chip="reimbursable"

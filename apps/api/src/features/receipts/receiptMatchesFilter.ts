@@ -1,4 +1,6 @@
 import { parseReceiptExtract } from './parseReceiptExtract';
+import type { ReceiptIssueFields, ReceiptIssueFilter } from './receiptIssues';
+import { receiptHasIssue } from './receiptIssues';
 
 export type ReceiptBoundFilter = 'bound' | 'unbound';
 
@@ -7,23 +9,27 @@ export type ReceiptListFilter = {
     /** Only receipts with a reimbursable note. */
     readonly reimbursable?: boolean;
     readonly bound?: ReceiptBoundFilter;
+    readonly issue?: ReceiptIssueFilter;
 };
 
-export type ReceiptFilterFields = {
+export type ReceiptFilterFields = ReceiptIssueFields & {
     readonly vendor: string | null;
     readonly purchaseDate: string | null;
     readonly printedMilliunits: number | null;
     readonly rawText: string | null;
-    readonly extractJson: string | null;
-    readonly transactionId: string | null;
 };
 
 export function receiptFilterActive(filter: ReceiptListFilter): boolean {
-    return Boolean(filter.q?.trim()) || filter.reimbursable === true || filter.bound !== undefined;
+    return (
+        Boolean(filter.q?.trim()) ||
+        filter.reimbursable === true ||
+        filter.bound !== undefined ||
+        filter.issue !== undefined
+    );
 }
 
 /**
- * True when the receipt passes every chip and every whitespace-separated search term is a
+ * True when the receipt passes every chip, has the chosen issue (see `receiptIssues`), and every whitespace-separated search term is a
  * case-insensitive substring of vendor, date, total, extracted lines, or the reimbursable note.
  * Reimbursable means what the inbox badge shows: the extract carries a reimbursable note.
  */
@@ -32,6 +38,9 @@ export function receiptMatchesFilter(receipt: ReceiptFilterFields, filter: Recei
         return false;
     }
     if (filter.bound === 'unbound' && receipt.transactionId) {
+        return false;
+    }
+    if (filter.issue && !receiptHasIssue(receipt, filter.issue)) {
         return false;
     }
     const terms = queryTerms(filter.q);

@@ -1,24 +1,29 @@
-import type { ReceiptBoundFilter } from '@budget-tools/web-sdk';
+import type { ReceiptBoundFilter, ReceiptIssueFilter } from '@budget-tools/web-sdk';
 
 import { parseReceiptExtract } from './parseReceiptExtract';
+import type { ReceiptIssueFields } from './receiptIssues';
+import { isReceiptIssueFilter, receiptHasIssue } from './receiptIssues';
 
 export type ReceiptsSearchState = {
     q: string | undefined;
     /** Only receipts with a reimbursable note. */
     reimbursable: boolean;
     bound: ReceiptBoundFilter | undefined;
+    issue: ReceiptIssueFilter | undefined;
 };
 
 /**
- * Reads the receipts inbox filters from the URL. Unknown `bound` values are ignored.
+ * Reads the receipts inbox filters from the URL. Unknown `bound` and `issue` values are ignored.
  */
 export function parseReceiptsSearchParams(searchParams: URLSearchParams): ReceiptsSearchState {
     const qRaw = searchParams.get('q');
     const boundRaw = searchParams.get('bound');
+    const issueRaw = searchParams.get('issue');
     return {
         q: qRaw?.trim() ? qRaw : undefined,
         reimbursable: searchParams.get('reimbursable') === '1',
         bound: boundRaw === 'bound' || boundRaw === 'unbound' ? boundRaw : undefined,
+        issue: isReceiptIssueFilter(issueRaw) ? issueRaw : undefined,
     };
 }
 
@@ -36,20 +41,21 @@ export function serializeReceiptsSearchParams(state: ReceiptsSearchState): URLSe
     if (state.bound) {
         params.set('bound', state.bound);
     }
+    if (state.issue) {
+        params.set('issue', state.issue);
+    }
     return params;
 }
 
 export function receiptsFilterCount(state: ReceiptsSearchState): number {
-    return (state.q ? 1 : 0) + (state.reimbursable ? 1 : 0) + (state.bound ? 1 : 0);
+    return (state.q ? 1 : 0) + (state.reimbursable ? 1 : 0) + (state.bound ? 1 : 0) + (state.issue ? 1 : 0);
 }
 
-export type ReceiptFilterFields = {
+export type ReceiptFilterFields = ReceiptIssueFields & {
     readonly vendor: string | null;
     readonly purchaseDate: string | null;
     readonly printedMilliunits: number | null;
     readonly rawText: string | null;
-    readonly extractJson: string | null;
-    readonly transactionId: string | null;
 };
 
 /**
@@ -62,6 +68,9 @@ export function receiptMatchesSearch(receipt: ReceiptFilterFields, search: Recei
         return false;
     }
     if (search.bound === 'unbound' && receipt.transactionId) {
+        return false;
+    }
+    if (search.issue && !receiptHasIssue(receipt, search.issue)) {
         return false;
     }
     const terms = search.q?.trim() ? search.q.trim().toLowerCase().split(/\s+/) : [];

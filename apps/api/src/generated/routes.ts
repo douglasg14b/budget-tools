@@ -124,6 +124,16 @@ const models: TsoaRoute.Models = {
         "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["bound"]},{"dataType":"enum","enums":["unbound"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ReceiptIssue": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["unreadable"]},{"dataType":"enum","enums":["needs-look"]},{"dataType":"enum","enums":["flagged"]},{"dataType":"enum","enums":["extracting"]},{"dataType":"enum","enums":["bind-ambiguous"]},{"dataType":"enum","enums":["bind-not-confirmed"]},{"dataType":"enum","enums":["bind-jev-unavailable"]},{"dataType":"enum","enums":["bind-no-charge"]}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "ReceiptIssueFilter": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["any"]},{"ref":"ReceiptIssue"}],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "CreateReceiptDto": {
         "dataType": "refAlias",
         "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"transactionId":{"dataType":"string"},"processed":{"dataType":"string"},"frames":{"dataType":"array","array":{"dataType":"string"},"required":true}},"validators":{}},
@@ -797,6 +807,7 @@ export function RegisterRoutes(app: Router) {
                 q: {"in":"query","name":"q","dataType":"string"},
                 reimbursable: {"in":"query","name":"reimbursable","dataType":"boolean"},
                 bound: {"in":"query","name":"bound","ref":"ReceiptBoundFilter"},
+                issue: {"in":"query","name":"issue","ref":"ReceiptIssueFilter"},
         };
         app.get('/api/receipts',
             ...(fetchMiddlewares<RequestHandler>(ReceiptsController)),

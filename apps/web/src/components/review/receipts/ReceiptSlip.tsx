@@ -1,4 +1,4 @@
-import type { ReceiptExtractStatus } from '@budget-tools/web-sdk';
+import type { ReceiptBindCheckOutcome, ReceiptExtractStatus } from '@budget-tools/web-sdk';
 import { Link, useLocation } from 'react-router-dom';
 
 import { formatTransactionDate } from '../formatTransactionDate';
@@ -6,6 +6,7 @@ import { formatYnabAmount } from '../formatYnabAmount';
 import { parseReceiptExtract } from './parseReceiptExtract';
 import classes from './ReceiptSlip.module.css';
 import { receiptExtractCopy } from './receiptExtractCopy';
+import { receiptIssueNotes } from './receiptIssues';
 import { RECEIPTS_INBOX_FROM_STATE } from './receiptsInboxBack';
 
 export type InboxSlipModel = {
@@ -18,6 +19,8 @@ export type InboxSlipModel = {
     readonly transactionId: string | null;
     readonly imageSrc: string | null;
     readonly extractJson: string | null;
+    /** Absent on Practice receipts, which never auto-bind. */
+    readonly bindCheckOutcome?: ReceiptBindCheckOutcome | null;
 };
 
 type ReceiptSlipProps = {
@@ -50,6 +53,11 @@ export function ReceiptSlip({ slip }: ReceiptSlipProps) {
                     ) : null}
                 </span>
                 <span className={classes.status}>{receiptExtractCopy(slip)}</span>
+                {receiptIssueNotes(slip).map((note) => (
+                    <span key={note} className={classes.issue}>
+                        {note}
+                    </span>
+                ))}
                 {reimbursable ? (
                     <span className={classes.reimbursable}>
                         {reimbursable.amountMilliunits != null

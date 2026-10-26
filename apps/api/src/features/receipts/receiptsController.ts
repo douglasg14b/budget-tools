@@ -43,6 +43,7 @@ import {
     toReceiptMatchDto,
 } from './lookupReceiptMatch';
 import { patchReceipt as patchReceiptRow } from './patchReceipt';
+import type { ReceiptIssueFilter } from './receiptIssues';
 import { decodeReceiptCursor, encodeReceiptCursor } from './receiptListCursor';
 import type { ReceiptBoundFilter, ReceiptListFilter } from './receiptMatchesFilter';
 import { receiptMatchesFilter } from './receiptMatchesFilter';
@@ -94,6 +95,7 @@ export class ReceiptsController {
      * @param q Case-insensitive substring filter over vendor, date, total, extracted lines, and the reimbursable note; every term must match
      * @param reimbursable Only receipts marked reimbursable
      * @param bound Only receipts bound to a transaction, or only unbound ones
+     * @param issue Only receipts with this problem; `any` leaves out the waiting states (`extracting`, `bind-no-charge`)
      * @summary listReceipts
      */
     @Response(400, 'Invalid page')
@@ -104,8 +106,9 @@ export class ReceiptsController {
         @Query() q?: string,
         @Query() reimbursable?: boolean,
         @Query() bound?: ReceiptBoundFilter,
+        @Query() issue?: ReceiptIssueFilter,
     ): Promise<ReceiptsDto> {
-        const filter: ReceiptListFilter = { q, reimbursable, bound };
+        const filter: ReceiptListFilter = { q, reimbursable, bound, issue };
         if (limit === undefined) {
             const receipts = (await listReceiptRows()).filter((row) => receiptMatchesFilter(row, filter));
             return { receipts: await Promise.all(receipts.map(toReceiptDto)), nextCursor: null };

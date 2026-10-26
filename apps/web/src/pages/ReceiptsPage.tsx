@@ -38,7 +38,7 @@ export function ReceiptsPage() {
         [setSearchParams],
     );
     const clearFilters = useCallback(() => {
-        updateSearch({ q: undefined, reimbursable: false, bound: undefined });
+        updateSearch({ q: undefined, reimbursable: false, bound: undefined, issue: undefined });
     }, [updateSearch]);
 
     return (

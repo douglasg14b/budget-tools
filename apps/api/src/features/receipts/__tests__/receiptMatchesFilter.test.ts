@@ -10,6 +10,9 @@ const base: ReceiptFilterFields = {
     rawText: 'Kirkland Paper Towels 21.99\nTax 1.20',
     extractJson: JSON.stringify({ lines: [] }),
     transactionId: null,
+    extractStatus: 'gated',
+    totalsDisagree: false,
+    bindCheckOutcome: null,
 };
 
 const reimbursable: ReceiptFilterFields = {
@@ -37,6 +40,15 @@ describe('receiptMatchesFilter', () => {
         expect(receiptMatchesFilter(base, { bound: 'bound' })).toBe(false);
         expect(receiptMatchesFilter(base, { bound: 'unbound' })).toBe(true);
         expect(receiptMatchesFilter(bound, { bound: 'unbound' })).toBe(false);
+    });
+
+    it('keeps only receipts with the chosen issue, alongside the other chips', () => {
+        const failed = { ...base, extractStatus: 'failed' as const };
+        expect(receiptFilterActive({ issue: 'any' })).toBe(true);
+        expect(receiptMatchesFilter(failed, { issue: 'unreadable' })).toBe(true);
+        expect(receiptMatchesFilter(base, { issue: 'unreadable' })).toBe(false);
+        expect(receiptMatchesFilter(failed, { issue: 'any', bound: 'bound' })).toBe(false);
+        expect(receiptMatchesFilter(failed, { issue: 'any', q: 'walmart' })).toBe(false);
     });
 
     it('needs every search term somewhere in vendor, date, total, lines, or the note', () => {

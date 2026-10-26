@@ -426,6 +426,34 @@
 					"unbound"
 				]
 			},
+			"ReceiptIssue": {
+				"type": "string",
+				"enum": [
+					"unreadable",
+					"needs-look",
+					"flagged",
+					"extracting",
+					"bind-ambiguous",
+					"bind-not-confirmed",
+					"bind-jev-unavailable",
+					"bind-no-charge"
+				],
+				"description": "Something stored on a receipt that says it needs a person. Each is a recorded fact, never a guess:\n- `unreadable`: the extract failed (vendor, date, or total missing).\n- `needs-look`: the extract finished but its amounts don't add up, or the two printed reads disagree.\n- `flagged`: the extract finished but a step errored or the verify pass flagged it.\n- `extracting`: the extract hasn't finished.\n- `bind-*`: unbound, and the last auto-bind check stopped for this reason."
+			},
+			"ReceiptIssueFilter": {
+				"anyOf": [
+					{
+						"$ref": "#/components/schemas/ReceiptIssue"
+					},
+					{
+						"type": "string",
+						"enum": [
+							"any"
+						]
+					}
+				],
+				"description": "`any` is every issue except the ones a fresh receipt has while it waits: extracting and no charge yet."
+			},
 			"CreateReceiptDto": {
 				"properties": {
 					"transactionId": {
@@ -2898,6 +2926,15 @@
 						"required": false,
 						"schema": {
 							"$ref": "#/components/schemas/ReceiptBoundFilter"
+						}
+					},
+					{
+						"description": "Only receipts with this problem; `any` leaves out the waiting states (`extracting`, `bind-no-charge`)",
+						"in": "query",
+						"name": "issue",
+						"required": false,
+						"schema": {
+							"$ref": "#/components/schemas/ReceiptIssueFilter"
 						}
 					}
 				]

@@ -2,7 +2,7 @@ import type { ReceiptDto } from '@budget-tools/web-sdk';
 
 export type ReceiptBindStatus = Pick<ReceiptDto, 'bindSource' | 'bindJevScore' | 'bindCheckedAt' | 'bindCheckOutcome'>;
 
-const CHECK_OUTCOME_COPY: Record<NonNullable<ReceiptDto['bindCheckOutcome']>, string> = {
+export const CHECK_OUTCOME_COPY: Record<NonNullable<ReceiptDto['bindCheckOutcome']>, string> = {
     bound: 'bound it',
     'no-candidate': 'no charge with this exact total yet',
     'not-confirmed': 'a charge matched the total, but Jev did not confirm it',

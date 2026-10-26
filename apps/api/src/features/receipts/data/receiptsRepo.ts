@@ -139,8 +139,8 @@ const FILTERED_SCAN_BATCH = 200;
  * One page of the newest-first list. Keyset on (createdAt, id), so receipts captured while
  * someone scrolls only show up on the first page instead of shifting later pages.
  *
- * A filter is applied in memory, scanning batches until the page fills: the reimbursable mark
- * lives inside the extract JSON, and this way it reads exactly as the inbox badge does.
+ * A filter is applied in memory, scanning batches until the page fills: the reimbursable mark and
+ * the read errors and flags live inside the extract JSON, and this way they read exactly as the inbox does.
  */
 export async function listReceiptsPage(
     input: { readonly limit: number; readonly after?: ReceiptListCursor; readonly filter?: ReceiptListFilter },

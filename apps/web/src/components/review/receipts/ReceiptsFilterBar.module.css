@@ -10,6 +10,10 @@
     align-items: stretch;
 }
 
+.issue {
+    min-width: 15rem;
+}
+
 .chips {
     display: flex;
     flex-wrap: wrap;
@@ -45,6 +49,10 @@
 
 .chip[data-chip="reimbursable"] {
     --chip-color: var(--app-tier-suggested);
+}
+
+.chip[data-chip="attention"] {
+    --chip-color: var(--app-tier-review);
 }
 
 .chip[data-chip="bound"] {
