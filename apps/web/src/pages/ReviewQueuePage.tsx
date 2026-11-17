@@ -92,7 +92,17 @@ export function ReviewQueuePage() {
             >
                 <div className={classes.list}>
                     {visibleItems.map((item) => (
-                        <QueueItemCard key={item.transaction.id} item={item} />
+                        <QueueItemCard
+                            key={item.transaction.id}
+                            item={item}
+                            classifyTo={{
+                                pathname: '/classify',
+                                search: serializeQueueSearchParams({
+                                    ...search,
+                                    transactionId: item.transaction.id,
+                                }).toString(),
+                            }}
+                        />
                     ))}
                     <QueuePrefetchSentinel
                         enabled={queueQuery.data?.hasMore === true}

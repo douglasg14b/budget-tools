@@ -2,6 +2,7 @@ import type { CategorizationQueueItemDto } from '@budget-tools/web-sdk';
 import { Collapse, UnstyledButton } from '@mantine/core';
 import { IconChevronDown } from '@tabler/icons-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { FlagChips } from './FlagChips';
 import { formatConfidence } from './formatConfidence';
@@ -16,9 +17,11 @@ import { TierBadge } from './TierBadge';
 
 type QueueItemCardProps = {
     item: CategorizationQueueItemDto;
+    /** Where the card opens this transaction for classifying (keeps the queue's filters and search). */
+    classifyTo: { pathname: string; search: string };
 };
 
-export function QueueItemCard({ item }: QueueItemCardProps) {
+export function QueueItemCard({ item, classifyTo }: QueueItemCardProps) {
     const [expanded, setExpanded] = useState(false);
     const { transaction, proposal } = item;
     if (!proposal) {
@@ -40,7 +43,11 @@ export function QueueItemCard({ item }: QueueItemCardProps) {
                 {formatTransactionDate(transaction.date)}
             </time>
             <div className={classes.payeeBlock}>
-                <p className={classes.payee}>{payee}</p>
+                <p className={classes.payee}>
+                    <Link className={classes.openLink} to={classifyTo}>
+                        {payee}
+                    </Link>
+                </p>
                 {rename ? <p className={classes.rename}>Suggested payee: {rename.name}</p> : null}
                 {memoLine ? <p className={classes.meta}>{memoLine}</p> : null}
                 {transaction.categoryName ? <p className={classes.meta}>Currently {transaction.categoryName}</p> : null}
