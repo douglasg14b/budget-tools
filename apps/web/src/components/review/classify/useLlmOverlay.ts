@@ -63,9 +63,11 @@ export function useLlmOverlay({
     usePrefetchOverlay(prefetchPrevious, 'prefetch-previous');
     usePrefetchOverlay(prefetchNext, 'prefetch-next');
 
-    const overlay = currentQuery.data;
-    const item =
-        current && overlay && !receiptSkipsLlmSuggest(receiptSkip) ? applyLlmOverlay(current, overlay) : current;
+    // An explicit retry is the user asking for the LLM, so it shows even when a bound receipt makes the
+    // automatic suggestion skip. The automatic result stays hidden in that case.
+    const retried = retryMutation.data?.transactionId === currentTransactionId ? retryMutation.data : undefined;
+    const overlay = retried ?? (receiptSkipsLlmSuggest(receiptSkip) ? undefined : currentQuery.data);
+    const item = current && overlay ? applyLlmOverlay(current, overlay) : current;
 
     return {
         errorMessage: currentQuery.isError ? formatLlmError(currentQuery.error) : null,
