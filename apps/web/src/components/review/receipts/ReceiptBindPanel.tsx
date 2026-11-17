@@ -1,5 +1,5 @@
 import type { ReceiptBindCandidateDto, ReceiptMatchDto } from '@budget-tools/web-sdk';
-import { Button } from '@mantine/core';
+import { Button, NativeSelect } from '@mantine/core';
 import { useMemo, useState } from 'react';
 
 import { formatTransactionDate } from '../formatTransactionDate';
@@ -9,6 +9,7 @@ import { filterBindCandidates } from './filterBindCandidates';
 import classes from './ReceiptBindPanel.module.css';
 import type { ReceiptBindStatus } from './receiptBindStatusCopy';
 import { describeBoundSource, describeLastBindCheck } from './receiptBindStatusCopy';
+import { emptySearchCopy, limitSearchHits, RECEIPT_SEARCH_RANGES } from './receiptSearchRange';
 
 type ReceiptBindPanelProps = {
     readonly asking: boolean;
@@ -17,10 +18,14 @@ type ReceiptBindPanelProps = {
     /** Live only: who bound it and what the background binder last concluded. */
     readonly bindStatus: ReceiptBindStatus | null;
     readonly error: string | null;
+    /** Days past the receipt date the charge search reaches; 0 is the default window. */
+    readonly extraDays: number;
+    readonly hasPurchaseDate: boolean;
     readonly live: boolean;
     readonly match: ReceiptMatchDto | undefined;
     readonly onBind: (transactionId: string) => void;
     readonly onDetach: () => void;
+    readonly onExtraDaysChange: (extraDays: number) => void;
 };
 
 export function ReceiptBindPanel({
@@ -29,10 +34,13 @@ export function ReceiptBindPanel({
     boundTransactionId,
     bindStatus,
     error,
+    extraDays,
+    hasPurchaseDate,
     live,
     match,
     onBind,
     onDetach,
+    onExtraDaysChange,
 }: ReceiptBindPanelProps) {
     const boundSource = bindStatus ? describeBoundSource(bindStatus) : null;
     const lastCheck = bindStatus && !boundTransactionId ? describeLastBindCheck(bindStatus) : null;
@@ -43,6 +51,7 @@ export function ReceiptBindPanel({
         return candidates.filter((row) => closeIds.has(row.id));
     }, [candidates, match?.closeMatches]);
     const searchHits = useMemo(() => filterBindCandidates(candidates, query), [candidates, query]);
+    const visibleHits = useMemo(() => limitSearchHits(searchHits, query), [searchHits, query]);
     const bound = candidates.find((row) => row.id === boundTransactionId);
     const exactFailed = Boolean(match && !match.autoBind && !boundTransactionId);
 
@@ -100,16 +109,30 @@ export function ReceiptBindPanel({
                     <h3 id="search-bind-title" className={classes.heading}>
                         Search charges
                     </h3>
+                    <NativeSelect
+                        label="Date range"
+                        description={
+                            hasPurchaseDate
+                                ? 'Widen this if the receipt date is wrong.'
+                                : 'This receipt has no date. Widen this to search around when it was captured.'
+                        }
+                        data={RECEIPT_SEARCH_RANGES.map((range) => ({
+                            value: String(range.extraDays),
+                            label: range.label,
+                        }))}
+                        value={String(extraDays)}
+                        onChange={(event) => {
+                            onExtraDaysChange(Number(event.currentTarget.value));
+                        }}
+                    />
                     <QueueSearchInput value={query} onChange={setQuery} />
                     {searchHits.length === 0 ? (
                         <p className={classes.quiet}>
-                            {candidates.length === 0
-                                ? 'No charges in the receipt date window yet.'
-                                : 'No charges match that search.'}
+                            {emptySearchCopy({ candidateCount: candidates.length, extraDays, hasPurchaseDate })}
                         </p>
                     ) : (
                         <ul className={classes.list}>
-                            {searchHits.map((row) => (
+                            {visibleHits.rows.map((row) => (
                                 <li key={row.id}>
                                     <CandidateRow candidate={row} />
                                     <Button
@@ -126,6 +149,11 @@ export function ReceiptBindPanel({
                             ))}
                         </ul>
                     )}
+                    {visibleHits.hidden > 0 ? (
+                        <p className={classes.quiet}>
+                            {visibleHits.hidden} more charges not shown. Search to narrow the list.
+                        </p>
+                    ) : null}
                 </section>
             ) : null}
 

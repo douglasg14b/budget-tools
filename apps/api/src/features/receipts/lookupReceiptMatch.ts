@@ -1,4 +1,5 @@
 import type { AppDatabaseClient } from '../../data-persistence/database';
+import { utcTodayIso } from '../amazonOrders/isoDate';
 import type { TransactionDetailDto } from '../categorization/categorizationDtos';
 import { listTransactionsByIds } from '../categorization/listTransactionsByIds';
 import { HttpError, NotFoundError } from '../travelWindows/HttpError';
@@ -9,6 +10,7 @@ import { listTransactionsForReceiptMatch } from './listTransactionsForReceiptMat
 import type { BankTransactionMatchKeys, ReceiptMatchKeys, ReceiptTransactionMatch } from './matchReceipts';
 import { matchReceiptsToTransaction, matchTransactionsToReceipt } from './matchReceipts';
 import { paymentDateWindow } from './paymentDateWindow';
+import { parseReceiptSearchExtraDays } from './receiptSearchRange';
 import type {
     MatchPreviewDto,
     MatchPreviewTransactionDto,
@@ -24,7 +26,13 @@ export type ReceiptLookupResult = ReceiptTransactionMatch & {
     readonly splitDraft: ReceiptSplitDraftDto | null;
 };
 
-export type ListReceiptMatchTransactions = (purchaseDate: string) => Promise<readonly TransactionDetailDto[]>;
+export type ListReceiptMatchTransactions = (
+    anchorDate: string,
+    extraDays: number,
+) => Promise<readonly TransactionDetailDto[]>;
+
+const listWindowForReceiptMatch: ListReceiptMatchTransactions = (anchorDate, extraDays) =>
+    listTransactionsForReceiptMatch(anchorDate, undefined, extraDays);
 
 export function toReceiptMatchDto(match: ReceiptLookupResult): ReceiptMatchDto {
     return {
@@ -124,26 +132,48 @@ export async function lookupByTransaction(transactionId: string, db?: AppDatabas
 
 /**
  * Live receipt row plus Postgres window. Does not start extract.
- * Missing purchaseDate (extract not ready) yields no bank candidates — not an HTTP error.
+ * `extraDays` widens only the search list: matching and auto-bind still judge the default window.
+ * Without a purchaseDate there is nothing to anchor on, so the list stays empty until the user
+ * widens it — then it centres on the day the receipt was captured. Not an HTTP error either way.
  */
-export async function lookupByReceipt(receiptId: string, db?: AppDatabaseClient): Promise<ReceiptLookupResult> {
+export async function lookupByReceipt(
+    receiptId: string,
+    db?: AppDatabaseClient,
+    extraDays = 0,
+): Promise<ReceiptLookupResult> {
     await assertReceiptLiveLookupAllowed(db);
     const receipt = await requireReceipt(receiptId, db);
+    const anchor = receipt.purchaseDate ?? (extraDays > 0 ? receipt.createdAt.slice(0, 10) : null);
+    const windowed = anchor ? await listTransactionsForReceiptMatch(anchor, undefined, extraDays) : [];
+    // A bound charge can sit outside the window (picked via a widened search, or a wrong receipt
+    // date); keep it listed so the panel still shows what the receipt is bound to.
+    const transactions = await withBoundTransaction(windowed, receipt.transactionId);
     if (!receipt.purchaseDate) {
         return withCandidates(
             matchTransactionsToReceipt({
                 receipt: receiptRowToMatchKeys(receipt),
                 transactions: [],
             }),
+            transactions,
         );
     }
-    const transactions = await listTransactionsForReceiptMatch(receipt.purchaseDate);
     const match = matchTransactionsToReceipt({
         receipt: receiptRowToMatchKeys(receipt),
         transactions: transactions.map(transactionDetailToMatchKeys),
     });
     const bank = transactions.find((row) => row.id === (match.exactTransactionId ?? receipt.transactionId));
     return withCandidates(match, transactions, await splitDraftFor(receipt, bank?.amount ?? null));
+}
+
+async function withBoundTransaction(
+    transactions: readonly TransactionDetailDto[],
+    boundTransactionId: string | null,
+): Promise<readonly TransactionDetailDto[]> {
+    if (!boundTransactionId || transactions.some((row) => row.id === boundTransactionId)) {
+        return transactions;
+    }
+    const [bound] = await listTransactionsByIds([boundTransactionId]);
+    return bound ? [...transactions, bound] : transactions;
 }
 
 function previewTransactionSource(
@@ -170,7 +200,7 @@ function previewTransactionSource(
  */
 export async function matchPreview(
     body: MatchPreviewDto,
-    listWindowTransactions: ListReceiptMatchTransactions = listTransactionsForReceiptMatch,
+    listWindowTransactions: ListReceiptMatchTransactions = listWindowForReceiptMatch,
 ): Promise<ReceiptLookupResult> {
     if (body.receipts.length === 0) {
         throw new HttpError(400, 'match-preview requires at least one receipt');
@@ -203,15 +233,19 @@ export async function matchPreview(
     if (body.receipts.length !== 1 || !only) {
         throw new HttpError(400, 'receipt-toward-bank match-preview requires exactly one receipt');
     }
+    const extraDays = parseReceiptSearchExtraDays(body.extraDays);
+    // A session receipt has no capture time, so a dateless one centres a widened search on today.
+    const anchor = only.purchaseDate ?? (extraDays > 0 ? utcTodayIso() : null);
     if (!only.purchaseDate) {
         return withCandidates(
             matchTransactionsToReceipt({
                 receipt: receiptRowToMatchKeys(only),
                 transactions: [],
             }),
+            anchor ? await listWindowTransactions(anchor, extraDays) : [],
         );
     }
-    const transactions = await listWindowTransactions(only.purchaseDate);
+    const transactions = await listWindowTransactions(only.purchaseDate, extraDays);
     const match = matchTransactionsToReceipt({
         receipt: receiptRowToMatchKeys(only),
         transactions: transactions.map(transactionDetailToMatchKeys),

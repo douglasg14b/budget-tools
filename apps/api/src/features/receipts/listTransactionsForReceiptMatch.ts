@@ -6,7 +6,8 @@ import { isAmazonTransaction } from '../amazonClassify/isAmazonTransaction';
 import type { TransactionDetailDto } from '../categorization/categorizationDtos';
 import { mapTransactionDetail, TRANSACTION_DETAIL_COLUMNS } from '../categorization/mapTransactionDetail';
 import type { IsoDateWindow } from './paymentDateWindow';
-import { bankDateWindowForPurchaseDate } from './paymentDateWindow';
+import { widenedBankDateWindow } from './paymentDateWindow';
+import { RECEIPT_SEARCH_MAX_ROWS } from './receiptSearchRange';
 
 export const RECEIPT_MATCH_CLEARED_STATUSES = ['cleared', 'reconciled'] as const;
 
@@ -22,12 +23,12 @@ export type ReceiptMatchTransactionCriteria = {
  * purchase-date window. Household matching is intentionally cross-account: receipt rows have
  * no YNAB account id.
  */
-export function receiptMatchTransactionCriteria(purchaseDate: string): ReceiptMatchTransactionCriteria {
+export function receiptMatchTransactionCriteria(purchaseDate: string, extraDays = 0): ReceiptMatchTransactionCriteria {
     return {
         deleted: false,
         transferAccountId: null,
         cleared: RECEIPT_MATCH_CLEARED_STATUSES,
-        window: bankDateWindowForPurchaseDate(purchaseDate),
+        window: widenedBankDateWindow(purchaseDate, extraDays),
     };
 }
 
@@ -40,13 +41,15 @@ export function excludeAmazonTransactions(transactions: readonly TransactionDeta
 
 /**
  * Cleared non-transfer ledger rows in the receipt's inverted bank window, including already categorized.
- * Does not use the pending-only queue filter.
+ * Does not use the pending-only queue filter. `extraDays` widens the window for manual search only;
+ * the auto-binder leaves it at 0.
  */
 export async function listTransactionsForReceiptMatch(
     purchaseDate: string,
     database: DatabaseClient = getDatabase(),
+    extraDays = 0,
 ): Promise<TransactionDetailDto[]> {
-    const criteria = receiptMatchTransactionCriteria(purchaseDate);
+    const criteria = receiptMatchTransactionCriteria(purchaseDate, extraDays);
     const rows = await database
         .selectFrom('transactions')
         .select([...TRANSACTION_DETAIL_COLUMNS])
@@ -57,6 +60,7 @@ export async function listTransactionsForReceiptMatch(
         .where(sql<boolean>`date::date <= ${criteria.window.latestDate}::date`)
         .orderBy('date', 'desc')
         .orderBy('id', 'asc')
+        .limit(RECEIPT_SEARCH_MAX_ROWS)
         .execute();
     return excludeAmazonTransactions(rows.map(mapTransactionDetail));
 }

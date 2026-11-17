@@ -47,12 +47,15 @@ type ReceiptDetailProps = {
     readonly saveError: string | null;
     readonly saveEpoch: number;
     readonly saving: boolean;
+    /** Days past the receipt date the charge search reaches; 0 is the default window. */
+    readonly searchExtraDays: number;
     readonly onBack: () => void;
     readonly onBind: (transactionId: string) => void;
     readonly onDelete: () => void;
     readonly onDetach: () => void;
     readonly onRetry: () => void;
     readonly onSave: (edit: ReceiptExtractEdit) => void;
+    readonly onSearchExtraDaysChange: (extraDays: number) => void;
 };
 
 export function ReceiptDetail({
@@ -70,12 +73,14 @@ export function ReceiptDetail({
     saveError,
     saveEpoch,
     saving,
+    searchExtraDays,
     onBack,
     onBind,
     onDelete,
     onDetach,
     onRetry,
     onSave,
+    onSearchExtraDaysChange,
 }: ReceiptDetailProps) {
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [rawOpen, setRawOpen] = useState(false);
@@ -212,10 +217,13 @@ export function ReceiptDetail({
                             boundTransactionId={receipt.transactionId}
                             bindStatus={receipt.bindStatus}
                             error={null}
+                            extraDays={searchExtraDays}
+                            hasPurchaseDate={Boolean(receipt.purchaseDate)}
                             live={live}
                             match={match}
                             onBind={onBind}
                             onDetach={onDetach}
+                            onExtraDaysChange={onSearchExtraDaysChange}
                         />
                     </section>
 

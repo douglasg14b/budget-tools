@@ -236,6 +236,10 @@ export type MatchPreviewTransactionDto = {
 };
 
 export type MatchPreviewDto = {
+    /**
+     * Receipt-only preview: widen the listed charges by this many days either side (0, 14, 30, 90 or 365).
+     */
+    extraDays?: number;
     transaction?: MatchPreviewTransactionDto;
     transactionId?: string;
     receipts: Array<MatchPreviewReceiptDto>;
@@ -1041,11 +1045,19 @@ export type LookupByReceiptData = {
     path?: never;
     query: {
         receiptId: string;
+        /**
+         * Widen the listed charges by this many days either side of the receipt date (0, 14, 30, 90 or 365). Matching and auto-bind ignore it.
+         */
+        extraDays?: number;
     };
     url: '/receipts/lookup-by-receipt';
 };
 
 export type LookupByReceiptErrors = {
+    /**
+     * Invalid extraDays
+     */
+    400: unknown;
     /**
      * Practice mode
      */

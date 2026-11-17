@@ -27,6 +27,7 @@ import type { ReceiptExtractEdit } from '../components/review/receipts/applyRece
 import { applyPracticeReceiptExtractEdit } from '../components/review/receipts/applyReceiptExtractEdit';
 import type { ReceiptDetailModel } from '../components/review/receipts/ReceiptDetail';
 import { ReceiptDetail } from '../components/review/receipts/ReceiptDetail';
+import { DEFAULT_RECEIPT_SEARCH_EXTRA_DAYS } from '../components/review/receipts/receiptSearchRange';
 import { isFromReceiptsInbox, receiptsInboxBackTarget } from '../components/review/receipts/receiptsInboxBack';
 import type { OperatingMode } from '../operatingMode/operatingModeCopy';
 import classes from './ReceiptsPage.module.css';
@@ -61,24 +62,36 @@ export function ReceiptDetailPage() {
           : null;
     const missing = live ? receiptQuery.isError : Boolean(receiptId) && !sessionReceipt;
 
+    // Kept across a bind (Practice has no stored binding to re-list a charge outside the default
+    // window) and reset per receipt.
+    const [searchExtraDays, setSearchExtraDays] = useState(DEFAULT_RECEIPT_SEARCH_EXTRA_DAYS);
+
     const lookupQuery = useQuery({
-        ...lookupByReceiptOptions({ query: { receiptId } }),
+        // Omitted at 0 so the default request and its query key stay exactly as before.
+        ...lookupByReceiptOptions({
+            query: searchExtraDays > 0 ? { receiptId, extraDays: searchExtraDays } : { receiptId },
+        }),
         enabled: live && Boolean(receipt?.id),
         staleTime: 5_000,
         refetchOnWindowFocus: false,
+        // Changing the range refetches; keep the old list (and the range picker) on screen meanwhile.
+        placeholderData: (previous, previousQuery) =>
+            previousQuery && queryKeyIsForReceipt(previousQuery.queryKey, receiptId) ? previous : undefined,
     });
 
     const practiceMatchQuery = useQuery({
-        queryKey: ['receipts', 'match-preview-by-receipt', receiptId || 'none'],
+        queryKey: ['receipts', 'match-preview-by-receipt', receiptId || 'none', searchExtraDays],
         queryFn: ({ signal }) => {
             if (!sessionReceipt) {
                 throw new Error('Match preview requires a session receipt');
             }
-            return fetchReceiptTowardBank(sessionReceipt, signal);
+            return fetchReceiptTowardBank(sessionReceipt, searchExtraDays, signal);
         },
         enabled: !live && Boolean(sessionReceipt),
         staleTime: 5_000,
         refetchOnWindowFocus: false,
+        placeholderData: (previous, previousQuery) =>
+            previousQuery && queryKeyIsForReceipt(previousQuery.queryKey, receiptId) ? previous : undefined,
     });
 
     const match = live ? lookupQuery.data : practiceMatchQuery.data;
@@ -140,6 +153,7 @@ export function ReceiptDetailPage() {
     useEffect(() => {
         bindAttempted.current = null;
         setPracticeSaveError(null);
+        setSearchExtraDays(DEFAULT_RECEIPT_SEARCH_EXTRA_DAYS);
     }, [receiptId]);
 
     // Live: opening an unbound, fully read receipt asks the server to auto-bind it now (exact amount +
@@ -284,12 +298,14 @@ export function ReceiptDetailPage() {
                 saveError={practiceSaveError ?? formatDetailError(patchMutation.error)}
                 saveEpoch={saveEpoch}
                 saving={patchMutation.isPending}
+                searchExtraDays={searchExtraDays}
                 onBack={goToInbox}
                 onBind={bindTo}
                 onDelete={remove}
                 onDetach={detach}
                 onRetry={retryExtract}
                 onSave={saveExtract}
+                onSearchExtraDaysChange={setSearchExtraDays}
             />
         </div>
     );
@@ -338,9 +354,18 @@ function modelFromPractice(row: PracticeReceipt): ReceiptDetailModel {
     };
 }
 
-async function fetchReceiptTowardBank(receipt: PracticeReceipt, signal?: AbortSignal): Promise<ReceiptMatchDto> {
+/** True when a cached query key was built for this receipt, so its data may stand in while a refetch runs. */
+function queryKeyIsForReceipt(queryKey: readonly unknown[], receiptId: string): boolean {
+    return receiptId !== '' && JSON.stringify(queryKey).includes(JSON.stringify(receiptId));
+}
+
+async function fetchReceiptTowardBank(
+    receipt: PracticeReceipt,
+    extraDays: number,
+    signal?: AbortSignal,
+): Promise<ReceiptMatchDto> {
     const result = await Receipts.request5({
-        body: { receipts: [toMatchPreviewReceipt(receipt)] },
+        body: { receipts: [toMatchPreviewReceipt(receipt)], ...(extraDays > 0 ? { extraDays } : {}) },
         signal,
         throwOnError: true,
     });

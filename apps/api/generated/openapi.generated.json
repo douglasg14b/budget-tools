@@ -757,6 +757,11 @@
 			},
 			"MatchPreviewDto": {
 				"properties": {
+					"extraDays": {
+						"type": "number",
+						"format": "double",
+						"description": "Receipt-only preview: widen the listed charges by this many days either side (0, 14, 30, 90 or 365)."
+					},
 					"transaction": {
 						"$ref": "#/components/schemas/MatchPreviewTransactionDto"
 					},
@@ -3032,6 +3037,9 @@
 							}
 						}
 					},
+					"400": {
+						"description": "Invalid extraDays"
+					},
 					"403": {
 						"description": "Practice mode"
 					},
@@ -3051,6 +3059,16 @@
 						"required": true,
 						"schema": {
 							"type": "string"
+						}
+					},
+					{
+						"description": "Widen the listed charges by this many days either side of the receipt date (0, 14, 30, 90 or 365). Matching and auto-bind ignore it.",
+						"in": "query",
+						"name": "extraDays",
+						"required": false,
+						"schema": {
+							"format": "double",
+							"type": "number"
 						}
 					}
 				]

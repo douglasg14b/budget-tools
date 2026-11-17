@@ -147,4 +147,6 @@ export type MatchPreviewDto = {
     receipts: MatchPreviewReceiptDto[];
     transactionId?: string;
     transaction?: MatchPreviewTransactionDto;
+    /** Receipt-only preview: widen the listed charges by this many days either side (0, 14, 30, 90 or 365). */
+    extraDays?: number;
 };

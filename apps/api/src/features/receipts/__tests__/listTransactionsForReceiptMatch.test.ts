@@ -52,4 +52,19 @@ describe('receiptMatchTransactionCriteria', () => {
         });
         expect(criteria.window).toEqual({ earliestDate: '2026-02-04', latestDate: '2026-02-10' });
     });
+
+    it('widens to a superset of the default window and never shrinks it', () => {
+        expect(receiptMatchTransactionCriteria('2026-02-05', 0).window).toEqual(
+            receiptMatchTransactionCriteria('2026-02-05').window,
+        );
+        expect(receiptMatchTransactionCriteria('2026-02-05', 30).window).toEqual({
+            earliestDate: '2026-01-06',
+            latestDate: '2026-03-07',
+        });
+        // A range narrower than the default asymmetric window still keeps the default's far edge.
+        expect(receiptMatchTransactionCriteria('2026-02-05', 2).window).toEqual({
+            earliestDate: '2026-02-03',
+            latestDate: '2026-02-10',
+        });
+    });
 });

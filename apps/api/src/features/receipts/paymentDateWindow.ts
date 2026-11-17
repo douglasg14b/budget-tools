@@ -25,6 +25,24 @@ export function bankDateWindowForPurchaseDate(purchaseDate: string): IsoDateWind
     };
 }
 
+/**
+ * The default bank window for `purchaseDate`, grown to at least `extraDays` on either side.
+ * Always a superset of `bankDateWindowForPurchaseDate`, so `0` leaves it unchanged. Used only to
+ * list search candidates; the matcher still judges each pair against the strict window.
+ */
+export function widenedBankDateWindow(purchaseDate: string, extraDays: number): IsoDateWindow {
+    const base = bankDateWindowForPurchaseDate(purchaseDate);
+    if (extraDays <= 0) {
+        return base;
+    }
+    const earliest = addIsoDays(purchaseDate, -extraDays);
+    const latest = addIsoDays(purchaseDate, extraDays);
+    return {
+        earliestDate: earliest < base.earliestDate ? earliest : base.earliestDate,
+        latestDate: latest > base.latestDate ? latest : base.latestDate,
+    };
+}
+
 export function isDateInPaymentWindow(purchaseDate: string, bankDate: string): boolean {
     const window = paymentDateWindow(bankDate);
     return purchaseDate >= window.earliestDate && purchaseDate <= window.latestDate;

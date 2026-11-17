@@ -47,6 +47,7 @@ import type { ReceiptIssueFilter } from './receiptIssues';
 import { decodeReceiptCursor, encodeReceiptCursor } from './receiptListCursor';
 import type { ReceiptBoundFilter, ReceiptListFilter } from './receiptMatchesFilter';
 import { receiptMatchesFilter } from './receiptMatchesFilter';
+import { parseReceiptSearchExtraDays } from './receiptSearchRange';
 import type {
     BindReceiptDto,
     CreateReceiptDto,
@@ -156,13 +157,16 @@ export class ReceiptsController {
     }
 
     /**
+     * @param extraDays Widen the listed charges by this many days either side of the receipt date (0, 14, 30, 90 or 365). Matching and auto-bind ignore it.
      * @summary lookupByReceipt
      */
+    @Response(400, 'Invalid extraDays')
     @Response(403, 'Practice mode')
     @Response(404, 'Not found')
     @Get('lookup-by-receipt')
-    public async lookupByReceipt(@Query() receiptId: string): Promise<ReceiptMatchDto> {
-        return toReceiptMatchDto(await lookupReceiptRow(receiptId));
+    public async lookupByReceipt(@Query() receiptId: string, @Query() extraDays?: number): Promise<ReceiptMatchDto> {
+        const days = parseReceiptSearchExtraDays(extraDays);
+        return toReceiptMatchDto(await lookupReceiptRow(receiptId, undefined, days));
     }
 
     /**

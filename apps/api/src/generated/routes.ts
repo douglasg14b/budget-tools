@@ -191,7 +191,7 @@ const models: TsoaRoute.Models = {
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "MatchPreviewDto": {
         "dataType": "refAlias",
-        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"transaction":{"ref":"MatchPreviewTransactionDto"},"transactionId":{"dataType":"string"},"receipts":{"dataType":"array","array":{"dataType":"refAlias","ref":"MatchPreviewReceiptDto"},"required":true}},"validators":{}},
+        "type": {"dataType":"nestedObjectLiteral","nestedProperties":{"extraDays":{"dataType":"double"},"transaction":{"ref":"MatchPreviewTransactionDto"},"transactionId":{"dataType":"string"},"receipts":{"dataType":"array","array":{"dataType":"refAlias","ref":"MatchPreviewReceiptDto"},"required":true}},"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "ExtractPreviewResultDto": {
@@ -898,6 +898,7 @@ export function RegisterRoutes(app: Router) {
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsReceiptsController_lookupByReceipt: Record<string, TsoaRoute.ParameterSchema> = {
                 receiptId: {"in":"query","name":"receiptId","required":true,"dataType":"string"},
+                extraDays: {"in":"query","name":"extraDays","dataType":"double"},
         };
         app.get('/api/receipts/lookup-by-receipt',
             ...(fetchMiddlewares<RequestHandler>(ReceiptsController)),
